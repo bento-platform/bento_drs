@@ -1,0 +1,18 @@
+# chord_drs specific
+test.sqlite3
+db.sqlite3
+
+# testing related
+.coverage
+.tox
+
+# IDE stuff
+.idea/workspace.xml
+.idea/dataSources*
+*.swp
+*.swo
+
+# others
+*.pyc
+env
+__pycache__
