@@ -5,6 +5,11 @@ from chord_drs.models import DrsObject
 from config import BASEDIR
 
 
+NON_EXISTENT_DUMMY_FILE = os.path.join(BASEDIR, 'potato')
+DUMMY_FILE = os.path.join(BASEDIR, "README.md")
+DUMMY_DIRECTORY = os.path.join(BASEDIR, "migrations")
+
+
 @pytest.fixture(scope='session')
 def client():
     db.create_all()
@@ -17,7 +22,7 @@ def client():
 
 @pytest.fixture
 def drs_object():
-    drs_object = DrsObject(location=os.path.join(BASEDIR, "README.md"))
+    drs_object = DrsObject(location=DUMMY_FILE)
 
     db.session.add(drs_object)
     db.session.commit()

@@ -3,6 +3,10 @@
 A proof of concept based on GA4GH's DRS specifications. This flask application
 offers an interface to query files in such a fashion: "drs://some-domain/some-ID"
 
+## TODO / Future considerations
+
+ - Currently not checking if a file is already in the repository
+
 ## Environment Variables
 
 None are currently needed (the only one being used currently is by pytest, it is
@@ -22,6 +26,13 @@ Afterwards we need to setup the DB:
 ```bash
 flask db init
 flask db upgrade
+```
+
+Most likely you will want to load some objects to serve through this service.
+This can be done with this command (currently ingestion is not recursive):
+
+```bash
+flask ingest $A_FILE_OR_A_DIRECTORY
 ```
 
 The Flask development server can be run with the following command:
