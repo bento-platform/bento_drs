@@ -1,11 +1,34 @@
+import os
 from flask import abort, jsonify, url_for, request, send_file
 from sqlalchemy.orm.exc import NoResultFound
+from chord_drs import __version__
 from chord_drs.app import app
 from chord_drs.models import DrsObject
 
 
+SERVICE_TYPE = "ca.c3g.chord:drs:{}".format(__version__)
+SERVICE_ID = os.environ.get("SERVICE_ID", SERVICE_TYPE)
+
+
 def create_drs_uri(host: str, object_id: str):
     return f"drs://{host}/{object_id}"
+
+
+@app.route("/service-info", methods=["GET"])
+def service_info():
+    # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
+    return jsonify({
+        "id": SERVICE_ID,
+        "name": "CHORD Data Repository Service",
+        "type": SERVICE_TYPE,
+        "description": "Data repository service (based on GA4GH's specs) for a CHORD application.",
+        "organization": {
+            "name": "C3G",
+            "url": "http://c3g.ca"
+        },
+        "contactUrl": "mailto:simon.chenard2@mcgill.ca",
+        "version": "0.1.0"
+    })
 
 
 @app.route('/objects/<string:object_id>', methods=['GET'])
