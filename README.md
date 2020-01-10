@@ -57,3 +57,7 @@ for multiple versions of Python.
 
 In production, the service should be deployed using a WSGI service like
 [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/).
+
+With uWSGI you should point to chord_drs.app:application, the wsgi.py file
+at the root of the project is there to simplify executing the commands (such
+as "ingest")

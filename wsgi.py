@@ -1,1 +1,1 @@
-from chord_drs.app import app
+from chord_drs.app import application

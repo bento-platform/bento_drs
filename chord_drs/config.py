@@ -1,7 +1,8 @@
 import os
+from pathlib import Path
 
 
-BASEDIR = os.path.abspath(os.path.dirname(__file__))
+BASEDIR = Path(__file__).resolve().parents[1]
 TESTING = 'CHORD_DRS_TESTING' in os.environ
 
 if TESTING:

@@ -2,7 +2,7 @@ import os
 from flask import abort, jsonify, url_for, request, send_file
 from sqlalchemy.orm.exc import NoResultFound
 from chord_drs import __version__
-from chord_drs.app import app
+from chord_drs.app import application
 from chord_drs.models import DrsObject
 
 
@@ -14,7 +14,7 @@ def create_drs_uri(host: str, object_id: str):
     return f"drs://{host}/{object_id}"
 
 
-@app.route("/service-info", methods=["GET"])
+@application.route("/service-info", methods=["GET"])
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
     return jsonify({
@@ -31,7 +31,7 @@ def service_info():
     })
 
 
-@app.route('/objects/<string:object_id>', methods=['GET'])
+@application.route('/objects/<string:object_id>', methods=['GET'])
 def object_info(object_id):
     try:
         drs_object = DrsObject.query.filter_by(id=object_id).one()
@@ -58,7 +58,7 @@ def object_info(object_id):
     return jsonify(response)
 
 
-@app.route('/objects/<string:object_id>/download', methods=['GET'])
+@application.route('/objects/<string:object_id>/download', methods=['GET'])
 def object_download(object_id):
     try:
         drs_object = DrsObject.query.filter_by(id=object_id).one()

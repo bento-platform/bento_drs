@@ -1,7 +1,7 @@
 import os
 import click
 from click import ClickException
-from chord_drs.app import app, db
+from chord_drs.app import application, db
 from chord_drs.models import DrsObject
 
 
@@ -14,7 +14,7 @@ def create_drs_object(location):
     print(f"Created a new object, filename: {drs_object.location} ID : {drs_object.id}")
 
 
-@app.cli.command("ingest")
+@application.cli.command("ingest")
 @click.argument("source")
 def ingest(source):
     """

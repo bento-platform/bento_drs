@@ -1,8 +1,8 @@
 import os
 import pytest
-from chord_drs.app import app, db
+from chord_drs.app import application, db
 from chord_drs.models import DrsObject
-from config import BASEDIR
+from chord_drs.config import BASEDIR
 
 
 NON_EXISTENT_DUMMY_FILE = os.path.join(BASEDIR, 'potato')
@@ -14,7 +14,7 @@ DUMMY_DIRECTORY = os.path.join(BASEDIR, "migrations")
 def client():
     db.create_all()
 
-    yield app.test_client()
+    yield application.test_client()
 
     db.session.remove()
     db.drop_all()
