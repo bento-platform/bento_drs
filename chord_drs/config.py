@@ -2,10 +2,13 @@ import os
 from pathlib import Path
 
 
-BASEDIR = Path(__file__).resolve().parents[1]
-TESTING = 'CHORD_DRS_TESTING' in os.environ
+if "DATABASE" in os.environ:
+    # when deployed inside chord_singularity
+    BASEDIR = os.environ["DATABASE"]
+else:
+    BASEDIR = Path(__file__).resolve().parents[1]
 
-if TESTING:
+if 'CHORD_DRS_TESTING' in os.environ:
     DB_NAME = 'test.sqlite3'
 else:
     DB_NAME = 'db.sqlite3'
