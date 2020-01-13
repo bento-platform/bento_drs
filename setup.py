@@ -27,6 +27,11 @@ setuptools.setup(
 
     packages=["chord_drs"],
     include_package_data=True,
+    entry_points={
+        'console_scripts': [
+            'ingest=chord_drs.commands:ingest'
+        ],
+    },
 
     url="https://github.com/c3g/chord_drs",
     license="LGPLv3",
