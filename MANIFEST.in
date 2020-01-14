@@ -1,0 +1,1 @@
+recursive-include chord_drs/migrations *
