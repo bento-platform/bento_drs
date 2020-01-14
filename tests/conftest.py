@@ -2,12 +2,12 @@ import os
 import pytest
 from chord_drs.app import application, db
 from chord_drs.models import DrsObject
-from chord_drs.config import BASEDIR
+from chord_drs.config import BASEDIR, APP_DIR
 
 
 NON_EXISTENT_DUMMY_FILE = os.path.join(BASEDIR, 'potato')
 DUMMY_FILE = os.path.join(BASEDIR, "README.md")
-DUMMY_DIRECTORY = os.path.join(BASEDIR, "migrations")
+DUMMY_DIRECTORY = os.path.join(APP_DIR, "migrations")
 
 
 @pytest.fixture(scope='session')

@@ -24,7 +24,6 @@ pip install -r requirements.txt
 Afterwards we need to setup the DB:
 
 ```bash
-flask db init
 flask db upgrade
 ```
 
