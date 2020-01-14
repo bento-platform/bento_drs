@@ -12,9 +12,9 @@ setuptools.setup(
     python_requires=">=3.6",
     install_requires=[
         "chord_lib @ git+https://github.com/c3g/chord_lib",
-        "Flask", 
-        "SQLAlchemy", 
-        "Flask-SQLAlchemy", 
+        "Flask",
+        "SQLAlchemy",
+        "Flask-SQLAlchemy",
         "Flask-Migrate"
     ],
 
@@ -37,7 +37,7 @@ setuptools.setup(
     license="LGPLv3",
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
         "Operating System :: OS Independent"
     ]
 )
