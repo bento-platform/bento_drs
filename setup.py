@@ -11,11 +11,11 @@ setuptools.setup(
 
     python_requires=">=3.6",
     install_requires=[
-        "chord_lib @ git+https://github.com/c3g/chord_lib",
-        "Flask",
-        "SQLAlchemy",
-        "Flask-SQLAlchemy",
-        "Flask-Migrate"
+        "chord_lib[flask]==0.1.0",
+        "Flask>=1.1,<2.0",
+        "SQLAlchemy>=1.3,<1.4",
+        "Flask-SQLAlchemy>=2.4,<3.0",
+        "Flask-Migrate>=2.5,<3.0"
     ],
 
     author="Simon Chénard",
