@@ -2,7 +2,6 @@ alembic==1.3.2
 attrs==19.3.0
 certifi==2019.11.28
 chardet==3.0.4
-chord-drs==0.1.0
 chord-lib==0.1.0
 Click==7.0
 codecov==2.0.15
