@@ -1,5 +1,8 @@
 # CHORD Data Repository Service
 
+![Build Status](https://api.travis-ci.org/c3g/chord_drs.svg?branch=master)
+[![codecov](https://codecov.io/gh/c3g/chord_drs/branch/master/graph/badge.svg)](https://codecov.io/gh/c3g/chord_drs)
+
 A proof of concept based on GA4GH's DRS specifications. This flask application
 offers an interface to query files in such a fashion: "drs://some-domain/some-ID"
 
