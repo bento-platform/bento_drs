@@ -1,6 +1,6 @@
 # CHORD Data Repository Service
 
-![Build Status](https://api.travis-ci.org/c3g/chord_drs.svg?branch=master)
+![Build Status](https://api.travis-ci.com/c3g/chord_drs.svg?branch=master)
 [![codecov](https://codecov.io/gh/c3g/chord_drs/branch/master/graph/badge.svg)](https://codecov.io/gh/c3g/chord_drs)
 
 A proof of concept based on GA4GH's DRS specifications. This flask application
