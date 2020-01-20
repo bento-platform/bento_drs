@@ -3,8 +3,9 @@
 ![Build Status](https://api.travis-ci.com/c3g/chord_drs.svg?branch=master)
 [![codecov](https://codecov.io/gh/c3g/chord_drs/branch/master/graph/badge.svg)](https://codecov.io/gh/c3g/chord_drs)
 
-A proof of concept based on GA4GH's DRS specifications. This flask application
-offers an interface to query files in such a fashion: "drs://some-domain/some-ID"
+A proof of concept based on [GA4GH's DRS specifications](https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-1.0.0/docs/).
+This flask application offers an interface to query files in such 
+a fashion: "drs://some-domain/some-ID".
 
 ## TODO / Future considerations
 
