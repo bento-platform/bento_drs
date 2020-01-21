@@ -3,15 +3,68 @@ from flask import abort, jsonify, url_for, request, send_file
 from sqlalchemy.orm.exc import NoResultFound
 from chord_drs import __version__
 from chord_drs.app import application
-from chord_drs.models import DrsObject
+from chord_drs.models import DrsObject, DrsBundle
 
 
 SERVICE_TYPE = "ca.c3g.chord:drs:{}".format(__version__)
 SERVICE_ID = os.environ.get("SERVICE_ID", SERVICE_TYPE)
 
 
-def create_drs_uri(host: str, object_id: str):
+def create_drs_uri(host: str, object_id: str) -> str:
     return f"drs://{host}/{object_id}"
+
+
+def build_bundle_json(drs_bundle: DrsBundle) -> str:
+    content = []
+    bundles = DrsBundle.query.filter_by(parent_bundle=drs_bundle).all()
+
+    for bundle in bundles:
+        obj_json = build_bundle_json(bundle)
+        content.append(obj_json)
+
+    for child in drs_bundle.objects:
+        obj_json = build_object_json(child)
+        content.append(obj_json)
+
+    response = {
+        "contents": {
+            "contents": content,
+            "name": drs_bundle.name
+        },
+        "checksums": {
+            "checksum": drs_bundle.checksum,
+            "type": "sha-256"
+        },
+        "created_time": f"{drs_bundle.created.isoformat('T')}Z",
+        "size": drs_bundle.size,
+        "description": drs_bundle.description,
+        "id": drs_bundle.id,
+        "self_uri": create_drs_uri(request.host, drs_bundle.id)
+    }
+
+    return response
+
+
+def build_object_json(drs_object: DrsObject) -> str:
+    response = {
+        "access_methods": {
+            "access_url": {
+                "url": url_for('object_download', object_id=drs_object.id, _external=True)
+            },
+            "type": "https"
+        },
+        "checksums": {
+            "checksum": drs_object.checksum,
+            "type": "sha-256"
+        },
+        "created_time": f"{drs_object.created.isoformat('T')}Z",
+        "size": drs_object.size,
+        "description": drs_object.description,
+        "id": drs_object.id,
+        "self_uri": create_drs_uri(request.host, drs_object.id)
+    }
+
+    return response
 
 
 @application.route("/service-info", methods=["GET"])
@@ -33,27 +86,16 @@ def service_info():
 
 @application.route('/objects/<string:object_id>', methods=['GET'])
 def object_info(object_id):
-    try:
-        drs_object = DrsObject.query.filter_by(id=object_id).one()
-    except NoResultFound:
+    drs_object = DrsObject.query.filter_by(id=object_id).first()
+    drs_bundle = DrsBundle.query.filter_by(id=object_id).first()
+
+    if not drs_object and not drs_bundle:
         return abort(404)
 
-    response = {
-        "access_methods": {
-            "access_url": {
-                "url": url_for('object_download', object_id=drs_object.id, _external=True)
-            },
-            "type": "https"
-        },
-        "checksums": {
-            "checksum": drs_object.checksum,
-            "type": "sha-256"
-        },
-        "created_time": f"{drs_object.created.isoformat('T')}Z",
-        "size": drs_object.size,
-        "id": drs_object.id,
-        "self_uri": create_drs_uri(request.host, drs_object.id)
-    }
+    if drs_bundle:
+        response = build_bundle_json(drs_bundle)
+    else:
+        response = build_object_json(drs_object)
 
     return jsonify(response)
 

@@ -3,6 +3,7 @@ import pytest
 from chord_drs.app import application, db
 from chord_drs.models import DrsObject
 from chord_drs.config import BASEDIR, APP_DIR
+from chord_drs.commands import create_drs_bundle
 
 
 NON_EXISTENT_DUMMY_FILE = os.path.join(BASEDIR, 'potato')
@@ -28,3 +29,12 @@ def drs_object():
     db.session.commit()
 
     yield drs_object
+
+
+@pytest.fixture
+def drs_bundle():
+    bundle = create_drs_bundle(DUMMY_DIRECTORY)
+
+    db.session.commit()
+
+    yield bundle

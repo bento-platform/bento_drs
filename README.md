@@ -32,7 +32,7 @@ flask db upgrade
 ```
 
 Most likely you will want to load some objects to serve through this service.
-This can be done with this command (currently ingestion is not recursive):
+This can be done with this command (ingestion is recursive for directories):
 
 ```bash
 flask ingest $A_FILE_OR_A_DIRECTORY

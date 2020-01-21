@@ -25,3 +25,4 @@ def test_ingest(client):
 
     assert result.exit_code == 0
     assert "Created a new object" in result.output
+    assert result.output.count("Created a new bundle") == 4
