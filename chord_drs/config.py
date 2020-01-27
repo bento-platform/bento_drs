@@ -10,12 +10,8 @@ if "DATABASE" in os.environ:
 else:
     BASEDIR = APP_DIR.parent
 
-if 'CHORD_DRS_TESTING' in os.environ:
-    DB_NAME = 'test.sqlite3'
-else:
-    DB_NAME = 'db.sqlite3'
 
-
-class Config(object):
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(BASEDIR, DB_NAME)
+class Config():
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(BASEDIR, "db.sqlite3")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    DATA = Path(os.environ.get("DATA", os.path.join(Path.home(), "chord_drs_data"))).resolve()

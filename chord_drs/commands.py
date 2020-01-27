@@ -48,6 +48,7 @@ def ingest(source: str):
 
     Should we go through the directories recursively?
     """
+    # TODO: ingestion for remote files or archives
     if os.path.exists(source):
         source = os.path.abspath(source)
 

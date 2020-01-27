@@ -3,7 +3,7 @@ from uuid import uuid4
 from hashlib import sha256
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from chord_drs.app import db
+from chord_drs.app import application, db
 
 
 class DrsMixin():
@@ -54,6 +54,15 @@ class DrsObject(db.Model, DrsMixin):
         location = kwargs.get('location', None)
 
         if os.path.exists(location):
+            try:
+                current_location = application.config["BACKEND"].save(location)
+            except Exception:
+                # TODO: implement more specific exception handling
+                raise Exception("Well if the file is not saved... we can't do squat")
+
+            self.location = current_location
+            del kwargs["location"]
+
             hash_obj = sha256()
             self.size = os.path.getsize(location)
 

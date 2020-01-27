@@ -14,4 +14,4 @@ db = SQLAlchemy(application)
 migrate = Migrate(application, db, directory=MIGRATION_DIR)
 
 
-from chord_drs import routes, models, commands  # noqa: E402,F401
+from chord_drs import routes, models, commands, backends  # noqa: E402,F401
