@@ -25,4 +25,9 @@ def test_ingest(client):
 
     assert result.exit_code == 0
     assert "Created a new object" in result.output
-    assert result.output.count("Created a new bundle") == 4
+    # TODO: kinda clunky, to refactor at some point
+    # 2 inside travis-si, no __pycache__ folders
+    assert (
+        result.output.count("Created a new bundle") == 4 or
+        result.output.count("Created a new bundle") == 2
+    )
