@@ -62,6 +62,7 @@ class DrsObject(db.Model, DrsMixin):
                 raise Exception("Well if the file is not saved... we can't do squat")
 
             self.location = current_location
+            self.name = current_location.split('/')[-1]
             del kwargs["location"]
 
             hash_obj = sha256()

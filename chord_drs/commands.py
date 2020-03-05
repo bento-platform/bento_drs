@@ -1,6 +1,8 @@
+import logging
 import os
 from typing import Optional
 import click
+from flask import current_app
 from flask.cli import with_appcontext
 from click import ClickException
 from chord_drs.app import db
@@ -24,7 +26,7 @@ def create_drs_bundle(location: str, parent: Optional[DrsBundle] = None) -> DrsB
     bundle.update_checksum_and_size()
     db.session.add(bundle)
 
-    print(f"Created a new bundle, name: {bundle.name}, ID : {bundle.id}, size: {bundle.size}")
+    current_app.logger.info(f"Created a new bundle, name: {bundle.name}, ID : {bundle.id}, size: {bundle.size}")
 
     return bundle
 
@@ -37,7 +39,7 @@ def create_drs_object(location: str, parent: Optional[DrsBundle] = None):
 
     db.session.add(drs_object)
 
-    print(f"Created a new object, filename: {drs_object.location} ID : {drs_object.id}")
+    current_app.logger.info(f"Created a new object, filename: {drs_object.location} ID : {drs_object.id}")
 
 
 @click.command("ingest")
@@ -50,6 +52,7 @@ def ingest(source: str):
 
     Should we go through the directories recursively?
     """
+    current_app.logger.setLevel(logging.INFO)
     # TODO: ingestion for remote files or archives
     if os.path.exists(source):
         source = os.path.abspath(source)
