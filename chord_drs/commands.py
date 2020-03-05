@@ -1,8 +1,9 @@
 import os
 from typing import Optional
 import click
+from flask.cli import with_appcontext
 from click import ClickException
-from chord_drs.app import application, db
+from chord_drs.app import db
 from chord_drs.models import DrsObject, DrsBundle
 
 
@@ -39,8 +40,9 @@ def create_drs_object(location: str, parent: Optional[DrsBundle] = None):
     print(f"Created a new object, filename: {drs_object.location} ID : {drs_object.id}")
 
 
-@application.cli.command("ingest")
+@click.command("ingest")
 @click.argument("source")
+@with_appcontext
 def ingest(source: str):
     """
     When provided with a file or a directory, this command will add these

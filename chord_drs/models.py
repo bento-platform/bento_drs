@@ -1,9 +1,10 @@
 import os
 from uuid import uuid4
 from hashlib import sha256
+from flask import current_app
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from chord_drs.app import application, db
+from chord_drs.app import db
 
 
 class DrsMixin():
@@ -55,7 +56,7 @@ class DrsObject(db.Model, DrsMixin):
 
         if os.path.exists(location):
             try:
-                current_location = application.config["BACKEND"].save(location)
+                current_location = current_app.config["BACKEND"].save(location)
             except Exception:
                 # TODO: implement more specific exception handling
                 raise Exception("Well if the file is not saved... we can't do squat")

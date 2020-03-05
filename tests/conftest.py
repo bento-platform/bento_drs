@@ -20,13 +20,16 @@ def client():
 
     db.create_all()
 
+    ctx = application.app_context()
+    ctx.push()
+
     yield application.test_client()
 
     db.session.remove()
     db.drop_all()
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def drs_object():
     drs_object = DrsObject(location=DUMMY_FILE)
 
@@ -36,7 +39,7 @@ def drs_object():
     yield drs_object
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def drs_bundle():
     bundle = create_drs_bundle(DUMMY_DIRECTORY)
 

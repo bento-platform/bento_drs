@@ -1,13 +1,14 @@
 import os
-from flask import abort, jsonify, url_for, request, send_file
+from flask import Blueprint, abort, jsonify, url_for, request, send_file
 from sqlalchemy.orm.exc import NoResultFound
 from chord_drs import __version__
-from chord_drs.app import application
 from chord_drs.models import DrsObject, DrsBundle
 
 
 SERVICE_TYPE = "ca.c3g.chord:drs:{}".format(__version__)
 SERVICE_ID = os.environ.get("SERVICE_ID", SERVICE_TYPE)
+
+drs_service = Blueprint("drs_service", __name__)
 
 
 def create_drs_uri(host: str, object_id: str) -> str:
@@ -49,7 +50,7 @@ def build_object_json(drs_object: DrsObject) -> str:
     response = {
         "access_methods": {
             "access_url": {
-                "url": url_for('object_download', object_id=drs_object.id, _external=True)
+                "url": url_for('drs_service.object_download', object_id=drs_object.id, _external=True)
             },
             "type": "https"
         },
@@ -67,7 +68,7 @@ def build_object_json(drs_object: DrsObject) -> str:
     return response
 
 
-@application.route("/service-info", methods=["GET"])
+@drs_service.route("/service-info", methods=["GET"])
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
     return jsonify({
@@ -84,7 +85,7 @@ def service_info():
     })
 
 
-@application.route('/objects/<string:object_id>', methods=['GET'])
+@drs_service.route('/objects/<string:object_id>', methods=['GET'])
 def object_info(object_id):
     drs_object = DrsObject.query.filter_by(id=object_id).first()
     drs_bundle = DrsBundle.query.filter_by(id=object_id).first()
@@ -100,7 +101,7 @@ def object_info(object_id):
     return jsonify(response)
 
 
-@application.route('/objects/<string:object_id>/download', methods=['GET'])
+@drs_service.route('/objects/<string:object_id>/download', methods=['GET'])
 def object_download(object_id):
     try:
         drs_object = DrsObject.query.filter_by(id=object_id).one()
