@@ -1,5 +1,6 @@
 from click.testing import CliRunner
 from chord_drs.commands import ingest
+from chord_drs.models import DrsObject, DrsBundle
 from tests.conftest import (
     NON_EXISTENT_DUMMY_FILE,
     DUMMY_FILE,
@@ -18,16 +19,16 @@ def test_ingest(client):
     runner = CliRunner()
     result = runner.invoke(ingest, [DUMMY_FILE])
 
+    filename = DUMMY_FILE.split('/')[-1]
+    obj = DrsObject.query.filter_by(name=filename).first()
+
     assert result.exit_code == 0
-    assert "Created a new object" in result.output
+    assert obj.location == DUMMY_FILE
 
     result = runner.invoke(ingest, [DUMMY_DIRECTORY])
 
+    filename = DUMMY_DIRECTORY.split('/')[-1]
+    bundle = DrsBundle.query.filter_by(name=filename).first()
+
     assert result.exit_code == 0
-    assert "Created a new object" in result.output
-    # TODO: kinda clunky, to refactor at some point
-    # 2 inside travis-si, no __pycache__ folders
-    assert (
-        result.output.count("Created a new bundle") == 4 or
-        result.output.count("Created a new bundle") == 2
-    )
+    assert len(bundle.objects) > 0

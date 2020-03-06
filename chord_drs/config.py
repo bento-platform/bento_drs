@@ -11,7 +11,7 @@ else:
     BASEDIR = APP_DIR.parent
 
 
-class Config():
+class Config:
     SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(BASEDIR, "db.sqlite3")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DATA = Path(os.environ.get("DATA", os.path.join(Path.home(), "chord_drs_data"))).resolve()
