@@ -41,6 +41,8 @@ def create_drs_object(location: str, parent: Optional[DrsBundle] = None):
 
     current_app.logger.info(f"Created a new object, filename: {drs_object.location} ID : {drs_object.id}")
 
+    return drs_object
+
 
 @click.command("ingest")
 @click.argument("source")

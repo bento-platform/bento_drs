@@ -2,6 +2,7 @@ import os
 from flask import Blueprint, abort, jsonify, url_for, request, send_file
 from sqlalchemy.orm.exc import NoResultFound
 from chord_drs import __version__
+from chord_drs.app import db
 from chord_drs.models import DrsObject, DrsBundle
 
 
@@ -109,3 +110,24 @@ def object_download(object_id):
         return abort(404)
 
     return send_file(drs_object.location)
+
+
+@drs_service.route('/ingest', methods=['POST'])
+def object_ingest():
+    try:
+        data = request.json
+        obj_path = data['path']
+    except Exception:
+        raise abort(400)
+
+    try:
+        new_object = DrsObject(location=obj_path)
+
+        db.session.add(new_object)
+        db.session.commit()
+    except Exception:
+        raise abort(400)
+
+    response = build_object_json(new_object)
+
+    return response, 201

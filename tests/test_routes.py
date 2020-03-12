@@ -1,8 +1,24 @@
 import chord_lib
 from jsonschema import validate
+from tests.conftest import NON_EXISTENT_DUMMY_FILE, DUMMY_FILE
 
 
 NON_EXISTENT_ID = '123'
+
+
+def validate_object_fields(data, existing_id=None):
+    assert "contents" not in data
+    assert "access_methods" in data
+    assert "access_url" in data["access_methods"]
+    assert "url" in data["access_methods"]["access_url"]
+
+    assert "checksums" in data
+    assert "created_time" in data
+    assert "size" in data
+    assert "self_uri" in data
+
+    if existing_id:
+        assert "id" in data and data["id"] == existing_id
 
 
 def test_service_info(client):
@@ -29,16 +45,7 @@ def test_object_and_download(client, drs_object):
     data = res.get_json()
 
     assert res.status_code == 200
-    assert "contents" not in data
-    assert "access_methods" in data
-    assert "access_url" in data["access_methods"]
-    assert "url" in data["access_methods"]["access_url"]
-
-    assert "checksums" in data
-    assert "created_time" in data
-    assert "size" in data
-    assert "id" in data and data["id"] == drs_object.id
-    assert "self_uri" in data
+    validate_object_fields(data, existing_id=drs_object.id)
 
     # Download the object
     res = client.get(data["access_methods"]["access_url"]["url"])
@@ -71,3 +78,21 @@ def test_bundle_and_download(client, drs_bundle):
 
     assert res.status_code == 200
     assert res.content_length == obj["size"]
+
+
+def test_object_ingest_fail(client):
+    res = client.post('/ingest', json={'wrong_arg': 'some_path'})
+
+    assert res.status_code == 400
+
+    res = client.post('/ingest', json={'path': NON_EXISTENT_DUMMY_FILE})
+
+    assert res.status_code == 400
+
+
+def test_object_ingest(client):
+    res = client.post('/ingest', json={'path': DUMMY_FILE})
+    data = res.get_json()
+
+    assert res.status_code == 201
+    validate_object_fields(data)
