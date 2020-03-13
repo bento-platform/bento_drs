@@ -9,8 +9,9 @@ NON_EXISTENT_ID = '123'
 def validate_object_fields(data, existing_id=None):
     assert "contents" not in data
     assert "access_methods" in data
-    assert "access_url" in data["access_methods"]
-    assert "url" in data["access_methods"]["access_url"]
+    assert len(data["access_methods"]) == 1
+    assert "access_url" in data["access_methods"][0]
+    assert "url" in data["access_methods"][0]["access_url"]
 
     assert "checksums" in data
     assert "created_time" in data
@@ -48,10 +49,18 @@ def test_object_and_download(client, drs_object):
     validate_object_fields(data, existing_id=drs_object.id)
 
     # Download the object
-    res = client.get(data["access_methods"]["access_url"]["url"])
+    res = client.get(data["access_methods"][0]["access_url"]["url"])
 
     assert res.status_code == 200
     assert res.content_length == drs_object.size
+
+
+def test_object_inside_bento(client, drs_object):
+    res = client.get(f'/objects/{drs_object.id}', headers={'X-User': 'potato'})
+    data = res.get_json()
+
+    assert res.status_code == 200
+    assert len(data["access_methods"]) == 2
 
 
 def test_bundle_and_download(client, drs_bundle):
@@ -74,7 +83,7 @@ def test_bundle_and_download(client, drs_bundle):
     # an object and not a bundle
     obj = data["contents"]["contents"][-1]
 
-    res = client.get(obj["access_methods"]["access_url"]["url"])
+    res = client.get(obj["access_methods"][0]["access_url"]["url"])
 
     assert res.status_code == 200
     assert res.content_length == obj["size"]
