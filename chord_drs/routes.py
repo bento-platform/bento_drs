@@ -136,19 +136,19 @@ def object_download(object_id):
 
 @drs_service.route('/ingest', methods=['POST'])
 def object_ingest():
-    #try:
-    data = request.json
-    obj_path = data['path']
-    #except Exception:
-    #    raise abort(400)
+    try:
+        data = request.json
+        obj_path = data['path']
+    except Exception:
+        raise abort(400, description="Missing path parameter in JSON request")
 
-    #try:
-    new_object = DrsObject(location=obj_path)
+    try:
+        new_object = DrsObject(location=obj_path)
 
-    db.session.add(new_object)
-    db.session.commit()
-    #except Exception:
-    #    raise abort(400)
+        db.session.add(new_object)
+        db.session.commit()
+    except Exception:
+        raise abort(400, description="Error while creating the object")
 
     response = build_object_json(new_object)
 
