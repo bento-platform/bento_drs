@@ -61,7 +61,7 @@ def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = 
             default_access_method,
             {
                 "access_url": {
-                    "url": drs_object.location
+                    "url": f"file://{drs_object.location}"
                 },
                 "type": "file"
             }
