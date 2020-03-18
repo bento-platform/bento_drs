@@ -111,10 +111,7 @@ def object_info(object_id):
         return abort(404)
 
     # Are we inside the bento singularity container? if so, provide local accessmethod
-    if request.headers.get('X-User'):
-        inside_container = True
-    else:
-        inside_container = False
+    inside_container = bool(request.headers.get('X-CHORD-Internal', False))
 
     if drs_bundle:
         response = build_bundle_json(drs_bundle, inside_container=inside_container)

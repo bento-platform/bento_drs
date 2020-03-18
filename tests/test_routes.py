@@ -56,7 +56,7 @@ def test_object_and_download(client, drs_object):
 
 
 def test_object_inside_bento(client, drs_object):
-    res = client.get(f'/objects/{drs_object.id}', headers={'X-User': 'potato'})
+    res = client.get(f'/objects/{drs_object.id}', headers={'X-CHORD-Internal': '1'})
     data = res.get_json()
 
     assert res.status_code == 200
