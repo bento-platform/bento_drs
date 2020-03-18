@@ -1,7 +1,9 @@
 import os
+from typing import Optional
 from flask import Blueprint, abort, jsonify, url_for, request, send_file
 from sqlalchemy.orm.exc import NoResultFound
 from chord_drs import __version__
+from chord_drs.app import db
 from chord_drs.models import DrsObject, DrsBundle
 
 
@@ -15,16 +17,16 @@ def create_drs_uri(host: str, object_id: str) -> str:
     return f"drs://{host}/{object_id}"
 
 
-def build_bundle_json(drs_bundle: DrsBundle) -> str:
+def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = False) -> str:
     content = []
     bundles = DrsBundle.query.filter_by(parent_bundle=drs_bundle).all()
 
     for bundle in bundles:
-        obj_json = build_bundle_json(bundle)
+        obj_json = build_bundle_json(bundle, inside_container=inside_container)
         content.append(obj_json)
 
     for child in drs_bundle.objects:
-        obj_json = build_object_json(child)
+        obj_json = build_object_json(child, inside_container=inside_container)
         content.append(obj_json)
 
     response = {
@@ -46,14 +48,29 @@ def build_bundle_json(drs_bundle: DrsBundle) -> str:
     return response
 
 
-def build_object_json(drs_object: DrsObject) -> str:
-    response = {
-        "access_methods": {
-            "access_url": {
-                "url": url_for('drs_service.object_download', object_id=drs_object.id, _external=True)
-            },
-            "type": "https"
+def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = False) -> str:
+    default_access_method = {
+        "access_url": {
+            "url": url_for('drs_service.object_download', object_id=drs_object.id, _external=True)
         },
+        "type": "https"
+    }
+
+    if inside_container:
+        access_methods = [
+            default_access_method,
+            {
+                "access_url": {
+                    "url": f"file://{drs_object.location}"
+                },
+                "type": "file"
+            }
+        ]
+    else:
+        access_methods = [default_access_method]
+
+    response = {
+        "access_methods": access_methods,
         "checksums": {
             "checksum": drs_object.checksum,
             "type": "sha-256"
@@ -93,10 +110,13 @@ def object_info(object_id):
     if not drs_object and not drs_bundle:
         return abort(404)
 
+    # Are we inside the bento singularity container? if so, provide local accessmethod
+    inside_container = bool(request.headers.get('X-CHORD-Internal', False))
+
     if drs_bundle:
-        response = build_bundle_json(drs_bundle)
+        response = build_bundle_json(drs_bundle, inside_container=inside_container)
     else:
-        response = build_object_json(drs_object)
+        response = build_object_json(drs_object, inside_container=inside_container)
 
     return jsonify(response)
 
@@ -109,3 +129,24 @@ def object_download(object_id):
         return abort(404)
 
     return send_file(drs_object.location)
+
+
+@drs_service.route('/ingest', methods=['POST'])
+def object_ingest():
+    try:
+        data = request.json
+        obj_path = data['path']
+    except Exception:
+        raise abort(400, description="Missing path parameter in JSON request")
+
+    try:
+        new_object = DrsObject(location=obj_path)
+
+        db.session.add(new_object)
+        db.session.commit()
+    except Exception:
+        raise abort(400, description="Error while creating the object")
+
+    response = build_object_json(new_object)
+
+    return response, 201

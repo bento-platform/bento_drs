@@ -73,6 +73,9 @@ class DrsObject(db.Model, DrsMixin):
                     hash_obj.update(chunk)
 
             self.checksum = hash_obj.hexdigest()
+        else:
+            # TODO: we will need to account for URLs at some point
+            raise Exception("Provided file path does not exists")
 
         self.id = str(uuid4())
         super().__init__(*args, **kwargs)
