@@ -89,6 +89,30 @@ def test_bundle_and_download(client, drs_bundle):
     assert res.content_length == obj["size"]
 
 
+def test_search_object_empty(client, drs_bundle):
+    res = client.get('/search')
+    data = res.get_json()
+
+    assert res.status_code == 200
+    assert len(data) == 0
+
+    res = client.get('/search?name=asd')
+    data = res.get_json()
+
+    assert res.status_code == 200
+    assert len(data) == 0
+
+
+def test_search_object(client, drs_bundle):
+    res = client.get('/search?name=alembic.ini')
+    data = res.get_json()
+
+    assert res.status_code == 200
+    assert len(data) == 1
+
+    validate_object_fields(data[0])
+
+
 def test_object_ingest_fail(client):
     res = client.post('/ingest', json={'wrong_arg': 'some_path'})
 

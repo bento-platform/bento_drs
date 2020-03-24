@@ -77,6 +77,7 @@ def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = 
         },
         "created_time": f"{drs_object.created.isoformat('T')}Z",
         "size": drs_object.size,
+        "name": drs_object.name,
         "description": drs_object.description,
         "id": drs_object.id,
         "self_uri": create_drs_uri(request.host, drs_object.id)
@@ -117,6 +118,20 @@ def object_info(object_id):
         response = build_bundle_json(drs_bundle, inside_container=inside_container)
     else:
         response = build_object_json(drs_object, inside_container=inside_container)
+
+    return jsonify(response)
+
+
+@drs_service.route('/search', methods=['GET'])
+def object_search():
+    response = []
+    name = request.args.get('name', None)
+
+    if name:
+        objects = DrsObject.query.filter_by(name=name).all()
+
+        for obj in objects:
+            response.append(build_object_json(obj))
 
     return jsonify(response)
 
