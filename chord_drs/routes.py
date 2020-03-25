@@ -2,6 +2,7 @@ import os
 import re
 import sys
 
+from chord_lib.responses import flask_errors
 from flask import Blueprint, abort, current_app, jsonify, url_for, request, send_file
 from sqlalchemy.orm.exc import NoResultFound
 from typing import Optional
@@ -157,7 +158,7 @@ def object_ingest():
         data = request.json
         obj_path = data['path']
     except KeyError:
-        raise abort(400, description="Missing path parameter in JSON request")
+        return flask_errors.flask_bad_request_error("Missing path parameter in JSON request")
 
     try:
         new_object = DrsObject(location=obj_path)
@@ -166,7 +167,7 @@ def object_ingest():
         db.session.commit()
     except Exception as e:  # TODO: More specific handling
         print(f"[{SERVICE_NAME}] Encountered exception during ingest: {e}", flush=True, file=sys.stderr)
-        raise abort(400, description="Error while creating the object")
+        return flask_errors.flask_bad_request_error("Error while creating the object")
 
     response = build_object_json(new_object)
 
