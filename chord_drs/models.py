@@ -7,7 +7,7 @@ from sqlalchemy.orm import relationship
 from chord_drs.app import db
 
 
-class DrsMixin():
+class DrsMixin:
     # TODO: tried refactoring the id inside this mixin except
     # sqlalchemy is confused when using DrsMixin.id for remote_side below
     created = db.Column(db.DateTime, server_default=func.now())

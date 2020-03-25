@@ -33,7 +33,7 @@ def create_drs_uri(object_id: str) -> str:
     return f"drs://{get_drs_base_path()}/{object_id}"
 
 
-def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = False) -> str:
+def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = False) -> dict:
     content = []
     bundles = DrsBundle.query.filter_by(parent_bundle=drs_bundle).all()
 
@@ -64,7 +64,7 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = 
     return response
 
 
-def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = False) -> str:
+def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = False) -> dict:
     default_access_method = {
         "access_url": {
             "url": url_for('drs_service.object_download', object_id=drs_object.id, _external=True)
