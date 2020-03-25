@@ -4,15 +4,14 @@ from flask import Blueprint, abort, current_app, jsonify, url_for, request, send
 from sqlalchemy.orm.exc import NoResultFound
 from typing import Optional
 from urllib.parse import urljoin, urlparse
-from chord_drs import __version__
 from chord_drs.app import db
+from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
 from chord_drs.models import DrsObject, DrsBundle
 
 
 RE_STARTING_SLASH = re.compile(r"^/")
 
 
-SERVICE_TYPE = "ca.c3g.chord:drs:{}".format(__version__)
 SERVICE_ID = os.environ.get("SERVICE_ID", SERVICE_TYPE)
 
 drs_service = Blueprint("drs_service", __name__)
@@ -108,7 +107,7 @@ def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
     return jsonify({
         "id": SERVICE_ID,
-        "name": "CHORD Data Repository Service",
+        "name": SERVICE_NAME,
         "type": SERVICE_TYPE,
         "description": "Data repository service (based on GA4GH's specs) for a CHORD application.",
         "organization": {
