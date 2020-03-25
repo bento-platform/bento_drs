@@ -65,6 +65,8 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = 
 
 
 def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = False) -> dict:
+    # TODO: This access type is wrong in the case of http (non-secure)
+
     default_access_method = {
         "access_url": {
             "url": url_for('drs_service.object_download', object_id=drs_object.id, _external=True)
