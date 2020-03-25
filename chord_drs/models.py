@@ -1,10 +1,14 @@
 import os
-from uuid import uuid4
+import sys
+
 from hashlib import sha256
 from flask import current_app
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from uuid import uuid4
+
 from chord_drs.app import db
+from chord_drs.constants import SERVICE_NAME
 
 
 class DrsMixin:
@@ -54,28 +58,30 @@ class DrsObject(db.Model, DrsMixin):
     def __init__(self, *args, **kwargs):
         location = kwargs.get('location', None)
 
-        if os.path.exists(location):
-            try:
-                current_location = current_app.config["BACKEND"].save(location)
-            except Exception:
-                # TODO: implement more specific exception handling
-                raise Exception("Well if the file is not saved... we can't do squat")
-
-            self.location = current_location
-            self.name = current_location.split('/')[-1]
-            del kwargs["location"]
-
-            hash_obj = sha256()
-            self.size = os.path.getsize(location)
-
-            with open(location, 'rb') as f:
-                for chunk in iter(lambda: f.read(4096), b""):
-                    hash_obj.update(chunk)
-
-            self.checksum = hash_obj.hexdigest()
-        else:
+        if not os.path.exists(location):
             # TODO: we will need to account for URLs at some point
             raise Exception("Provided file path does not exists")
+
+        try:
+            current_location = current_app.config["BACKEND"].save(location)
+        except Exception as e:
+            print(f"[{SERVICE_NAME}] Encountered exception during DRS object creation: {e}", flush=True,
+                  file=sys.stderr)
+            # TODO: implement more specific exception handling
+            raise Exception("Well if the file is not saved... we can't do squat")
+
+        self.location = current_location
+        self.name = current_location.split('/')[-1]
+        del kwargs["location"]
+
+        hash_obj = sha256()
+        self.size = os.path.getsize(location)
+
+        with open(location, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_obj.update(chunk)
+
+        self.checksum = hash_obj.hexdigest()
 
         self.id = str(uuid4())
         super().__init__(*args, **kwargs)
