@@ -165,7 +165,7 @@ def object_ingest():
         db.session.add(new_object)
         db.session.commit()
     except Exception as e:  # TODO: More specific handling
-        print(f"[{SERVICE_NAME}] Encountered exception: {e}", flush=True, file=sys.stderr)
+        print(f"[{SERVICE_NAME}] Encountered exception during ingest: {e}", flush=True, file=sys.stderr)
         raise abort(400, description="Error while creating the object")
 
     response = build_object_json(new_object)
