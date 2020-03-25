@@ -1,10 +1,15 @@
 import os
-from typing import Optional
-from flask import Blueprint, abort, jsonify, url_for, request, send_file
+import re
+from flask import Blueprint, abort, current_app, jsonify, url_for, request, send_file
 from sqlalchemy.orm.exc import NoResultFound
+from typing import Optional
+from urllib.parse import urljoin, urlparse
 from chord_drs import __version__
 from chord_drs.app import db
 from chord_drs.models import DrsObject, DrsBundle
+
+
+RE_STARTING_SLASH = re.compile(r"^/")
 
 
 SERVICE_TYPE = "ca.c3g.chord:drs:{}".format(__version__)
@@ -13,8 +18,19 @@ SERVICE_ID = os.environ.get("SERVICE_ID", SERVICE_TYPE)
 drs_service = Blueprint("drs_service", __name__)
 
 
-def create_drs_uri(host: str, object_id: str) -> str:
-    return f"drs://{host}/{object_id}"
+def get_drs_base_path():
+    base_path = request.host
+    if current_app.config["CHORD_URL"]:
+        parsed_chord_url = urlparse(current_app.config["CHORD_URL"])
+        base_path = f"{parsed_chord_url.netloc}{parsed_chord_url.path}"
+        if current_app.config["CHORD_SERVICE_URL_BASE_PATH"]:
+            base_path = urljoin(base_path, re.sub(RE_STARTING_SLASH, "",
+                                                  current_app.config["CHORD_SERVICE_URL_BASE_PATH"]))
+    return base_path
+
+
+def create_drs_uri(object_id: str) -> str:
+    return f"drs://{get_drs_base_path()}/{object_id}"
 
 
 def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = False) -> str:
@@ -42,7 +58,7 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = 
         "size": drs_bundle.size,
         "description": drs_bundle.description,
         "id": drs_bundle.id,
-        "self_uri": create_drs_uri(request.host, drs_bundle.id)
+        "self_uri": create_drs_uri(drs_bundle.id)
     }
 
     return response
@@ -79,7 +95,7 @@ def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = 
         "size": drs_object.size,
         "description": drs_object.description,
         "id": drs_object.id,
-        "self_uri": create_drs_uri(request.host, drs_object.id)
+        "self_uri": create_drs_uri(drs_object.id)
     }
 
     return response
