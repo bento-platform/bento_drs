@@ -4,11 +4,8 @@ from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parents[0]
 
-if "DATABASE" in os.environ:
-    # when deployed inside chord_singularity
-    BASEDIR = os.environ["DATABASE"]
-else:
-    BASEDIR = APP_DIR.parent
+# when deployed inside chord_singularity, DATABASE will be set
+BASEDIR = os.environ.get("DATABASE", APP_DIR.parent)
 
 
 class Config:
