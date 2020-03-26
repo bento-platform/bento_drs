@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from chord_drs.constants import SERVICE_NAME
+
 
 __all__ = [
     "APP_DIR",
@@ -22,3 +24,7 @@ class Config:
     CHORD_URL: Optional[str] = os.environ.get("CHORD_URL", None)
     CHORD_SERVICE_URL_BASE_PATH: Optional[str] = os.environ.get("SERVICE_URL_BASE_PATH", None)
     DATA = Path(os.environ.get("DATA", os.path.join(Path.home(), "chord_drs_data"))).expanduser().resolve()
+
+
+print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
+print(f"[{SERVICE_NAME}]           data path {Config.DATA}", flush=True)
