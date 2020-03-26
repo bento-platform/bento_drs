@@ -134,6 +134,10 @@ def object_info(object_id):
     # Are we inside the bento singularity container? if so, provide local accessmethod
     inside_container = request.headers.get("X-CHORD-Internal", "0") == "1"
 
+    # Log X-CHORD-Internal header
+    print(f"[{SERVICE_NAME}] object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}",
+          flush=True)
+
     if drs_bundle:
         response = build_bundle_json(drs_bundle, inside_container=inside_container)
     else:
