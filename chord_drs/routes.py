@@ -128,7 +128,11 @@ def object_search():
     name = request.args.get('name', None)
 
     if name:
-        objects = DrsObject.query.filter_by(name=name).all()
+        # if it includes a dot, we do a strict search.
+        if '.' in name:
+            objects = DrsObject.query.filter_by(name=name).all()
+        else:
+            objects = DrsObject.query.filter(DrsObject.name.contains(name)).all()
 
         for obj in objects:
             response.append(build_object_json(obj))
