@@ -93,8 +93,7 @@ def test_search_object_empty(client, drs_bundle):
     res = client.get('/search')
     data = res.get_json()
 
-    assert res.status_code == 200
-    assert len(data) == 0
+    assert res.status_code == 400
 
     res = client.get('/search?name=asd')
     data = res.get_json()

@@ -137,7 +137,9 @@ def object_search():
         for obj in objects:
             response.append(build_object_json(obj))
 
-    return jsonify(response)
+        return jsonify(response)
+    else:
+        raise abort(400, description="Missing name param to perform the search")
 
 
 @drs_service.route('/objects/<string:object_id>/download', methods=['GET'])
