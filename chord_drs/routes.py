@@ -1,23 +1,42 @@
 import os
-from typing import Optional
-from flask import Blueprint, abort, jsonify, url_for, request, send_file
+import re
+import sys
+
+from chord_lib.responses import flask_errors
+from flask import Blueprint, abort, current_app, jsonify, url_for, request, send_file
 from sqlalchemy.orm.exc import NoResultFound
-from chord_drs import __version__
+from typing import Optional
+from urllib.parse import urljoin, urlparse
+
 from chord_drs.app import db
+from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
 from chord_drs.models import DrsObject, DrsBundle
 
 
-SERVICE_TYPE = "ca.c3g.chord:drs:{}".format(__version__)
+RE_STARTING_SLASH = re.compile(r"^/")
+
+
 SERVICE_ID = os.environ.get("SERVICE_ID", SERVICE_TYPE)
 
 drs_service = Blueprint("drs_service", __name__)
 
 
-def create_drs_uri(host: str, object_id: str) -> str:
-    return f"drs://{host}/{object_id}"
+def get_drs_base_path():
+    base_path = request.host
+    if current_app.config["CHORD_URL"]:
+        parsed_chord_url = urlparse(current_app.config["CHORD_URL"])
+        base_path = f"{parsed_chord_url.netloc}{parsed_chord_url.path}"
+        if current_app.config["CHORD_SERVICE_URL_BASE_PATH"]:
+            base_path = urljoin(base_path, re.sub(RE_STARTING_SLASH, "",
+                                                  current_app.config["CHORD_SERVICE_URL_BASE_PATH"]))
+    return base_path
 
 
-def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = False) -> str:
+def create_drs_uri(object_id: str) -> str:
+    return f"drs://{get_drs_base_path()}/{object_id}"
+
+
+def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = False) -> dict:
     content = []
     bundles = DrsBundle.query.filter_by(parent_bundle=drs_bundle).all()
 
@@ -42,13 +61,15 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = 
         "size": drs_bundle.size,
         "description": drs_bundle.description,
         "id": drs_bundle.id,
-        "self_uri": create_drs_uri(request.host, drs_bundle.id)
+        "self_uri": create_drs_uri(drs_bundle.id)
     }
 
     return response
 
 
-def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = False) -> str:
+def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = False) -> dict:
+    # TODO: This access type is wrong in the case of http (non-secure)
+
     default_access_method = {
         "access_url": {
             "url": url_for('drs_service.object_download', object_id=drs_object.id, _external=True)
@@ -80,7 +101,7 @@ def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = 
         "name": drs_object.name,
         "description": drs_object.description,
         "id": drs_object.id,
-        "self_uri": create_drs_uri(request.host, drs_object.id)
+        "self_uri": create_drs_uri(drs_object.id)
     }
 
     return response
@@ -91,7 +112,7 @@ def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
     return jsonify({
         "id": SERVICE_ID,
-        "name": "CHORD Data Repository Service",
+        "name": SERVICE_NAME,
         "type": SERVICE_TYPE,
         "description": "Data repository service (based on GA4GH's specs) for a CHORD application.",
         "organization": {
@@ -112,7 +133,11 @@ def object_info(object_id):
         return abort(404)
 
     # Are we inside the bento singularity container? if so, provide local accessmethod
-    inside_container = bool(request.headers.get('X-CHORD-Internal', False))
+    inside_container = request.headers.get("X-CHORD-Internal", "0") == "1"
+
+    # Log X-CHORD-Internal header
+    print(f"[{SERVICE_NAME}] object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}",
+          flush=True)
 
     if drs_bundle:
         response = build_bundle_json(drs_bundle, inside_container=inside_container)
@@ -157,16 +182,17 @@ def object_ingest():
     try:
         data = request.json
         obj_path = data['path']
-    except Exception:
-        raise abort(400, description="Missing path parameter in JSON request")
+    except KeyError:
+        return flask_errors.flask_bad_request_error("Missing path parameter in JSON request")
 
     try:
         new_object = DrsObject(location=obj_path)
 
         db.session.add(new_object)
         db.session.commit()
-    except Exception:
-        raise abort(400, description="Error while creating the object")
+    except Exception as e:  # TODO: More specific handling
+        print(f"[{SERVICE_NAME}] Encountered exception during ingest: {e}", flush=True, file=sys.stderr)
+        return flask_errors.flask_bad_request_error("Error while creating the object")
 
     response = build_object_json(new_object)
 
