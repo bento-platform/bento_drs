@@ -7,8 +7,10 @@ db.sqlite3
 .tox
 
 # IDE stuff
-.idea/workspace.xml
+.idea/$CACHE_FILE$
 .idea/dataSources*
+.idea/rSettings.xml
+.idea/workspace.xml
 *.swp
 *.swo
 

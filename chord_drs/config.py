@@ -1,17 +1,30 @@
 import os
 from pathlib import Path
+from typing import Optional
+
+from chord_drs.constants import SERVICE_NAME
+
+
+__all__ = [
+    "APP_DIR",
+    "BASEDIR",
+    "Config",
+]
 
 
 APP_DIR = Path(__file__).resolve().parents[0]
 
-if "DATABASE" in os.environ:
-    # when deployed inside chord_singularity
-    BASEDIR = os.environ["DATABASE"]
-else:
-    BASEDIR = APP_DIR.parent
+# when deployed inside chord_singularity, DATABASE will be set
+BASEDIR = os.environ.get("DATABASE", APP_DIR.parent)
 
 
 class Config:
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(BASEDIR, "db.sqlite3")
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + str(Path(os.path.join(BASEDIR, "db.sqlite3")).expanduser().resolve())
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    DATA = Path(os.environ.get("DATA", os.path.join(Path.home(), "chord_drs_data"))).resolve()
+    CHORD_URL: Optional[str] = os.environ.get("CHORD_URL", None)
+    CHORD_SERVICE_URL_BASE_PATH: Optional[str] = os.environ.get("SERVICE_URL_BASE_PATH", None)
+    DATA = Path(os.environ.get("DATA", os.path.join(Path.home(), "chord_drs_data"))).expanduser().resolve()
+
+
+print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
+print(f"[{SERVICE_NAME}]           data path {Config.DATA}", flush=True)

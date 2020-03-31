@@ -19,9 +19,8 @@ class FileBackend(Backend):
     """
     def __init__(self):
         self.base_location = application.config["DATA"]
-
-        if not os.path.exists(self.base_location):
-            os.mkdir(self.base_location)
+        # We can use makedirs, since resolve has been called in config.py
+        os.makedirs(self.base_location, exist_ok=True)
 
     def save(self, location: str) -> str:
         p = Path(location)

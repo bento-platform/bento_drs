@@ -1,31 +1,36 @@
 #!/usr/bin/env python
 
+import configparser
+import os
 import setuptools
 
 with open("README.md", "r") as rf:
     long_description = rf.read()
 
+config = configparser.ConfigParser()
+config.read(os.path.join(os.path.dirname(os.path.realpath(__file__)), "chord_drs", "package.cfg"))
+
 setuptools.setup(
-    name="chord_drs",
-    version="0.1.0",
+    name=config["package"]["name"],
+    version=config["package"]["version"],
 
     python_requires=">=3.6",
     install_requires=[
-        "chord_lib[flask]==0.1.0",
+        "chord_lib[flask]==0.7.0",
         "Flask>=1.1,<2.0",
         "SQLAlchemy>=1.3,<1.4",
         "Flask-SQLAlchemy>=2.4,<3.0",
         "Flask-Migrate>=2.5,<3.0"
     ],
 
-    author="Simon Chénard",
-    author_email="simon.chenard2@mcgill.ca",
+    author=config["package"]["authors"],
+    author_email=config["package"]["author_emails"],
 
     description="An implementation of a data repository system (as per GA4GH's specs) for the CHORD project.",
     long_description=long_description,
     long_description_content_type="text/markdown",
 
-    packages=["chord_drs"],
+    packages=setuptools.find_packages(),
     include_package_data=True,
     entry_points={
         'console_scripts': [
