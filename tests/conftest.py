@@ -13,23 +13,21 @@ DUMMY_FILE = os.path.join(BASEDIR, "README.md")
 DUMMY_DIRECTORY = os.path.join(APP_DIR, "migrations")
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture
 def client():
     application.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
     application.config["BACKEND"] = FakeBackend()
 
-    db.create_all()
+    with application.app_context():
+        db.create_all()
 
-    ctx = application.app_context()
-    ctx.push()
+        yield application.test_client()
 
-    yield application.test_client()
-
-    db.session.remove()
-    db.drop_all()
+        db.session.remove()
+        db.drop_all()
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture
 def drs_object():
     drs_object = DrsObject(location=DUMMY_FILE)
 
@@ -39,7 +37,7 @@ def drs_object():
     yield drs_object
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture
 def drs_bundle():
     bundle = create_drs_bundle(DUMMY_DIRECTORY)
 

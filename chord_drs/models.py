@@ -1,11 +1,10 @@
 import os
-import sys
-
 from hashlib import sha256
+from pathlib import Path
+from uuid import uuid4
 from flask import current_app
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from uuid import uuid4
 
 from chord_drs.app import db
 from chord_drs.constants import SERVICE_NAME
@@ -57,21 +56,24 @@ class DrsObject(db.Model, DrsMixin):
 
     def __init__(self, *args, **kwargs):
         location = kwargs.get('location', None)
+        p = Path(location)
 
-        if not os.path.exists(location):
+        if not p.exists():
             # TODO: we will need to account for URLs at some point
             raise Exception("Provided file path does not exists")
 
+        self.id = str(uuid4())
+        self.name = p.name
+        new_filename = f"{self.id[:12]}-{p.name}"
+
         try:
-            current_location = current_app.config["BACKEND"].save(location)
+            current_location = current_app.config["BACKEND"].save(location, new_filename)
         except Exception as e:
-            print(f"[{SERVICE_NAME}] Encountered exception during DRS object creation: {e}", flush=True,
-                  file=sys.stderr)
+            current_app.logger.error(f"[{SERVICE_NAME}] Encountered exception during DRS object creation: {e}")
             # TODO: implement more specific exception handling
             raise Exception("Well if the file is not saved... we can't do squat")
 
         self.location = current_location
-        self.name = current_location.split('/')[-1]
         del kwargs["location"]
 
         hash_obj = sha256()
@@ -83,5 +85,4 @@ class DrsObject(db.Model, DrsMixin):
 
         self.checksum = hash_obj.hexdigest()
 
-        self.id = str(uuid4())
         super().__init__(*args, **kwargs)

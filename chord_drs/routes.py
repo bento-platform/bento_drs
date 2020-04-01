@@ -1,23 +1,17 @@
-import os
 import re
-import sys
 
 from chord_lib.responses import flask_errors
-from flask import Blueprint, abort, current_app, jsonify, url_for, request, send_file
+from flask import Blueprint, current_app, jsonify, url_for, request, send_file
 from sqlalchemy.orm.exc import NoResultFound
 from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 from chord_drs.app import db
-from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
+from chord_drs.constants import SERVICE_ID, SERVICE_NAME, SERVICE_TYPE
 from chord_drs.models import DrsObject, DrsBundle
 
 
 RE_STARTING_SLASH = re.compile(r"^/")
-
-
-SERVICE_ID = os.environ.get("SERVICE_ID", SERVICE_TYPE)
-
 drs_service = Blueprint("drs_service", __name__)
 
 
@@ -98,6 +92,7 @@ def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = 
         },
         "created_time": f"{drs_object.created.isoformat('T')}Z",
         "size": drs_object.size,
+        "name": drs_object.name,
         "description": drs_object.description,
         "id": drs_object.id,
         "self_uri": create_drs_uri(drs_object.id)
@@ -129,14 +124,15 @@ def object_info(object_id):
     drs_bundle = DrsBundle.query.filter_by(id=object_id).first()
 
     if not drs_object and not drs_bundle:
-        return abort(404)
+        return flask_errors.flask_not_found_error("No object found for this ID")
 
     # Are we inside the bento singularity container? if so, provide local accessmethod
     inside_container = request.headers.get("X-CHORD-Internal", "0") == "1"
 
     # Log X-CHORD-Internal header
-    print(f"[{SERVICE_NAME}] object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}",
-          flush=True)
+    current_app.logger.info(
+        f"[{SERVICE_NAME}] object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}"
+    )
 
     if drs_bundle:
         response = build_bundle_json(drs_bundle, inside_container=inside_container)
@@ -146,12 +142,31 @@ def object_info(object_id):
     return jsonify(response)
 
 
+@drs_service.route('/search', methods=['GET'])
+def object_search():
+    response = []
+    name = request.args.get('name', None)
+    fuzzy_name = request.args.get('fuzzy_name', None)
+
+    if name:
+        objects = DrsObject.query.filter_by(name=name).all()
+    elif fuzzy_name:
+        objects = DrsObject.query.filter(DrsObject.name.contains(fuzzy_name)).all()
+    else:
+        return flask_errors.flask_bad_request_error("Missing GET search terms (either name or fuzzy_name)")
+
+    for obj in objects:
+        response.append(build_object_json(obj))
+
+    return jsonify(response)
+
+
 @drs_service.route('/objects/<string:object_id>/download', methods=['GET'])
 def object_download(object_id):
     try:
         drs_object = DrsObject.query.filter_by(id=object_id).one()
     except NoResultFound:
-        return abort(404)
+        return flask_errors.flask_not_found_error("No object found for this ID")
 
     return send_file(drs_object.location)
 
@@ -170,7 +185,7 @@ def object_ingest():
         db.session.add(new_object)
         db.session.commit()
     except Exception as e:  # TODO: More specific handling
-        print(f"[{SERVICE_NAME}] Encountered exception during ingest: {e}", flush=True, file=sys.stderr)
+        current_app.logger.error(f"[{SERVICE_NAME}] Encountered exception during ingest: {e}")
         return flask_errors.flask_bad_request_error("Error while creating the object")
 
     response = build_object_json(new_object)
