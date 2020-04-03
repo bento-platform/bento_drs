@@ -1,10 +1,18 @@
 import re
-
-from chord_lib.responses import flask_errors
-from flask import Blueprint, current_app, jsonify, url_for, request, send_file
-from sqlalchemy.orm.exc import NoResultFound
 from typing import Optional
 from urllib.parse import urljoin, urlparse
+
+from chord_lib.responses import flask_errors
+from flask import (
+    Blueprint,
+    current_app,
+    jsonify,
+    url_for,
+    request,
+    send_file,
+    make_response
+)
+from sqlalchemy.orm.exc import NoResultFound
 
 from chord_drs.app import db
 from chord_drs.constants import SERVICE_ID, SERVICE_NAME, SERVICE_TYPE
@@ -12,17 +20,23 @@ from chord_drs.models import DrsObject, DrsBundle
 
 
 RE_STARTING_SLASH = re.compile(r"^/")
+
 drs_service = Blueprint("drs_service", __name__)
 
 
 def get_drs_base_path():
     base_path = request.host
+
     if current_app.config["CHORD_URL"]:
         parsed_chord_url = urlparse(current_app.config["CHORD_URL"])
         base_path = f"{parsed_chord_url.netloc}{parsed_chord_url.path}"
+
         if current_app.config["CHORD_SERVICE_URL_BASE_PATH"]:
-            base_path = urljoin(base_path, re.sub(RE_STARTING_SLASH, "",
-                                                  current_app.config["CHORD_SERVICE_URL_BASE_PATH"]))
+            base_path = urljoin(
+                base_path, re.sub(
+                    RE_STARTING_SLASH, "", current_app.config["CHORD_SERVICE_URL_BASE_PATH"]
+                )
+            )
     return base_path
 
 
@@ -168,7 +182,23 @@ def object_download(object_id):
     except NoResultFound:
         return flask_errors.flask_not_found_error("No object found for this ID")
 
-    return send_file(drs_object.location)
+    minio_obj = drs_object.return_minio_object()
+
+    if minio_obj:
+        # TODO: kinda greasy, not really sure we want to support such a feature later on
+        response = make_response(
+            send_file(
+                minio_obj['Body'],
+                mimetype="application/octet-stream",
+                as_attachment=True,
+                attachment_filename=drs_object.name
+            )
+        )
+
+        response.headers['Content-length'] = minio_obj['ContentLength']
+        return response
+    else:
+        return send_file(drs_object.location)
 
 
 @drs_service.route('/ingest', methods=['POST'])

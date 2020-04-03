@@ -7,6 +7,7 @@ from werkzeug.exceptions import BadRequest, NotFound
 
 from chord_drs.config import Config, APP_DIR
 from chord_drs.constants import SERVICE_NAME
+from chord_drs.backend import close_backend
 
 
 MIGRATION_DIR = os.path.join(APP_DIR, "migrations")
@@ -31,6 +32,4 @@ application.register_blueprint(drs_service)
 from chord_drs.commands import ingest  # noqa: E402
 application.cli.add_command(ingest)
 
-# TODO: would be nice to deal with backends the same way we deal with commands
-# that is not be importing application, running in context and using current_app
-from chord_drs import backends  # noqa: E402,F401
+application.teardown_appcontext(close_backend)

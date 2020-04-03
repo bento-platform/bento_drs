@@ -22,49 +22,63 @@ def validate_object_fields(data, existing_id=None):
         assert "id" in data and data["id"] == existing_id
 
 
-def test_service_info(client):
-    res = client.get("/service-info")
+def test_service_info(client_local):
+    res = client_local.get("/service-info")
     data = res.get_json()
 
     validate(data, chord_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
 
 
-def test_object_fail(client):
-    res = client.get(f'/objects/{NON_EXISTENT_ID}')
+def test_object_fail(client_local):
+    res = client_local.get(f'/objects/{NON_EXISTENT_ID}')
 
     assert res.status_code == 404
 
 
-def test_object_download_fail(client):
-    res = client.get(f'/objects/{NON_EXISTENT_ID}/download')
+def test_object_download_fail(client_local):
+    res = client_local.get(f'/objects/{NON_EXISTENT_ID}/download')
 
     assert res.status_code == 404
 
 
-def test_object_and_download(client, drs_object):
-    res = client.get(f'/objects/{drs_object.id}')
+def test_object_and_download_minio(client_minio, drs_object_minio):
+    res = client_minio.get(f'/objects/{drs_object_minio.id}')
+    data = res.get_json()
+
+    assert res.status_code == 200
+    validate_object_fields(data, existing_id=drs_object_minio.id)
+
+    # Download the object
+    res = client_minio.get(data["access_methods"][0]["access_url"]["url"])
+
+    assert res.status_code == 200
+    assert res.content_length == drs_object_minio.size
+
+
+def test_object_and_download(client_local, drs_object):
+    res = client_local.get(f'/objects/{drs_object.id}')
     data = res.get_json()
 
     assert res.status_code == 200
     validate_object_fields(data, existing_id=drs_object.id)
 
     # Download the object
-    res = client.get(data["access_methods"][0]["access_url"]["url"])
+    res = client_local.get(data["access_methods"][0]["access_url"]["url"])
 
     assert res.status_code == 200
     assert res.content_length == drs_object.size
 
 
-def test_object_inside_bento(client, drs_object):
-    res = client.get(f'/objects/{drs_object.id}', headers={'X-CHORD-Internal': '1'})
+def test_object_inside_bento(client_local, drs_object):
+    res = client_local.get(f'/objects/{drs_object.id}', headers={'X-CHORD-Internal': '1'})
     data = res.get_json()
 
     assert res.status_code == 200
     assert len(data["access_methods"]) == 2
 
 
-def test_bundle_and_download(client, drs_bundle):
-    res = client.get(f'/objects/{drs_bundle.id}')
+def test_bundle_and_download(client_local, drs_bundle):
+    res = client_local.get(f'/objects/{drs_bundle.id}')
     data = res.get_json()
 
     assert res.status_code == 200
@@ -83,27 +97,27 @@ def test_bundle_and_download(client, drs_bundle):
     # an object and not a bundle
     obj = data["contents"]["contents"][-1]
 
-    res = client.get(obj["access_methods"][0]["access_url"]["url"])
+    res = client_local.get(obj["access_methods"][0]["access_url"]["url"])
 
     assert res.status_code == 200
     assert res.content_length == obj["size"]
 
 
-def test_search_object_empty(client, drs_bundle):
-    res = client.get('/search')
+def test_search_object_empty(client_local, drs_bundle):
+    res = client_local.get('/search')
     data = res.get_json()
 
     assert res.status_code == 400
 
-    res = client.get('/search?name=asd')
+    res = client_local.get('/search?name=asd')
     data = res.get_json()
 
     assert res.status_code == 200
     assert len(data) == 0
 
 
-def test_search_object(client, drs_bundle):
-    res = client.get('/search?name=alembic.ini')
+def test_search_object(client_local, drs_bundle):
+    res = client_local.get('/search?name=alembic.ini')
     data = res.get_json()
 
     assert res.status_code == 200
@@ -112,18 +126,18 @@ def test_search_object(client, drs_bundle):
     validate_object_fields(data[0])
 
 
-def test_object_ingest_fail(client):
-    res = client.post('/ingest', json={'wrong_arg': 'some_path'})
+def test_object_ingest_fail(client_local):
+    res = client_local.post('/ingest', json={'wrong_arg': 'some_path'})
 
     assert res.status_code == 400
 
-    res = client.post('/ingest', json={'path': NON_EXISTENT_DUMMY_FILE})
+    res = client_local.post('/ingest', json={'path': NON_EXISTENT_DUMMY_FILE})
 
     assert res.status_code == 400
 
 
-def test_object_ingest(client):
-    res = client.post('/ingest', json={'path': DUMMY_FILE})
+def test_object_ingest(client_local):
+    res = client_local.post('/ingest', json={'path': DUMMY_FILE})
     data = res.get_json()
 
     assert res.status_code == 201

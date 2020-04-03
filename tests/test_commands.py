@@ -8,14 +8,14 @@ from tests.conftest import (
 )
 
 
-def test_ingest_fail(client):
+def test_ingest_fail(client_local):
     runner = CliRunner()
     result = runner.invoke(ingest, [NON_EXISTENT_DUMMY_FILE])
 
     assert result.exit_code == 1
 
 
-def test_ingest(client):
+def test_ingest(client_local):
     runner = CliRunner()
     result = runner.invoke(ingest, [DUMMY_FILE])
 
@@ -23,7 +23,8 @@ def test_ingest(client):
     obj = DrsObject.query.filter_by(name=filename).first()
 
     assert result.exit_code == 0
-    assert obj.location == DUMMY_FILE
+    assert obj.name == filename
+    assert obj.location
 
     result = runner.invoke(ingest, [DUMMY_DIRECTORY])
 

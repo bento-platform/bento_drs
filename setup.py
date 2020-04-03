@@ -16,11 +16,12 @@ setuptools.setup(
 
     python_requires=">=3.6",
     install_requires=[
+        "boto3==1.12.32",
         "chord_lib[flask]==0.7.0",
         "Flask>=1.1,<2.0",
-        "SQLAlchemy>=1.3,<1.4",
         "Flask-SQLAlchemy>=2.4,<3.0",
-        "Flask-Migrate>=2.5,<3.0"
+        "Flask-Migrate>=2.5,<3.0",
+        "SQLAlchemy>=1.3,<1.4"
     ],
 
     author=config["package"]["authors"],
