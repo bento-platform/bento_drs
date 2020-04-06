@@ -7,14 +7,31 @@ A proof of concept based on [GA4GH's DRS specifications](https://ga4gh.github.io
 This flask application offers an interface to query files in such 
 a fashion: "drs://some-domain/some-ID".
 
+For storing the files, two methods are currently supported : in the current filesystem
+or inside a MinIO instance (which is a s3-like software).
+
 ## TODO / Future considerations
 
- - Currently not checking if a file is already in the repository
+ - Ingesting is either through the command line or by the endpoint of the same name
+ (which will create a single object). There is currently no way to ingest an archive
+ or to package objects into bundles.
+ - Consider how to be aware of http vs https depending on the deployment setup
+ (in singularity, docker, as is).
 
 ## Environment Variables
 
-None are currently needed (the only one being used currently is by pytest, it is
-set automatically inside the tox.ini config).
+If none are set, the application will store the files on the filesystem (by default,
+in the user's home directory in a folder named "chord_drs_data"). You can change this
+by using the DATA variable, to point to a different directory.
+
+Otherwise, to store the files in MinIO, you have to provide these :
+
+MINIO_URL
+MINIO_USERNAME
+MINIO_PASSWORD
+MINIO_BUCKET
+
+You can also change the default location of the sqlite DB by using the DATABASE variable.
 
 ## Running in Development
 
