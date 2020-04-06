@@ -54,6 +54,7 @@ def ingest(source: str):
     """
     current_app.logger.setLevel(logging.INFO)
     # TODO: ingestion for remote files or archives
+    # TODO: Create directories in minio when ingesting a bundle
     if os.path.exists(source):
         source = os.path.abspath(source)
 

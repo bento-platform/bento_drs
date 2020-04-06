@@ -18,7 +18,8 @@ class MinioBackend(Backend):
         self.bucket = self.minio.Bucket(current_app.config['MINIO_BUCKET'])
 
     def build_minio_location(self, obj):
-        return f"s3://{current_app.config['MINIO_URL']}/{obj.bucket_name}/{obj.key}"
+        host = current_app.config['MINIO_URL'].split('/')[2]
+        return f"s3://{host}/{obj.bucket_name}/{obj.key}"
 
     def get_minio_object(self, location: str):
         obj = self.bucket.Object(location.split('/')[-1])

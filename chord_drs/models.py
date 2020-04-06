@@ -71,7 +71,6 @@ class DrsObject(db.Model, DrsMixin):
 
         if not backend:
             raise Exception("The backend for this instance is not properly configured.")
-
         try:
             current_location = backend.save(location, new_filename)
         except Exception as e:

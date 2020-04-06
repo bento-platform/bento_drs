@@ -8,6 +8,7 @@ from tests.conftest import (
 )
 
 
+# TODO: Issue with app context and backends. On hold for now
 def test_ingest_fail(client_local):
     runner = CliRunner()
     result = runner.invoke(ingest, [NON_EXISTENT_DUMMY_FILE])

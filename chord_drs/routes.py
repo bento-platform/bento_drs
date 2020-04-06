@@ -77,15 +77,16 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = 
 
 def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = False) -> dict:
     # TODO: This access type is wrong in the case of http (non-secure)
-
+    # TODO: I'll change it to http for now, will think of a way to fix this
+    data_source = current_app.config['SERVICE_DATA_SOURCE']
     default_access_method = {
         "access_url": {
             "url": url_for('drs_service.object_download', object_id=drs_object.id, _external=True)
         },
-        "type": "https"
+        "type": "http"
     }
 
-    if inside_container:
+    if inside_container and data_source == 'local':
         access_methods = [
             default_access_method,
             {
@@ -93,6 +94,16 @@ def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = 
                     "url": f"file://{drs_object.location}"
                 },
                 "type": "file"
+            }
+        ]
+    elif data_source == 'minio':
+        access_methods = [
+            default_access_method,
+            {
+                "access_url": {
+                    "url": drs_object.location
+                },
+                "type": "s3"
             }
         ]
     else:

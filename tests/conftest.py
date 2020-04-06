@@ -4,6 +4,7 @@ import boto3
 from flask import g
 from moto import mock_s3
 import pytest
+from pytest_lazyfixture import lazy_fixture
 
 from chord_drs.app import application, db
 from chord_drs.backends.base import FakeBackend
@@ -19,10 +20,12 @@ DUMMY_FILE = os.path.join(BASEDIR, "README.md")
 DUMMY_DIRECTORY = os.path.join(APP_DIR, "migrations")
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture
 def client_minio():
     bucket_name = 'test'
+    application.config['MINIO_URL'] = 'http://127.0.0.1:9000'
     application.config['MINIO_BUCKET'] = bucket_name
+    application.config['SERVICE_DATA_SOURCE'] = 'minio'
 
     with application.app_context():
         with mock_s3():
@@ -52,6 +55,14 @@ def client_local():
 
         db.session.remove()
         db.drop_all()
+
+
+@pytest.fixture(params=[
+    lazy_fixture('client_minio'),
+    lazy_fixture('client_local')
+])
+def client(request):
+    return request.param
 
 
 @pytest.fixture
