@@ -1,6 +1,7 @@
 import os
 from hashlib import sha256
 from pathlib import Path
+from urllib.parse import urlparse
 from uuid import uuid4
 from flask import current_app
 from sqlalchemy.sql import func
@@ -93,7 +94,9 @@ class DrsObject(db.Model, DrsMixin):
         super().__init__(*args, **kwargs)
 
     def return_minio_object(self):
-        if 's3' in self.location:
+        parsed_url = urlparse(self.location)
+
+        if parsed_url.scheme == 's3':
             backend = get_backend()
 
             if not backend:

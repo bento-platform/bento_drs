@@ -24,12 +24,14 @@ If none are set, the application will store the files on the filesystem (by defa
 in the user's home directory in a folder named "chord_drs_data"). You can change this
 by using the DATA variable, to point to a different directory.
 
-Otherwise, to store the files in MinIO, you have to provide these :
+Otherwise, to store the files in MinIO, you have to provide these:
 
+```
 MINIO_URL
 MINIO_USERNAME
 MINIO_PASSWORD
 MINIO_BUCKET
+```
 
 You can also change the default location of the sqlite DB by using the DATABASE variable.
 

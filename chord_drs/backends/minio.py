@@ -5,15 +5,12 @@ from chord_drs.backends.base import Backend
 
 class MinioBackend(Backend):
     def __init__(self, resource=None):
-        if resource:
-            self.minio = resource
-        else:
-            self.minio = boto3.resource(
-                's3',
-                endpoint_url=current_app.config['MINIO_URL'],
-                aws_access_key_id=current_app.config['MINIO_USERNAME'],
-                aws_secret_access_key=current_app.config['MINIO_PASSWORD']
-            )
+        self.minio = resource or boto3.resource(
+            's3',
+            endpoint_url=current_app.config['MINIO_URL'],
+            aws_access_key_id=current_app.config['MINIO_USERNAME'],
+            aws_secret_access_key=current_app.config['MINIO_PASSWORD']
+        )
 
         self.bucket = self.minio.Bucket(current_app.config['MINIO_BUCKET'])
 
@@ -27,8 +24,7 @@ class MinioBackend(Backend):
         return obj.get()
 
     def save(self, current_location: str, filename: str) -> str:
-        f = open(current_location, 'rb')
+        with open(current_location, 'rb') as f:
+            obj = self.bucket.put_object(Key=filename, Body=f)
 
-        obj = self.bucket.put_object(Key=filename, Body=f)
-
-        return self.build_minio_location(obj)
+            return self.build_minio_location(obj)
