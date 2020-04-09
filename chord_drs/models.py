@@ -1,12 +1,14 @@
 import os
 from hashlib import sha256
 from pathlib import Path
+from urllib.parse import urlparse
 from uuid import uuid4
 from flask import current_app
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
 from chord_drs.app import db
+from chord_drs.backend import get_backend
 from chord_drs.constants import SERVICE_NAME
 
 
@@ -66,8 +68,12 @@ class DrsObject(db.Model, DrsMixin):
         self.name = p.name
         new_filename = f"{self.id[:12]}-{p.name}"
 
+        backend = get_backend()
+
+        if not backend:
+            raise Exception("The backend for this instance is not properly configured.")
         try:
-            current_location = current_app.config["BACKEND"].save(location, new_filename)
+            current_location = backend.save(location, new_filename)
         except Exception as e:
             current_app.logger.error(f"[{SERVICE_NAME}] Encountered exception during DRS object creation: {e}")
             # TODO: implement more specific exception handling
@@ -86,3 +92,16 @@ class DrsObject(db.Model, DrsMixin):
         self.checksum = hash_obj.hexdigest()
 
         super().__init__(*args, **kwargs)
+
+    def return_minio_object(self):
+        parsed_url = urlparse(self.location)
+
+        if parsed_url.scheme == 's3':
+            backend = get_backend()
+
+            if not backend:
+                raise Exception("The backend for this instance is not properly configured.")
+
+            return backend.get_minio_object(self.location)
+        else:
+            return None
