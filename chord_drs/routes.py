@@ -212,7 +212,7 @@ def object_download(object_id):
         return send_file(drs_object.location)
 
 
-@drs_service.route('/ingest', methods=['POST'])
+@drs_service.route('/private/ingest', methods=['POST'])
 def object_ingest():
     try:
         data = request.json

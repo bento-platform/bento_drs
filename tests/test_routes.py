@@ -127,17 +127,17 @@ def test_search_object(client, drs_bundle):
 
 
 def test_object_ingest_fail(client):
-    res = client.post('/ingest', json={'wrong_arg': 'some_path'})
+    res = client.post('/private/ingest', json={'wrong_arg': 'some_path'})
 
     assert res.status_code == 400
 
-    res = client.post('/ingest', json={'path': NON_EXISTENT_DUMMY_FILE})
+    res = client.post('/private/ingest', json={'path': NON_EXISTENT_DUMMY_FILE})
 
     assert res.status_code == 400
 
 
 def test_object_ingest(client):
-    res = client.post('/ingest', json={'path': DUMMY_FILE})
+    res = client.post('/private/ingest', json={'path': DUMMY_FILE})
     data = res.get_json()
 
     assert res.status_code == 201
