@@ -18,22 +18,15 @@ or inside a MinIO instance (which is a s3-like software).
  - Consider how to be aware of http vs https depending on the deployment setup
  (in singularity, docker, as is).
 
-## Environment Variables
+## Configuration
 
-If none are set, the application will store the files on the filesystem (by default,
-in the user's home directory in a folder named "chord_drs_data"). You can change this
-by using the DATA variable, to point to a different directory.
+At the root of this project there is a sample dotenv file (.env-sample). These can be
+exported as environment variables or used as is. Simply copy the sample file and
+provide the missing values.
 
-Otherwise, to store the files in MinIO, you have to provide these:
-
+```bash
+cp .env-sample .env
 ```
-MINIO_URL
-MINIO_USERNAME
-MINIO_PASSWORD
-MINIO_BUCKET
-```
-
-You can also change the default location of the sqlite DB by using the DATABASE variable.
 
 ## Running in Development
 

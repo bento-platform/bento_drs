@@ -1,6 +1,7 @@
 # chord_drs specific
 test.sqlite3
 db.sqlite3
+.env
 
 # testing related
 .coverage
