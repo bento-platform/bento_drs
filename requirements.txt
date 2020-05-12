@@ -38,6 +38,7 @@ pytest==5.4.1
 pytest-cov==2.8.1
 pytest-lazy-fixture==0.6.3
 python-dateutil==2.8.1
+python-dotenv==0.13.0
 python-editor==1.0.4
 redis==3.4.1
 requests==2.23.0

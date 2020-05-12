@@ -21,6 +21,7 @@ setuptools.setup(
         "Flask>=1.1,<2.0",
         "Flask-SQLAlchemy>=2.4,<3.0",
         "Flask-Migrate>=2.5,<3.0",
+        "python-dotenv==0.13.0",
         "SQLAlchemy>=1.3,<1.4"
     ],
 
