@@ -8,7 +8,7 @@ from werkzeug.exceptions import BadRequest, NotFound
 from chord_drs.config import Config, APP_DIR
 from chord_drs.constants import SERVICE_NAME
 from chord_drs.backend import close_backend
-
+from prometheus_flask_exporter import PrometheusMetrics
 
 MIGRATION_DIR = os.path.join(APP_DIR, "migrations")
 
@@ -33,3 +33,4 @@ from chord_drs.commands import ingest  # noqa: E402
 application.cli.add_command(ingest)
 
 application.teardown_appcontext(close_backend)
+metrics = PrometheusMetrics(application)
