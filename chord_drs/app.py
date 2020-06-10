@@ -4,11 +4,11 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from chord_lib.responses import flask_errors
 from werkzeug.exceptions import BadRequest, NotFound
+from prometheus_flask_exporter import PrometheusMetrics
 
 from chord_drs.config import Config, APP_DIR
 from chord_drs.constants import SERVICE_NAME
 from chord_drs.backend import close_backend
-from prometheus_flask_exporter import PrometheusMetrics
 
 MIGRATION_DIR = os.path.join(APP_DIR, "migrations")
 
