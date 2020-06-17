@@ -23,9 +23,9 @@ class DrsMixin:
 
 
 class DrsBundle(db.Model, DrsMixin):
-    ___tablename__ = 'drs_bundle'
+    ___tablename__ = "drs_bundle"
     id = db.Column(db.String, primary_key=True)
-    parent_bundle_id = db.Column(db.Integer, db.ForeignKey('drs_bundle.id'))
+    parent_bundle_id = db.Column(db.Integer, db.ForeignKey("drs_bundle.id"))
     parent_bundle = relationship("DrsBundle", remote_side=[id])
     objects = relationship("DrsObject", cascade="all, delete-orphan", backref="bundle")
 
@@ -85,7 +85,7 @@ class DrsObject(db.Model, DrsMixin):
         hash_obj = sha256()
         self.size = os.path.getsize(location)
 
-        with open(location, 'rb') as f:
+        with open(location, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_obj.update(chunk)
 
@@ -96,7 +96,7 @@ class DrsObject(db.Model, DrsMixin):
     def return_minio_object(self):
         parsed_url = urlparse(self.location)
 
-        if parsed_url.scheme == 's3':
+        if parsed_url.scheme == "s3":
             backend = get_backend()
 
             if not backend:

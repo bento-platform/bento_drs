@@ -1,5 +1,4 @@
 import re
-from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 from chord_lib.responses import flask_errors
@@ -37,6 +36,7 @@ def get_drs_base_path():
                     RE_STARTING_SLASH, "", current_app.config["CHORD_SERVICE_URL_BASE_PATH"]
                 )
             )
+
     return base_path
 
 
@@ -44,7 +44,7 @@ def create_drs_uri(object_id: str) -> str:
     return f"drs://{get_drs_base_path()}/{object_id}"
 
 
-def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = False) -> dict:
+def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False) -> dict:
     content = []
     bundles = DrsBundle.query.filter_by(parent_bundle=drs_bundle).all()
 
@@ -75,13 +75,13 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: Optional[bool] = 
     return response
 
 
-def build_object_json(drs_object: DrsObject, inside_container: Optional[bool] = False) -> dict:
+def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> dict:
     # TODO: This access type is wrong in the case of http (non-secure)
     # TODO: I'll change it to http for now, will think of a way to fix this
-    data_source = current_app.config['SERVICE_DATA_SOURCE']
+    data_source = current_app.config["SERVICE_DATA_SOURCE"]
     default_access_method = {
         "access_url": {
-            "url": url_for('drs_service.object_download', object_id=drs_object.id, _external=True)
+            "url": url_for("drs_service.object_download", object_id=drs_object.id, _external=True)
         },
         "type": "http"
     }
@@ -143,7 +143,7 @@ def service_info():
     })
 
 
-@drs_service.route('/objects/<string:object_id>', methods=['GET'])
+@drs_service.route("/objects/<string:object_id>", methods=["GET"])
 def object_info(object_id):
     drs_object = DrsObject.query.filter_by(id=object_id).first()
     drs_bundle = DrsBundle.query.filter_by(id=object_id).first()
@@ -167,11 +167,11 @@ def object_info(object_id):
     return jsonify(response)
 
 
-@drs_service.route('/search', methods=['GET'])
+@drs_service.route("/search", methods=["GET"])
 def object_search():
     response = []
-    name = request.args.get('name', None)
-    fuzzy_name = request.args.get('fuzzy_name', None)
+    name = request.args.get("name")
+    fuzzy_name = request.args.get("fuzzy_name")
 
     if name:
         objects = DrsObject.query.filter_by(name=name).all()
@@ -186,7 +186,7 @@ def object_search():
     return jsonify(response)
 
 
-@drs_service.route('/objects/<string:object_id>/download', methods=['GET'])
+@drs_service.route("/objects/<string:object_id>/download", methods=["GET"])
 def object_download(object_id):
     try:
         drs_object = DrsObject.query.filter_by(id=object_id).one()
@@ -195,28 +195,28 @@ def object_download(object_id):
 
     minio_obj = drs_object.return_minio_object()
 
-    if minio_obj:
-        # TODO: kinda greasy, not really sure we want to support such a feature later on
-        response = make_response(
-            send_file(
-                minio_obj['Body'],
-                mimetype="application/octet-stream",
-                as_attachment=True,
-                attachment_filename=drs_object.name
-            )
-        )
-
-        response.headers['Content-length'] = minio_obj['ContentLength']
-        return response
-    else:
+    if not minio_obj:
         return send_file(drs_object.location)
 
+    # TODO: kinda greasy, not really sure we want to support such a feature later on
+    response = make_response(
+        send_file(
+            minio_obj["Body"],
+            mimetype="application/octet-stream",
+            as_attachment=True,
+            attachment_filename=drs_object.name
+        )
+    )
 
-@drs_service.route('/private/ingest', methods=['POST'])
+    response.headers["Content-length"] = minio_obj["ContentLength"]
+    return response
+
+
+@drs_service.route("/private/ingest", methods=["POST"])
 def object_ingest():
     try:
         data = request.json
-        obj_path = data['path']
+        obj_path = data["path"]
     except KeyError:
         return flask_errors.flask_bad_request_error("Missing path parameter in JSON request")
 

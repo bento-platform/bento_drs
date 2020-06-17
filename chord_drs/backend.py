@@ -1,5 +1,6 @@
-from typing import Optional
 from flask import current_app, g
+from typing import Optional
+
 from chord_drs.backends.base import Backend
 from chord_drs.backends.local import LocalBackend
 from chord_drs.backends.minio import MinioBackend
