@@ -1,5 +1,6 @@
 import boto3
 from flask import current_app
+from urllib.parse import urlparse
 from chord_drs.backends.base import Backend
 
 
@@ -17,8 +18,9 @@ class MinioBackend(Backend):
 
         self.bucket = self.minio.Bucket(current_app.config["MINIO_BUCKET"])
 
-    def build_minio_location(self, obj):
-        host = current_app.config['MINIO_URL'].split('/')[2]
+    @staticmethod
+    def build_minio_location(obj):
+        host = urlparse(current_app.config["MINIO_URL"]).netloc
         return f"s3://{host}/{obj.bucket_name}/{obj.key}"
 
     def get_minio_object(self, location: str):
@@ -28,5 +30,4 @@ class MinioBackend(Backend):
     def save(self, current_location: str, filename: str) -> str:
         with open(current_location, "rb") as f:
             obj = self.bucket.put_object(Key=filename, Body=f)
-
-            return self.build_minio_location(obj)
+            return MinioBackend.build_minio_location(obj)
