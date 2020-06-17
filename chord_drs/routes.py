@@ -147,11 +147,14 @@ def service_info():
 
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
 def object_info(object_id):
-    drs_object = DrsObject.query.filter_by(id=object_id).first()
     drs_bundle = DrsBundle.query.filter_by(id=object_id).first()
+    drs_object = None
 
-    if not drs_object and not drs_bundle:
-        return flask_errors.flask_not_found_error("No object found for this ID")
+    if not drs_bundle:  # Only try hitting the database for an object if no bundle was found
+        drs_object = DrsObject.query.filter_by(id=object_id).first()
+
+        if not drs_object:
+            return flask_errors.flask_not_found_error("No object found for this ID")
 
     # Are we inside the bento singularity container? if so, provide local accessmethod
     inside_container = request.headers.get("X-CHORD-Internal", "0") == "1"
