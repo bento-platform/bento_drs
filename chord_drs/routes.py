@@ -13,9 +13,9 @@ from flask import (
 )
 from sqlalchemy.orm.exc import NoResultFound
 
-from chord_drs.app import db
-from chord_drs.constants import SERVICE_ID, SERVICE_NAME, SERVICE_TYPE
+from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
+from chord_drs.db import db
 from chord_drs.models import DrsObject, DrsBundle
 
 

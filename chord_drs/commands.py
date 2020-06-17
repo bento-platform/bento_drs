@@ -1,11 +1,13 @@
+import click
 import logging
 import os
-from typing import Optional
-import click
+
+from click import ClickException
 from flask import current_app
 from flask.cli import with_appcontext
-from click import ClickException
-from chord_drs.app import db
+from typing import Optional
+
+from chord_drs.db import db
 from chord_drs.models import DrsObject, DrsBundle
 
 

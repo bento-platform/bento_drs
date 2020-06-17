@@ -7,9 +7,9 @@ from flask import current_app
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
-from chord_drs.app import db
 from chord_drs.backend import get_backend
 from chord_drs.constants import SERVICE_NAME
+from chord_drs.db import db
 
 
 class DrsMixin:
