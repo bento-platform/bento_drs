@@ -4,7 +4,8 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-from chord_drs.constants import SERVICE_NAME
+from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
+from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 
 
 __all__ = [
@@ -48,9 +49,10 @@ if MINIO_SECRET_KEY_FILE:
 class Config:
     SQLALCHEMY_DATABASE_URI = "sqlite:///" + str(Path(os.path.join(BASEDIR, "db.sqlite3")).expanduser().resolve())
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    CHORD_URL: Optional[str] = os.environ.get("CHORD_URL", None)
-    CHORD_SERVICE_URL_BASE_PATH: Optional[str] = os.environ.get("SERVICE_URL_BASE_PATH", None)
-    SERVICE_DATA_SOURCE: str = 'minio' if MINIO_URL else 'local'
+    CHORD_URL: Optional[str] = os.environ.get("CHORD_URL")
+    CHORD_SERVICE_URL_BASE_PATH: Optional[str] = os.environ.get("SERVICE_URL_BASE_PATH")
+    SERVICE_ID: str = os.environ.get("SERVICE_ID", SERVICE_TYPE)
+    SERVICE_DATA_SOURCE: str = DATA_SOURCE_MINIO if MINIO_URL else DATA_SOURCE_LOCAL
     SERVICE_DATA: Optional[str] = None if MINIO_URL else SERVICE_DATA
     MINIO_URL: Optional[str] = MINIO_URL
     MINIO_USERNAME: Optional[str] = MINIO_USERNAME

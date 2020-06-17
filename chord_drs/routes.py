@@ -15,6 +15,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from chord_drs.app import db
 from chord_drs.constants import SERVICE_ID, SERVICE_NAME, SERVICE_TYPE
+from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from chord_drs.models import DrsObject, DrsBundle
 
 
@@ -86,7 +87,7 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
         "type": "http"
     }
 
-    if inside_container and data_source == 'local':
+    if inside_container and data_source == DATA_SOURCE_LOCAL:
         access_methods = [
             default_access_method,
             {
@@ -96,7 +97,7 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
                 "type": "file"
             }
         ]
-    elif data_source == 'minio':
+    elif data_source == DATA_SOURCE_MINIO:
         access_methods = [
             default_access_method,
             {
@@ -130,7 +131,7 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
     return jsonify({
-        "id": SERVICE_ID,
+        "id": current_app.config["SERVICE_ID"],
         "name": SERVICE_NAME,
         "type": SERVICE_TYPE,
         "description": "Data repository service (based on GA4GH's specs) for a CHORD application.",
