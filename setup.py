@@ -16,19 +16,20 @@ setuptools.setup(
 
     python_requires=">=3.6",
     install_requires=[
-        "boto3==1.12.32",
-        "chord_lib[flask]==0.7.0",
-        "Flask>=1.1,<2.0",
-        "Flask-SQLAlchemy>=2.4,<3.0",
-        "Flask-Migrate>=2.5,<3.0",
+        "boto3>=1.14.5,<1.15",
+        "chord_lib[flask]==0.9.0",
+        "Flask>=1.1.2,<2.0",
+        "Flask-SQLAlchemy>=2.4.3,<3.0",
+        "Flask-Migrate>=2.5.3,<3.0",
+        "prometheus_flask_exporter>=0.14.1,<0.15",
         "python-dotenv==0.13.0",
-        "SQLAlchemy>=1.3,<1.4"
+        "SQLAlchemy>=1.3.17,<1.4"
     ],
 
     author=config["package"]["authors"],
     author_email=config["package"]["author_emails"],
 
-    description="An implementation of a data repository system (as per GA4GH's specs) for the CHORD project.",
+    description="An implementation of a data repository system (as per GA4GH's specs) for the Bento platform.",
     long_description=long_description,
     long_description_content_type="text/markdown",
 
