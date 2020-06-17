@@ -8,6 +8,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
 from chord_drs.backend import get_backend
+from chord_drs.backends.minio import MinioBackend
 from chord_drs.constants import SERVICE_NAME
 from chord_drs.db import db
 
@@ -96,12 +97,12 @@ class DrsObject(db.Model, DrsMixin):
     def return_minio_object(self):
         parsed_url = urlparse(self.location)
 
-        if parsed_url.scheme == "s3":
-            backend = get_backend()
-
-            if not backend:
-                raise Exception("The backend for this instance is not properly configured.")
-
-            return backend.get_minio_object(self.location)
-        else:
+        if parsed_url.scheme != "s3":
             return None
+
+        backend = get_backend()
+
+        if not backend or not isinstance(backend, MinioBackend):
+            raise Exception("The backend for this instance is not properly configured.")
+
+        return backend.get_minio_object(self.location)
