@@ -13,6 +13,7 @@ from flask import (
 )
 from sqlalchemy.orm.exc import NoResultFound
 
+from chord_drs import __version__
 from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from chord_drs.db import db
@@ -140,7 +141,7 @@ def service_info():
             "url": "http://c3g.ca"
         },
         "contactUrl": "mailto:simon.chenard2@mcgill.ca",
-        "version": "0.1.0"
+        "version": __version__,
     })
 
 
