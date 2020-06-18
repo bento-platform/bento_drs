@@ -12,8 +12,7 @@ def validate_object_fields(data, existing_id=None):
     assert len(data["access_methods"]) == 2
     assert "access_url" in data["access_methods"][0]
     assert "url" in data["access_methods"][0]["access_url"]
-
-    assert "checksums" in data
+    assert "checksums" in data and len("checksums") > 0
     assert "created_time" in data
     assert "size" in data
     assert "self_uri" in data
@@ -78,24 +77,24 @@ def test_object_inside_bento(client, drs_object):
 
 
 def test_bundle_and_download(client, drs_bundle):
-    res = client.get(f'/objects/{drs_bundle.id}')
+    res = client.get(f"/objects/{drs_bundle.id}")
     data = res.get_json()
 
     assert res.status_code == 200
     assert "access_methods" not in data
-    assert "contents" in data
-    assert "name" in data["contents"] and data["contents"]["name"] == drs_bundle.name
     # issue again with the number of files ingested when ran locally vs travis-ci
-    assert "contents" in data["contents"] and len(data["contents"]["contents"]) > 0
+    assert "contents" in data and len(data["contents"]) > 0
+    assert "name" in data and data["name"] == drs_bundle.name
 
-    assert "checksums" in data
+    assert "checksums" in data and len("checksums") > 0
+
     assert "created_time" in data
     assert "size" in data
     assert "id" in data and data["id"] == drs_bundle.id
 
     # jsonify sort alphabetically - makes it that the last element will be
     # an object and not a bundle
-    obj = data["contents"]["contents"][-1]
+    obj = data["contents"][-1]
 
     res = client.get(obj["access_methods"][0]["access_url"]["url"])
 

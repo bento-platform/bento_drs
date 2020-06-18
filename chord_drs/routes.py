@@ -61,16 +61,16 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False) -> 
         content.append(obj_json)
 
     response = {
-        "contents": {
-            "contents": content,
-            "name": drs_bundle.name
-        },
-        "checksums": {
-            "checksum": drs_bundle.checksum,
-            "type": "sha-256"
-        },
+        "contents": content,
+        "checksums": [
+            {
+                "checksum": drs_bundle.checksum,
+                "type": "sha-256"
+            },
+        ],
         "created_time": f"{drs_bundle.created.isoformat('T')}Z",
         "size": drs_bundle.size,
+        "name": drs_bundle.name,
         "description": drs_bundle.description,
         "id": drs_bundle.id,
         "self_uri": create_drs_uri(drs_bundle.id)
@@ -115,10 +115,12 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
 
     response = {
         "access_methods": access_methods,
-        "checksums": {
-            "checksum": drs_object.checksum,
-            "type": "sha-256"
-        },
+        "checksums": [
+            {
+                "checksum": drs_object.checksum,
+                "type": "sha-256"
+            },
+        ],
         "created_time": f"{drs_object.created.isoformat('T')}Z",
         "size": drs_object.size,
         "name": drs_object.name,
