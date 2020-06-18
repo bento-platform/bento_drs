@@ -1,6 +1,6 @@
 import re
 
-from chord_lib.responses import flask_errors
+from bento_lib.responses import flask_errors
 from flask import (
     Blueprint,
     current_app,

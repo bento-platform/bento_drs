@@ -1,5 +1,5 @@
 import os
-from chord_lib.responses import flask_errors
+from bento_lib.responses import flask_errors
 from flask import Flask
 from flask_migrate import Migrate
 from werkzeug.exceptions import BadRequest, NotFound
