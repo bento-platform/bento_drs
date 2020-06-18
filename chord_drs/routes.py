@@ -1,5 +1,4 @@
 import re
-from urllib.parse import urljoin, urlparse
 
 from bento_lib.responses import flask_errors
 from flask import (
@@ -12,12 +11,15 @@ from flask import (
     make_response
 )
 from sqlalchemy.orm.exc import NoResultFound
+from typing import Optional
+from urllib.parse import urljoin, urlparse
 
 from chord_drs import __version__
 from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from chord_drs.db import db
 from chord_drs.models import DrsObject, DrsBundle
+from chord_drs.utils import drs_file_checksum
 
 
 RE_STARTING_SLASH = re.compile(r"^/")
@@ -59,16 +61,16 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False) -> 
         content.append(obj_json)
 
     response = {
-        "contents": {
-            "contents": content,
-            "name": drs_bundle.name
-        },
-        "checksums": {
-            "checksum": drs_bundle.checksum,
-            "type": "sha-256"
-        },
+        "contents": content,
+        "checksums": [
+            {
+                "checksum": drs_bundle.checksum,
+                "type": "sha-256"
+            },
+        ],
         "created_time": f"{drs_bundle.created.isoformat('T')}Z",
         "size": drs_bundle.size,
+        "name": drs_bundle.name,
         "description": drs_bundle.description,
         "id": drs_bundle.id,
         "self_uri": create_drs_uri(drs_bundle.id)
@@ -113,10 +115,12 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
 
     response = {
         "access_methods": access_methods,
-        "checksums": {
-            "checksum": drs_object.checksum,
-            "type": "sha-256"
-        },
+        "checksums": [
+            {
+                "checksum": drs_object.checksum,
+                "type": "sha-256"
+            },
+        ],
         "created_time": f"{drs_object.created.isoformat('T')}Z",
         "size": drs_object.size,
         "name": drs_object.name,
@@ -135,7 +139,7 @@ def service_info():
         "id": current_app.config["SERVICE_ID"],
         "name": SERVICE_NAME,
         "type": SERVICE_TYPE,
-        "description": "Data repository service (based on GA4GH's specs) for a CHORD application.",
+        "description": "Data repository service (based on GA4GH's specs) for a Bento platform node.",
         "organization": {
             "name": "C3G",
             "url": "http://c3g.ca"
@@ -219,21 +223,32 @@ def object_download(object_id):
 
 @drs_service.route("/private/ingest", methods=["POST"])
 def object_ingest():
-    try:
-        data = request.json
-        obj_path = data["path"]
-    except KeyError:
-        return flask_errors.flask_bad_request_error("Missing path parameter in JSON request")
+    data = request.json or {}
 
-    try:
-        new_object = DrsObject(location=obj_path)
+    obj_path: str = data.get("path")
 
-        db.session.add(new_object)
-        db.session.commit()
-    except Exception as e:  # TODO: More specific handling
-        current_app.logger.error(f"[{SERVICE_NAME}] Encountered exception during ingest: {e}")
-        return flask_errors.flask_bad_request_error("Error while creating the object")
+    if not obj_path or not isinstance(obj_path, str):
+        return flask_errors.flask_bad_request_error("Missing or invalid path parameter in JSON request")
 
-    response = build_object_json(new_object)
+    # TODO: Should this always be the case?
+    deduplicate: bool = data.get("deduplicate", False)
+
+    drs_object: Optional[DrsObject] = None
+    if deduplicate:
+        # Get checksum of original file, and query database for objects that match
+        checksum = drs_file_checksum(obj_path)
+        drs_object = DrsObject.query.filter_by(checksum=checksum).first()
+
+    if not drs_object:
+        try:
+            drs_object = DrsObject(location=obj_path)
+
+            db.session.add(drs_object)
+            db.session.commit()
+        except Exception as e:  # TODO: More specific handling
+            current_app.logger.error(f"[{SERVICE_NAME}] Encountered exception during ingest: {e}")
+            return flask_errors.flask_bad_request_error("Error while creating the object")
+
+    response = build_object_json(drs_object)
 
     return response, 201

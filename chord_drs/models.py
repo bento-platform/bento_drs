@@ -11,6 +11,7 @@ from chord_drs.backend import get_backend
 from chord_drs.backends.minio import MinioBackend
 from chord_drs.constants import SERVICE_NAME
 from chord_drs.db import db
+from chord_drs.utils import drs_file_checksum
 
 
 class DrsMixin:
@@ -58,7 +59,7 @@ class DrsObject(db.Model, DrsMixin):
     location = db.Column(db.String(500), nullable=False)
 
     def __init__(self, *args, **kwargs):
-        location = kwargs.get('location', None)
+        location = kwargs.get("location")
         p = Path(location)
 
         if not p.exists():
@@ -83,14 +84,8 @@ class DrsObject(db.Model, DrsMixin):
         self.location = current_location
         del kwargs["location"]
 
-        hash_obj = sha256()
         self.size = os.path.getsize(location)
-
-        with open(location, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                hash_obj.update(chunk)
-
-        self.checksum = hash_obj.hexdigest()
+        self.checksum = drs_file_checksum(location)
 
         super().__init__(*args, **kwargs)
 
