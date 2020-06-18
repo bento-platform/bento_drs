@@ -3,8 +3,9 @@ db.sqlite3
 .env
 
 # testing related
-.coverage
+.coverage*
 .tox
+htmlcov/
 
 # IDE stuff
 .idea/$CACHE_FILE$
