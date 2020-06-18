@@ -1,7 +1,7 @@
 import re
 from urllib.parse import urljoin, urlparse
 
-from chord_lib.responses import flask_errors
+from bento_lib.responses import flask_errors
 from flask import (
     Blueprint,
     current_app,
