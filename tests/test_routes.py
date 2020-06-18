@@ -1,4 +1,6 @@
 import chord_lib
+import json
+
 from jsonschema import validate
 from tests.conftest import NON_EXISTENT_DUMMY_FILE, DUMMY_FILE
 
@@ -144,7 +146,13 @@ def test_object_ingest(client):
     _ingest_one(client)
 
 
+def test_object_ingest_x2(client):
+    data_1 = _ingest_one(client)
+    data_2 = _ingest_one(client)
+    assert data_1["id"] != data_2["id"]
+
+
 def test_object_ingest_deduplicate(client):
-    data = _ingest_one(client)
-    data_2 = _ingest_one(client, data["id"], {"deduplicate": True})
-    assert data["checksums"][0]["checksum"] == data_2["checksums"][0]["checksum"]
+    data_1 = _ingest_one(client)
+    data_2 = _ingest_one(client, data_1["id"], {"deduplicate": True})
+    assert json.dumps(data_1, sort_keys=True) == json.dumps(data_2, sort_keys=True)
