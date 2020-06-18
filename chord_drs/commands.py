@@ -1,11 +1,13 @@
+import click
 import logging
 import os
-from typing import Optional
-import click
+
+from click import ClickException
 from flask import current_app
 from flask.cli import with_appcontext
-from click import ClickException
-from chord_drs.app import db
+from typing import Optional
+
+from chord_drs.db import db
 from chord_drs.models import DrsObject, DrsBundle
 
 
@@ -52,17 +54,19 @@ def ingest(source: str):
 
     Should we go through the directories recursively?
     """
+
     current_app.logger.setLevel(logging.INFO)
     # TODO: ingestion for remote files or archives
     # TODO: Create directories in minio when ingesting a bundle
-    if os.path.exists(source):
-        source = os.path.abspath(source)
 
-        if os.path.isfile(source):
-            create_drs_object(source)
-        else:
-            create_drs_bundle(source)
+    if not os.path.exists(source):
+        raise ClickException("File or directory provided does not exist")
 
-        db.session.commit()
+    source = os.path.abspath(source)
+
+    if os.path.isfile(source):
+        create_drs_object(source)
     else:
-        raise ClickException('File or directory provided does not exists')
+        create_drs_bundle(source)
+
+    db.session.commit()

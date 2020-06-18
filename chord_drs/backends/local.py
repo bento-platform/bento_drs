@@ -4,6 +4,9 @@ from flask import current_app
 from chord_drs.backends.base import Backend
 
 
+__all__ = ["LocalBackend"]
+
+
 class LocalBackend(Backend):
     """
     Default backend class for the location of the objects served
