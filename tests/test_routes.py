@@ -1,5 +1,5 @@
 from jsonschema import validate
-import chord_lib
+import bento_lib
 from tests.conftest import NON_EXISTENT_DUMMY_FILE, DUMMY_FILE
 
 
@@ -26,7 +26,7 @@ def test_service_info(client):
     res = client.get("/service-info")
     data = res.get_json()
 
-    validate(data, chord_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
+    validate(data, bento_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
 
 
 def test_object_fail(client):
