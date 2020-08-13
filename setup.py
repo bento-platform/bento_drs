@@ -37,7 +37,7 @@ setuptools.setup(
     include_package_data=True,
     entry_points={
         "console_scripts": [
-            "ingest=chord_drs.commands:ingest"
+            "ingest=bento_drs.commands:ingest"
         ],
     },
 
