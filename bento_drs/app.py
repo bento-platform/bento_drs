@@ -4,13 +4,13 @@ from flask import Flask
 from flask_migrate import Migrate
 from werkzeug.exceptions import BadRequest, NotFound
 
-from chord_drs.backend import close_backend
-from chord_drs.commands import ingest
-from chord_drs.config import Config, APP_DIR
-from chord_drs.constants import SERVICE_NAME
-from chord_drs.db import db
-from chord_drs.metrics import metrics
-from chord_drs.routes import drs_service
+from bento_drs.backend import close_backend
+from bento_drs.commands import ingest
+from bento_drs.config import Config, APP_DIR
+from bento_drs.constants import SERVICE_NAME
+from bento_drs.db import db
+from bento_drs.metrics import metrics
+from bento_drs.routes import drs_service
 
 MIGRATION_DIR = os.path.join(APP_DIR, "migrations")
 

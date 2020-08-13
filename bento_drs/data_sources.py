@@ -1,8 +1,8 @@
 from typing import Dict, Type
 
-from chord_drs.backends.base import Backend
-from chord_drs.backends.local import LocalBackend
-from chord_drs.backends.minio import MinioBackend
+from bento_drs.backends.base import Backend
+from bento_drs.backends.local import LocalBackend
+from bento_drs.backends.minio import MinioBackend
 
 
 __all__ = [

@@ -7,8 +7,8 @@ from flask import current_app
 from flask.cli import with_appcontext
 from typing import Optional
 
-from chord_drs.db import db
-from chord_drs.models import DrsObject, DrsBundle
+from bento_drs.db import db
+from bento_drs.models import DrsObject, DrsBundle
 
 
 def create_drs_bundle(location: str, parent: Optional[DrsBundle] = None) -> DrsBundle:

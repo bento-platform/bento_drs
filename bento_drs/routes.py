@@ -14,12 +14,12 @@ from sqlalchemy.orm.exc import NoResultFound
 from typing import Optional
 from urllib.parse import urljoin, urlparse
 
-from chord_drs import __version__
-from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
-from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
-from chord_drs.db import db
-from chord_drs.models import DrsObject, DrsBundle
-from chord_drs.utils import drs_file_checksum
+from bento_drs import __version__
+from bento_drs.constants import SERVICE_NAME, SERVICE_TYPE
+from bento_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
+from bento_drs.db import db
+from bento_drs.models import DrsObject, DrsBundle
+from bento_drs.utils import drs_file_checksum
 
 
 RE_STARTING_SLASH = re.compile(r"^/")

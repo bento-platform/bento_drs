@@ -1,8 +1,8 @@
 from flask import current_app, g
 from typing import Optional
 
-from chord_drs.backends.base import Backend
-from chord_drs.data_sources import DATA_SOURCE_BACKENDS
+from bento_drs.backends.base import Backend
+from bento_drs.data_sources import DATA_SOURCE_BACKENDS
 
 
 __all__ = [

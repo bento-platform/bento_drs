@@ -1,4 +1,4 @@
-from chord_drs import __version__
+from bento_drs import __version__
 
 __all__ = ["SERVICE_NAME", "SERVICE_ARTIFACT", "SERVICE_TYPE"]
 

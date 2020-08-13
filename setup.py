@@ -8,7 +8,7 @@ with open("README.md", "r") as rf:
     long_description = rf.read()
 
 config = configparser.ConfigParser()
-config.read(os.path.join(os.path.dirname(os.path.realpath(__file__)), "chord_drs", "package.cfg"))
+config.read(os.path.join(os.path.dirname(os.path.realpath(__file__)), "bento_drs", "package.cfg"))
 
 setuptools.setup(
     name=config["package"]["name"],

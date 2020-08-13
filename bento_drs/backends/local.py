@@ -1,7 +1,7 @@
 import os
 from shutil import copy
 from flask import current_app
-from chord_drs.backends.base import Backend
+from bento_drs.backends.base import Backend
 
 
 __all__ = ["LocalBackend"]

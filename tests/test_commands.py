@@ -1,6 +1,6 @@
 from click.testing import CliRunner
-from chord_drs.commands import ingest
-from chord_drs.models import DrsObject, DrsBundle
+from bento_drs.commands import ingest
+from bento_drs.models import DrsObject, DrsBundle
 from tests.conftest import (
     NON_EXISTENT_DUMMY_FILE,
     DUMMY_FILE,

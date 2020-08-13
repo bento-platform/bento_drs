@@ -6,12 +6,12 @@ from moto import mock_s3
 import pytest
 from pytest_lazyfixture import lazy_fixture
 
-from chord_drs.app import application, db
-from chord_drs.backends.base import FakeBackend
-from chord_drs.backends.minio import MinioBackend
-from chord_drs.config import BASEDIR, APP_DIR
-from chord_drs.commands import create_drs_bundle
-from chord_drs.models import DrsObject
+from bento_drs.app import application, db
+from bento_drs.backends.base import FakeBackend
+from bento_drs.backends.minio import MinioBackend
+from bento_drs.config import BASEDIR, APP_DIR
+from bento_drs.commands import create_drs_bundle
+from bento_drs.models import DrsObject
 
 
 SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"

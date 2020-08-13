@@ -1,1 +1,1 @@
-from chord_drs.app import application
+from bento_drs.app import application

@@ -7,11 +7,11 @@ from flask import current_app
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
-from chord_drs.backend import get_backend
-from chord_drs.backends.minio import MinioBackend
-from chord_drs.constants import SERVICE_NAME
-from chord_drs.db import db
-from chord_drs.utils import drs_file_checksum
+from bento_drs.backend import get_backend
+from bento_drs.backends.minio import MinioBackend
+from bento_drs.constants import SERVICE_NAME
+from bento_drs.db import db
+from bento_drs.utils import drs_file_checksum
 
 
 class DrsMixin:

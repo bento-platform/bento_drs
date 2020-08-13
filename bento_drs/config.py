@@ -4,8 +4,8 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
-from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
+from bento_drs.constants import SERVICE_NAME, SERVICE_TYPE
+from bento_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 
 
 __all__ = [
