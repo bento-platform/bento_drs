@@ -86,6 +86,9 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
     default_access_method = {
         "access_url": {
             "url": url_for("drs_service.object_download", object_id=drs_object.id, _external=True)
+            # No headers means that auth will have to be obtained via some
+            # out-of-band method, or the object's contents are public. This
+            # will depend on how the service is deployed.
         },
         "type": "http"
     }
@@ -150,7 +153,8 @@ def service_info():
 
 
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
-def object_info(object_id):
+@drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])
+def object_info(object_id: str):
     drs_bundle = DrsBundle.query.filter_by(id=object_id).first()
     drs_object = None
 
