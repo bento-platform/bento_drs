@@ -16,7 +16,7 @@ setuptools.setup(
 
     python_requires=">=3.6",
     install_requires=[
-        "boto3>=1.14.63,<1.15",
+        "boto3>=1.17.25,<1.18",
         "bento_lib[flask]==1.0.0",
         "Flask>=1.1.2,<2.0",
         "Flask-SQLAlchemy>=2.4.4,<3.0",
