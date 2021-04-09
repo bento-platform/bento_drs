@@ -21,6 +21,8 @@ from chord_drs.db import db
 from chord_drs.models import DrsObject, DrsBundle
 from chord_drs.utils import drs_file_checksum
 
+from werkzeug.utils import secure_filename
+
 
 RE_STARTING_SLASH = re.compile(r"^/")
 
@@ -219,6 +221,44 @@ def object_download(object_id):
 
     response.headers["Content-length"] = minio_obj["ContentLength"]
     return response
+
+
+@drs_service.route("/public/ingest", methods=["POST"])
+def upload_and_ingest():
+
+    try:
+        f = request.files['file']
+        print(f)
+        if f == None or f == "":
+            return flask_errors.flask_bad_request_error("Missing file!")
+    except Exception as e:
+        print(e)
+        return flask_errors.flask_bad_request_error(f"{e}")
+
+
+
+    f.save(secure_filename(f.filename))
+    print('file uploaded successfully')
+
+    drs_object: Optional[DrsObject] = None
+
+    # Get checksum of original file, and query database for objects that match
+    checksum = drs_file_checksum(f.filename)
+    drs_object = DrsObject.query.filter_by(checksum=checksum).first()
+
+    if not drs_object:
+        try:
+            drs_object = DrsObject(location=f.filename)
+
+            db.session.add(drs_object)
+            db.session.commit()
+        except Exception as e:  # TODO: More specific handling
+            current_app.logger.error(f"[{SERVICE_NAME}] Encountered exception during ingest: {e}")
+            return flask_errors.flask_bad_request_error("Error while creating the object")
+
+    response = build_object_json(drs_object)
+
+    return response, 201
 
 
 @drs_service.route("/private/ingest", methods=["POST"])
