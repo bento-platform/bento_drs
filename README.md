@@ -1,6 +1,7 @@
 # CHORD Data Repository Service
 
-![Build Status](https://api.travis-ci.com/c3g/chord_drs.svg?branch=master)
+![Test Status](https://github.com/c3g/chord_drs/workflows/Test/badge.svg)
+![Lint Status](https://github.com/c3g/chord_drs/workflows/Lint/badge.svg)
 [![codecov](https://codecov.io/gh/c3g/chord_drs/branch/master/graph/badge.svg)](https://codecov.io/gh/c3g/chord_drs)
 
 A proof of concept based on [GA4GH's DRS specifications](https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-1.0.0/docs/).
