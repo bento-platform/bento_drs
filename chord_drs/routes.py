@@ -209,8 +209,7 @@ def object_download(object_id):
     minio_obj = drs_object.return_minio_object()
 
     if not minio_obj:
-        return send_file(drs_object.location,
-            mimetype="application/octet-stream")
+        return send_file(drs_object.location, mimetype="application/octet-stream")
 
     # TODO: kinda greasy, not really sure we want to support such a feature later on
     response = make_response(
