@@ -215,14 +215,19 @@ def object_download(object_id):
             # Check for "Range" HTTP header
             bytesTag = request.headers.get('Range')  # supports "headers={'Range': 'bytes=x-y'}"
             if bytesTag != "":
-                print(f"Found Range header: {bytesTag}")
+                current_app.logger.debug(f"Found Range header: {bytesTag}")
+                
                 bytesSplit = bytesTag.split("=")
-                print(f"Found bytesSplit {bytesSplit}")
+                current_app.logger.debug(f"Found bytesSplit {bytesSplit}")
+                
                 rangeSplit = bytesSplit[1].strip().split("-")
-                print(f"Found rangeSplit {rangeSplit}")
+                current_app.logger.debug(f"Found rangeSplit {rangeSplit}")
 
-                fh.seek(rangeSplit[0])
-                data = fh.read(rangeSplit[1] - rangeSplit[0])
+                start=int(rangeSplit[0])
+                end=int(rangeSplit[1])
+
+                fh.seek(start)
+                data = fh.read(end - start)
 
                 buf = BytesIO(data)
             else:
