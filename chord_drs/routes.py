@@ -212,7 +212,22 @@ def object_download(object_id):
 
     if not minio_obj:
         with open(drs_object.location, 'rb') as fh:
-            buf = BytesIO(fh.read()) # supports "headers={'Range': 'bytes=x-y'}"
+            # Check for "Range" HTTP header
+            bytesTag = request.headers.get('Range')  # supports "headers={'Range': 'bytes=x-y'}"
+            if bytesTag != "":
+                print(f"Found Range header: {bytesTag}")
+                bytesSplit = bytesTag.split("=")
+                print(f"Found bytesSplit {bytesSplit}")
+                rangeSplit = bytesSplit[1].strip().split("-")
+                print(f"Found rangeSplit {rangeSplit}")
+
+                fh.seek(rangeSplit[0])
+                data = fh.read(rangeSplit[1] - rangeSplit[0])
+
+                buf = BytesIO(data)
+            else:
+                buf = BytesIO(fh.read())
+
             return send_file(buf, mimetype="application/octet-stream")
 
     # TODO: kinda greasy, not really sure we want to support such a feature later on
