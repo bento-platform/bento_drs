@@ -214,7 +214,7 @@ def object_download(object_id):
         with open(drs_object.location, 'rb') as fh:
             # Check for "Range" HTTP header
             bytesTag = request.headers.get('Range')  # supports "headers={'Range': 'bytes=x-y'}"
-            if bytesTag != "":
+            if bytesTag != None:
                 current_app.logger.debug(f"Found Range header: {bytesTag}")
                 
                 bytesSplit = bytesTag.split("=")
