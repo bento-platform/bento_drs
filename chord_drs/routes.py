@@ -1,5 +1,7 @@
 import re
 
+from io import BytesIO
+
 from bento_lib.responses import flask_errors
 from flask import (
     Blueprint,
@@ -209,7 +211,9 @@ def object_download(object_id):
     minio_obj = drs_object.return_minio_object()
 
     if not minio_obj:
-        return send_file(drs_object.location, mimetype="application/octet-stream")
+        with open(drs_object.location, 'rb') as fh:
+            buf = BytesIO(fh.read()) # supports "headers={'Range': 'bytes=x-y'}"
+            return send_file(buf, mimetype="application/octet-stream")
 
     # TODO: kinda greasy, not really sure we want to support such a feature later on
     response = make_response(
