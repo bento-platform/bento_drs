@@ -1,6 +1,5 @@
 import re
-
-from io import BytesIO
+import urllib.parse
 
 from bento_lib.responses import flask_errors
 from flask import (
@@ -25,6 +24,8 @@ from chord_drs.utils import drs_file_checksum
 
 
 RE_STARTING_SLASH = re.compile(r"^/")
+MIME_OCTET_STREAM = "application/octet-stream"
+CHUNK_SIZE = 1024 * 16  # Read 16 KB at a time
 
 drs_service = Blueprint("drs_service", __name__)
 
@@ -211,30 +212,64 @@ def object_download(object_id):
     minio_obj = drs_object.return_minio_object()
 
     if not minio_obj:
-        with open(drs_object.location, 'rb') as fh:
-            # Check for "Range" HTTP header
-            bytesTag = request.headers.get('Range')  # supports "headers={'Range': 'bytes=x-y'}"
-            if bytesTag is not None:
-                current_app.logger.debug(f"Found Range header: {bytesTag}")
+        # Check for "Range" HTTP header
+        range_header = request.headers.get("Range")  # supports "headers={'Range': 'bytes=x-y'}"
 
-                bytesSplit = bytesTag.split("=")
-                current_app.logger.debug(f"Found bytesSplit {bytesSplit}")
+        if range_header is None:
+            # Early return, no range header so send the whole thing
+            return send_file(
+                drs_object.location,
+                mimetype=MIME_OCTET_STREAM,
+                attachment_filename=drs_object.name,
+            )
 
-                rangeSplit = bytesSplit[1].strip().split("-")
-                current_app.logger.debug(f"Found rangeSplit {rangeSplit}")
+        current_app.logger.debug(f"Found Range header: {range_header}")
 
-                start = int(rangeSplit[0])
-                end = int(rangeSplit[1])
+        rh_split = range_header.split("=")
+        if len(rh_split) != 2 or rh_split[0] != "bytes":
+            err = f"Malformatted range header: expected bytes=X-Y or bytes=X-, got {range_header}"
+            current_app.logger.error(err)
+            return flask_errors.flask_bad_request_error(err)
 
-                fh.seek(start)
-                data = fh.read(end - start)
+        byte_range = rh_split[1].strip().split("-")
+        current_app.logger.debug(f"Retrieving byte range {byte_range}")
 
-                buf = BytesIO(data)
-            else:
-                buf = BytesIO(fh.read())
+        start = int(byte_range[0])
+        end = int(byte_range[1]) if byte_range[1] else None
 
-            return send_file(buf, mimetype="application/octet-stream")
+        if end is not None and end < start:
+            err = f"Invalid range header: end cannot be less than start (start={start}, end={end})"
+            current_app.logger.error(err)
+            return flask_errors.flask_bad_request_error(err)
 
+        def generate_bytes():
+            with open(drs_object.location, "rb") as fh2:
+                # First, skip over <start> bytes to get to the beginning of the range
+                fh2.seek(start)
+
+                # Then, read in either CHUNK_SIZE byte segments or however many bytes are left to send, whichever is
+                # left. This avoids filling memory with the contents of large files.
+                byte_offset = start
+                while True:
+                    # Add a 1 to the amount to read if it's below chunk size, because the last coordinate is inclusive.
+                    data = fh2.read(min(CHUNK_SIZE, (end + 1 - byte_offset) if end is not None else CHUNK_SIZE))
+                    byte_offset += len(data)
+                    yield data
+
+                    # If we've hit the end of the file and are reading empty byte strings, or we've reached the
+                    # end of our range (inclusive), then escape the loop.
+                    # This is guaranteed to terminate with a finite-sized file.
+                    if len(data) == 0 or (end is not None and byte_offset > end):
+                        break
+
+        # Stream the bytes of the file or file segment from the generator function
+        r = current_app.response_class(generate_bytes(), status=206, mimetype=MIME_OCTET_STREAM)
+        r.headers["Accept-Ranges"] = "bytes"
+        r.headers["Content-Disposition"] = \
+            f"attachment; filename*=UTF-8'{urllib.parse.quote(drs_object.name, encoding='utf-8')}'"
+        return r
+
+    # TODO: Support range headers for MinIO objects - only the local backend supports it for now
     # TODO: kinda greasy, not really sure we want to support such a feature later on
     response = make_response(
         send_file(

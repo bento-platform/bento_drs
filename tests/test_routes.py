@@ -42,7 +42,7 @@ def test_object_download_fail(client):
     assert res.status_code == 404
 
 
-def _test_object_and_download(client, obj):
+def _test_object_and_download(client, obj, test_range=False):
     res = client.get(f"/objects/{obj.id}")
     data = res.get_json()
 
@@ -54,6 +54,37 @@ def _test_object_and_download(client, obj):
 
     assert res.status_code == 200
     assert res.content_length == obj.size
+    assert len(res.get_data(as_text=False)) == obj.size
+
+    if test_range:
+        # Test fetching with Range headers
+
+        #  - first 5 bytes of a file
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=0-4"),))
+        assert res.status_code == 206
+        body = res.get_data(as_text=False)
+        assert len(body) == 5
+
+        #  - bytes 100-19999
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=100-1999"),))
+        assert res.status_code == 206
+        body = res.get_data(as_text=False)
+        assert len(body) == 1900
+
+        # Size is 2455, so these'll run off the end and return the whole thing after 100
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=100-19999"),))
+        assert res.status_code == 206
+        body = res.get_data(as_text=False)
+        assert len(body) == 2355
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=100-"),))
+        assert res.status_code == 206
+        body = res.get_data(as_text=False)
+        assert len(body) == 2355
+
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=0-"),))
+        assert res.status_code == 206
+        body = res.get_data(as_text=False)
+        assert len(body) == 2455
 
 
 def test_object_and_download_minio(client_minio, drs_object_minio):
@@ -62,6 +93,11 @@ def test_object_and_download_minio(client_minio, drs_object_minio):
 
 def test_object_and_download(client, drs_object):
     _test_object_and_download(client, drs_object)
+
+
+def test_object_and_download_with_ranges(client_local, drs_object):
+    # Only local backend supports ranges for now
+    _test_object_and_download(client_local, drs_object, test_range=True)
 
 
 def test_object_inside_bento(client, drs_object):
