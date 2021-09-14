@@ -77,3 +77,41 @@ In production, the service should be deployed using a WSGI service like
 With uWSGI you should point to chord_drs.app:application, the wsgi.py file
 at the root of the project is there to simplify executing the commands (such
 as "ingest")
+
+## API
+
+##### GET a single object
+
+`/objects/<string:object_id>`
+
+`/ga4gh/drs/v1/objects/<string:object_id>`
+
+##### GET search
+
+`/search`
+
+exact match `/search?name=P-1001.hc.g.vcf.gz` 
+
+partial match `/search?fuzzy_name=1001`
+
+##### GET download a single object
+
+`/objects/<string:object_id>/download`
+
+
+##### POST ingest
+
+`/private/ingest`
+
+e.g. POST body
+
+```bash
+{
+     "path": "examples/P-1001.hc.g.vcf.gz"
+}
+```
+
+
+##### GET service info
+
+`/service-info`
