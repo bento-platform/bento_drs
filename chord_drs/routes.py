@@ -229,13 +229,11 @@ def upload_and_ingest():
     try:
         f = request.files['file']
         print(f)
-        if f == None or f == "":
+        if f is None or f == "":
             return flask_errors.flask_bad_request_error("Missing file!")
     except Exception as e:
         print(e)
         return flask_errors.flask_bad_request_error(f"{e}")
-
-
 
     f.save(secure_filename(f.filename))
     print('file uploaded successfully')
