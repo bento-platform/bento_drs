@@ -246,7 +246,7 @@ def upload_and_ingest():
     checksum = drs_file_checksum(f.filename)
     drs_object = DrsObject.query.filter_by(checksum=checksum).first()
 
-    if not drs_object:
+    if drs_object is not None:
         try:
             drs_object = DrsObject(location=f.filename)
 
