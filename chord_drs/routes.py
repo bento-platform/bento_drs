@@ -188,6 +188,7 @@ def object_search():
     response = []
     name = request.args.get("name")
     fuzzy_name = request.args.get("fuzzy_name")
+    internal_path = request.args.get("internal_path")
 
     if name:
         objects = DrsObject.query.filter_by(name=name).all()
@@ -197,7 +198,7 @@ def object_search():
         return flask_errors.flask_bad_request_error("Missing GET search terms (either name or fuzzy_name)")
 
     for obj in objects:
-        response.append(build_object_json(obj))
+        response.append(build_object_json(obj, bool(internal_path)))
 
     return jsonify(response)
 
