@@ -4,7 +4,7 @@ import json
 from jsonschema import validate
 from tests.conftest import NON_EXISTENT_DUMMY_FILE, DUMMY_FILE
 from chord_drs.app import application
-from chord_drs.data_sources import DATA_SOURCE_LOCAL
+from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 
 
 NON_EXISTENT_ID = "123"
@@ -12,6 +12,7 @@ NON_EXISTENT_ID = "123"
 
 def validate_object_fields(data, existing_id=None, with_internal_path=False):
     is_local = application.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_LOCAL
+    is_minio = application.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_MINIO
 
     assert "contents" not in data
     assert "access_methods" in data
@@ -22,6 +23,13 @@ def validate_object_fields(data, existing_id=None, with_internal_path=False):
     assert "created_time" in data
     assert "size" in data
     assert "self_uri" in data
+
+    method_types = [method['type'] for method in data["access_methods"]]
+    assert "http" in method_types
+    if is_minio:
+        assert "s3" in method_types
+    elif is_local and with_internal_path:
+        assert "file" in method_types
 
     if existing_id:
         assert "id" in data and data["id"] == existing_id
@@ -156,16 +164,11 @@ def test_search_object(client, drs_bundle):
         res = client.get(url)
         data = res.get_json()
         has_internal_path = "internal_path" in url
-        is_local = application.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_LOCAL
 
         assert res.status_code == 200
         assert len(data) == 1
 
         validate_object_fields(data[0], with_internal_path=has_internal_path)
-
-        assert len(data[0]["access_methods"]) == 2 if has_internal_path else 1
-        has_file_property = ("file" in [method['type'] for method in data[0]["access_methods"]])
-        assert has_file_property == (is_local and has_internal_path)
 
 
 def test_object_ingest_fail(client):
