@@ -175,10 +175,13 @@ def object_info(object_id: str):
         f"[{SERVICE_NAME}] object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}"
     )
 
+    # The requester can specify object internal path to be added to the response
+    use_internal_path = bool(request.args.get("internal_path"))
+
     if drs_bundle:
-        response = build_bundle_json(drs_bundle, inside_container=inside_container)
+        response = build_bundle_json(drs_bundle, inside_container=(inside_container or use_internal_path))
     else:
-        response = build_object_json(drs_object, inside_container=inside_container)
+        response = build_object_json(drs_object, inside_container=(inside_container or use_internal_path))
 
     return jsonify(response)
 

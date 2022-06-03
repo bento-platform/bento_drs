@@ -120,6 +120,14 @@ def test_object_inside_bento(client, drs_object):
     assert len(data["access_methods"]) == 2
 
 
+def test_object_with_internal_path(client, drs_object):
+    res = client.get(f"/objects/{drs_object.id}?internal_path=1")
+    data = res.get_json()
+
+    assert res.status_code == 200
+    validate_object_fields(data, with_internal_path=True)
+
+
 def test_bundle_and_download(client, drs_bundle):
     res = client.get(f"/objects/{drs_bundle.id}")
     data = res.get_json()
