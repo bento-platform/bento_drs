@@ -30,6 +30,10 @@ CHUNK_SIZE = 1024 * 16  # Read 16 KB at a time
 drs_service = Blueprint("drs_service", __name__)
 
 
+def strtobool(val: str):
+    return val.lower() in ("yes", "true", "t", "1", "on")
+
+
 def get_drs_base_path():
     base_path = request.host
 
@@ -175,10 +179,13 @@ def object_info(object_id: str):
         f"[{SERVICE_NAME}] object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}"
     )
 
+    # The requester can specify object internal path to be added to the response
+    use_internal_path = strtobool(request.args.get("internal_path", ""))
+
     if drs_bundle:
-        response = build_bundle_json(drs_bundle, inside_container=inside_container)
+        response = build_bundle_json(drs_bundle, inside_container=(inside_container or use_internal_path))
     else:
-        response = build_object_json(drs_object, inside_container=inside_container)
+        response = build_object_json(drs_object, inside_container=(inside_container or use_internal_path))
 
     return jsonify(response)
 
@@ -188,6 +195,7 @@ def object_search():
     response = []
     name = request.args.get("name")
     fuzzy_name = request.args.get("fuzzy_name")
+    internal_path = request.args.get("internal_path", "")
 
     if name:
         objects = DrsObject.query.filter_by(name=name).all()
@@ -197,7 +205,7 @@ def object_search():
         return flask_errors.flask_bad_request_error("Missing GET search terms (either name or fuzzy_name)")
 
     for obj in objects:
-        response.append(build_object_json(obj))
+        response.append(build_object_json(obj, strtobool(internal_path)))
 
     return jsonify(response)
 

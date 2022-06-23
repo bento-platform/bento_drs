@@ -3,21 +3,33 @@ import json
 
 from jsonschema import validate
 from tests.conftest import NON_EXISTENT_DUMMY_FILE, DUMMY_FILE
+from chord_drs.app import application
+from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 
 
 NON_EXISTENT_ID = "123"
 
 
-def validate_object_fields(data, existing_id=None):
+def validate_object_fields(data, existing_id=None, with_internal_path=False):
+    is_local = application.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_LOCAL
+    is_minio = application.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_MINIO
+
     assert "contents" not in data
     assert "access_methods" in data
-    assert len(data["access_methods"]) == 2
+    assert len(data["access_methods"]) == 1 if is_local and not with_internal_path else 2
     assert "access_url" in data["access_methods"][0]
     assert "url" in data["access_methods"][0]["access_url"]
     assert "checksums" in data and len("checksums") > 0
     assert "created_time" in data
     assert "size" in data
     assert "self_uri" in data
+
+    method_types = [method['type'] for method in data["access_methods"]]
+    assert "http" in method_types
+    if is_minio:
+        assert "s3" in method_types
+    elif is_local and with_internal_path:
+        assert "file" in method_types
 
     if existing_id:
         assert "id" in data and data["id"] == existing_id
@@ -108,6 +120,22 @@ def test_object_inside_bento(client, drs_object):
     assert len(data["access_methods"]) == 2
 
 
+def test_object_with_internal_path(client, drs_object):
+    res = client.get(f"/objects/{drs_object.id}?internal_path=1")
+    data = res.get_json()
+
+    assert res.status_code == 200
+    validate_object_fields(data, with_internal_path=True)
+
+
+def test_object_with_disabled_internal_path(client, drs_object):
+    res = client.get(f"/objects/{drs_object.id}?internal_path=0")
+    data = res.get_json()
+
+    assert res.status_code == 200
+    validate_object_fields(data, with_internal_path=False)
+
+
 def test_bundle_and_download(client, drs_bundle):
     res = client.get(f"/objects/{drs_bundle.id}")
     data = res.get_json()
@@ -148,14 +176,15 @@ def test_search_object_empty(client, drs_bundle):
 
 
 def test_search_object(client, drs_bundle):
-    for url in ("/search?name=alembic.ini", "/search?fuzzy_name=mbic"):
+    for url in ("/search?name=alembic.ini", "/search?fuzzy_name=mbic", "/search?name=alembic.ini&internal_path=1"):
         res = client.get(url)
         data = res.get_json()
+        has_internal_path = "internal_path" in url
 
         assert res.status_code == 200
         assert len(data) == 1
 
-        validate_object_fields(data[0])
+        validate_object_fields(data[0], with_internal_path=has_internal_path)
 
 
 def test_object_ingest_fail(client):

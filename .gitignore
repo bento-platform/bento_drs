@@ -2,6 +2,9 @@
 db.sqlite3
 .env
 
+# added at runtime by bentoV2
+chord_drs/startup.sh
+
 # testing related
 .coverage*
 .tox
@@ -19,3 +22,4 @@ htmlcov/
 *.pyc
 env
 __pycache__
+data/

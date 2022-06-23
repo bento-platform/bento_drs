@@ -12,6 +12,7 @@ from chord_drs.backends.minio import MinioBackend
 from chord_drs.config import BASEDIR, APP_DIR
 from chord_drs.commands import create_drs_bundle
 from chord_drs.models import DrsObject
+from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 
 
 SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
@@ -25,7 +26,7 @@ def client_minio():
     bucket_name = "test"
     application.config["MINIO_URL"] = "http://127.0.0.1:9000"
     application.config["MINIO_BUCKET"] = bucket_name
-    application.config["SERVICE_DATA_SOURCE"] = "minio"
+    application.config["SERVICE_DATA_SOURCE"] = DATA_SOURCE_MINIO
 
     with application.app_context(), mock_s3():
         s3 = boto3.resource("s3")
@@ -44,6 +45,7 @@ def client_minio():
 @pytest.fixture
 def client_local():
     application.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
+    application.config["SERVICE_DATA_SOURCE"] = DATA_SOURCE_LOCAL
 
     with application.app_context():
         g.backend = FakeBackend()
