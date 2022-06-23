@@ -128,6 +128,14 @@ def test_object_with_internal_path(client, drs_object):
     validate_object_fields(data, with_internal_path=True)
 
 
+def test_object_with_disabled_internal_path(client, drs_object):
+    res = client.get(f"/objects/{drs_object.id}?internal_path=0")
+    data = res.get_json()
+
+    assert res.status_code == 200
+    validate_object_fields(data, with_internal_path=False)
+
+
 def test_bundle_and_download(client, drs_bundle):
     res = client.get(f"/objects/{drs_bundle.id}")
     data = res.get_json()
