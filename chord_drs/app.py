@@ -43,3 +43,12 @@ application.teardown_appcontext(close_backend)
 with application.app_context():
     if not application.config["CHORD_URL"]:
         metrics.init_app(application)
+
+# # debugger section
+# Ensure 'debugpy' is installed (via requirements.txt or manually)
+if os.environ.get('FLASK_DEBUG', False):
+    import debugpy
+    DEBUGGER_PORT = int(os.environ.get('DEBUGGER_PORT', 5678))
+    debugpy.listen(("0.0.0.0", DEBUGGER_PORT))
+    print('Attached')
+# # end debugger section
