@@ -46,9 +46,13 @@ with application.app_context():
 
 # # debugger section
 # Ensure 'debugpy' is installed (via requirements.txt or manually)
-if os.environ.get('FLASK_DEBUG', False):
-    import debugpy
-    DEBUGGER_PORT = int(os.environ.get('DEBUGGER_PORT', 5678))
-    debugpy.listen(("0.0.0.0", DEBUGGER_PORT))
-    print('Attached')
+DEBUG = os.environ.get('FLASK_DEBUG', False)
+if DEBUG:
+    try:
+        import debugpy
+        DEBUGGER_PORT = int(os.environ.get('DEBUGGER_PORT', 5678))
+        debugpy.listen(("0.0.0.0", DEBUGGER_PORT))
+        print('Debugger Attached')
+    except ImportError as e:
+        print("Module debugpy not found. Run pip install debugpy to enable VSCode debugging")
 # # end debugger section
