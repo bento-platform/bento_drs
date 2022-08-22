@@ -52,7 +52,7 @@ if DEBUG:
         import debugpy
         DEBUGGER_PORT = int(os.environ.get('DEBUGGER_PORT', 5678))
         debugpy.listen(("0.0.0.0", DEBUGGER_PORT))
-        print('Debugger Attached')
-    except ImportError as e:
-        print("Module debugpy not found. Run pip install debugpy to enable VSCode debugging")
+        print('\nDebugger Attached\n')
+    except ImportError:
+        print("\nWARNING Module debugpy not found. To enable VSCode debugging, run:\n\tpip install debugpy\n")
 # # end debugger section
