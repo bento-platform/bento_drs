@@ -17,6 +17,7 @@ htmlcov/
 .idea/workspace.xml
 *.swp
 *.swo
+.vscode
 
 # others
 *.pyc
