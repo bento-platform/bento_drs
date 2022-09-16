@@ -142,17 +142,11 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
 
     return response
 
-def get_isDebbuging():
-    if (current_app.config["BENTO_DEBUG"][0]==True):
-        return True
-    else:
-        return False
-
 
 @drs_service.route("/service-info", methods=["GET"])
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
-    service_dict= {
+    info= {
             "id": current_app.config["SERVICE_ID"],
             "name": SERVICE_NAME,
             "type": SERVICE_TYPE,
@@ -163,27 +157,25 @@ def service_info():
             },
             "contactUrl": "mailto:simon.chenard2@mcgill.ca",
             "version": __version__,
+            "environment": "prod"
         }
 
-    if get_isDebbuging()== False:
-        return jsonify(service_dict.update({"environment": "production"}))
+    if not current_app.config["BENTO_DEBUG"]:
+        return jsonify(info)
     else:
-        git_info={"environment": "development"}
+        info["environment"] = "dev"
         try:
-            subprocess.run(['git', 'config', '--global', '--add', 'safe.directory', '/drs/bento_drs'])
-            res_tag = subprocess.check_output(['git', 'describe', '--tags', '--abbrev=0'])
-            if res_tag is not None:
-                git_tag= res_tag.decode('utf-8').rstrip()
-                git_info["git_tag"]=git_tag
+            subprocess.run(["git", "config", "--global", "--add", "safe.directory", "./bento_drs"])
+            res_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"])
+            if res_tag:
+                info["git_tag"] = res_tag.decode().rstrip()
             res_branch= subprocess.check_output(["git", "branch", "--show-current"])
-            if res_branch is not None:
-                git_branch= res_branch.decode('utf-8').rstrip()
-                git_info["git_branch"]= git_branch
-            service_dict.update(git_info)
-            return jsonify(service_dict)
+            if res_branch:
+                info["git_branch"] = res_branch.decode().rstrip()
+            return jsonify(info)
            
         except:
-            return flask_errors.flask_not_found_error("Error in dev-mode retrieving git information")
+            return flask_errors.flask_internal_server_error("Error in dev-mode retrieving git information") 
         
 
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
