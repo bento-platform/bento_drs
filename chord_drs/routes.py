@@ -1,6 +1,7 @@
 import re
 import urllib.parse
 import subprocess
+import os
 
 from bento_lib.responses import flask_errors
 from flask import (
@@ -29,6 +30,8 @@ MIME_OCTET_STREAM = "application/octet-stream"
 CHUNK_SIZE = 1024 * 16  # Read 16 KB at a time
 
 drs_service = Blueprint("drs_service", __name__)
+
+path_for_git = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 def strtobool(val: str):
@@ -146,18 +149,18 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
 @drs_service.route("/service-info", methods=["GET"])
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
-    info= {
-            "id": current_app.config["SERVICE_ID"],
-            "name": SERVICE_NAME,
-            "type": SERVICE_TYPE,
-            "description": "Data repository service (based on GA4GH's specs) for a Bento platform node.",
-            "organization": {
-                "name": "C3G",
-                "url": "http://c3g.ca"
-            },
-            "contactUrl": "mailto:simon.chenard2@mcgill.ca",
-            "version": __version__,
-            "environment": "prod"
+    info = {
+        "id": current_app.config["SERVICE_ID"],
+        "name": SERVICE_NAME,
+        "type": SERVICE_TYPE,
+        "description": "Data repository service (based on GA4GH's specs) for a Bento platform node.",
+        "organization": {
+            "name": "C3G",
+            "url": "http://c3g.ca"
+        },
+        "contactUrl": "mailto:simon.chenard2@mcgill.ca",
+        "version": __version__,
+        "environment": "prod"
         }
 
     if not current_app.config["BENTO_DEBUG"]:
@@ -165,18 +168,18 @@ def service_info():
     else:
         info["environment"] = "dev"
         try:
-            subprocess.run(["git", "config", "--global", "--add", "safe.directory", "./bento_drs"])
+            subprocess.run(["git", "config", "--global", "--add", "safe.directory", str(path_for_git)])
             res_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"])
             if res_tag:
                 info["git_tag"] = res_tag.decode().rstrip()
-            res_branch= subprocess.check_output(["git", "branch", "--show-current"])
+            res_branch = subprocess.check_output(["git", "branch", "--show-current"])
             if res_branch:
                 info["git_branch"] = res_branch.decode().rstrip()
             return jsonify(info)
-           
-        except:
-            return flask_errors.flask_internal_server_error("Error in dev-mode retrieving git information") 
-        
+        except Exception as e:
+            except_name = type(e).__name__
+            return flask_errors.flask_internal_server_error("Error in dev-mode retrieving git information", except_name)
+
 
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])

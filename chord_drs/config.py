@@ -58,9 +58,8 @@ class Config:
     MINIO_USERNAME: Optional[str] = MINIO_USERNAME
     MINIO_PASSWORD: Optional[str] = MINIO_PASSWORD
     MINIO_BUCKET: Optional[str] = os.environ.get("MINIO_BUCKET") if MINIO_URL else None
-    BENTO_DEBUG=os.environ.get("FLASK_DEBUG", os.environ.get("FLASK_ENV", "production")).strip().lower() in (
-        "true", "1", "development"),
-   
+    BENTO_DEBUG = os.environ.get("FLASK_DEBUG", os.environ.get("FLASK_ENV", "production"))
+
 
 print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
 print(f"[{SERVICE_NAME}]         data source {Config.SERVICE_DATA_SOURCE}")
