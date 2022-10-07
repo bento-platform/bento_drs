@@ -1,5 +1,6 @@
 import re
 import urllib.parse
+import subprocess
 
 from bento_lib.responses import flask_errors
 from flask import (
@@ -145,7 +146,7 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
 @drs_service.route("/service-info", methods=["GET"])
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
-    return jsonify({
+    info = {
         "id": current_app.config["SERVICE_ID"],
         "name": SERVICE_NAME,
         "type": SERVICE_TYPE,
@@ -156,7 +157,26 @@ def service_info():
         },
         "contactUrl": "mailto:simon.chenard2@mcgill.ca",
         "version": __version__,
-    })
+        "environment": "prod"
+        }
+
+    if not current_app.config["BENTO_DEBUG"]:
+        return jsonify(info)
+
+    info["environment"] = "dev"
+    try:
+        res_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"])
+        if res_tag:
+            info["git_tag"] = res_tag.decode().rstrip()
+        res_branch = subprocess.check_output(["git", "branch", "--show-current"])
+        if res_branch:
+            info["git_branch"] = res_branch.decode().rstrip()
+
+    except Exception as e:
+        except_name = type(e).__name__
+        print("Error in dev-mode retrieving git information", except_name, e)
+
+    return jsonify(info)
 
 
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
