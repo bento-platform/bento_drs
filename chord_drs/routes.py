@@ -18,6 +18,7 @@ from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 from chord_drs import __version__
+from chord_drs.config import APP_DIR
 from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from chord_drs.db import db
@@ -30,8 +31,6 @@ MIME_OCTET_STREAM = "application/octet-stream"
 CHUNK_SIZE = 1024 * 16  # Read 16 KB at a time
 
 drs_service = Blueprint("drs_service", __name__)
-
-path_for_git = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 def strtobool(val: str):
@@ -165,20 +164,22 @@ def service_info():
 
     if not current_app.config["BENTO_DEBUG"]:
         return jsonify(info)
-    else:
-        info["environment"] = "dev"
-        try:
-            subprocess.run(["git", "config", "--global", "--add", "safe.directory", str(path_for_git)])
-            res_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"])
-            if res_tag:
-                info["git_tag"] = res_tag.decode().rstrip()
-            res_branch = subprocess.check_output(["git", "branch", "--show-current"])
-            if res_branch:
-                info["git_branch"] = res_branch.decode().rstrip()
-            return jsonify(info)
-        except Exception as e:
-            except_name = type(e).__name__
-            return flask_errors.flask_internal_server_error("Error in dev-mode retrieving git information", except_name)
+
+    info["environment"] = "dev"
+    try:
+        subprocess.run(["git", "config", "--global", "--add", "safe.directory", str(APP_DIR)])
+        res_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"])
+        if res_tag:
+            info["git_tag"] = res_tag.decode().rstrip()
+        res_branch = subprocess.check_output(["git", "branch", "--show-current"])
+        if res_branch:
+            info["git_branch"] = res_branch.decode().rstrip()
+
+    except Exception as e:
+        except_name = type(e).__name__
+        print("Error in dev-mode retrieving git information", except_name, e)
+
+    return jsonify(info)
 
 
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
