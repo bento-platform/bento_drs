@@ -1,7 +1,6 @@
 import re
 import urllib.parse
 import subprocess
-import os
 
 from bento_lib.responses import flask_errors
 from flask import (
@@ -18,7 +17,6 @@ from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 from chord_drs import __version__
-from chord_drs.config import APP_DIR
 from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from chord_drs.db import db
@@ -167,7 +165,6 @@ def service_info():
 
     info["environment"] = "dev"
     try:
-        subprocess.run(["git", "config", "--global", "--add", "safe.directory", str(APP_DIR)])
         res_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"])
         if res_tag:
             info["git_tag"] = res_tag.decode().rstrip()
