@@ -20,7 +20,7 @@ flake8-polyfill==1.0.2
 Flask==2.0.1
 Flask-Migrate==3.1.0
 Flask-SQLAlchemy==2.5.1
-greenlet==1.0.0
+greenlet==1.2.2
 idna==2.10
 iniconfig==1.1.1
 itsdangerous==2.0.1
