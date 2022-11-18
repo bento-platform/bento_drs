@@ -1,0 +1,34 @@
+name: Build and push bento_notification_service
+
+on:
+  release:
+    types: [ published ]
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+      - "features/dockerize"
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Run Bento build action
+        uses: bento-platform/bento_build_action@v0.6
+        with:
+          registry: ghcr.io
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          image-name: ghcr.io/bento-platform/bento_notification_service
+          development-dockerfile: Dockerfile
+          dockerfile: Dockerfile
