@@ -3,7 +3,7 @@ FROM ghcr.io/bento-platform/bento_base_image:python-debian-2022.10.11
 # TODO: change USER
 USER root
 
-RUN apt update && apt upgrade && apt install gcc -y
+RUN apt install gcc -y
 
 RUN mkdir -p /drs/bento_drs && \
     mkdir /wes;
