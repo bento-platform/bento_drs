@@ -3,12 +3,12 @@ FROM ghcr.io/bento-platform/bento_base_image:python-debian-2022.10.11
 # TODO: change USER
 USER root
 
-RUN apt install gcc libffi-dev -y
+RUN apt install libffi-dev -y
 
 RUN mkdir -p /drs/bento_drs && \
     mkdir /wes;
 
-RUN echo "Building DRS in Production Mode";
+RUN echo "Building DRS in Developmnet Mode";
 
 WORKDIR /drs/bento_drs
 COPY . .
@@ -16,9 +16,8 @@ COPY . .
 WORKDIR /drs/bento_drs
 RUN mkdir -p /drs/bento_drs/data/obj && \
     mkdir -p /drs/bento_drs/data/db;
-RUN ["pip", "install", "-r", "requirements.txt"]
+RUN ["pip", "install", "debugpy", "-r", "requirements.txt"]
 
 # Run
 WORKDIR /drs/bento_drs/chord_drs
 COPY startup.sh ./startup.sh
-CMD ["sh", "startup.sh"]
