@@ -8,10 +8,10 @@ RUN apt install libffi-dev -y
 RUN mkdir -p /drs/bento_drs && \
     mkdir /wes;
 
-RUN echo "Building DRS in Developmnet Mode";
+RUN echo "Building DRS in Development Mode";
 
 WORKDIR /drs/bento_drs
-COPY . .
+COPY ./requirements.txt .
 
 WORKDIR /drs/bento_drs
 RUN mkdir -p /drs/bento_drs/data/obj && \
