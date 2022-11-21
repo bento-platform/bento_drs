@@ -1,6 +1,6 @@
 cd ../data;
-mkdir db;
-mkdir obj;
+mkdir -p db;
+mkdir -p obj;
 
 cd ../chord_drs;
 flask db upgrade;

@@ -5,17 +5,12 @@ USER root
 
 RUN apt install libffi-dev -y
 
-RUN mkdir -p /drs/bento_drs && \
-    mkdir /wes;
-
 RUN echo "Building DRS in Development Mode";
-
 WORKDIR /drs/bento_drs
-COPY ./requirements.txt .
-
-WORKDIR /drs/bento_drs
-RUN mkdir -p /drs/bento_drs/data/obj && \
+RUN mkdir /wes && \
+    mkdir -p /drs/bento_drs/data/obj && \
     mkdir -p /drs/bento_drs/data/db;
+COPY ./requirements.txt .
 RUN ["pip", "install", "debugpy", "-r", "requirements.txt"]
 
 # Run

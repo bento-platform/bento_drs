@@ -5,18 +5,14 @@ USER root
 
 RUN apt install gcc libffi-dev -y
 
-RUN mkdir -p /drs/bento_drs && \
-    mkdir /wes;
-
 RUN echo "Building DRS in Production Mode";
-
 WORKDIR /drs/bento_drs
-COPY . .
-
-WORKDIR /drs/bento_drs
-RUN mkdir -p /drs/bento_drs/data/obj && \
+RUN mkdir /wes && \
+    mkdir -p /drs/bento_drs/data/obj && \
     mkdir -p /drs/bento_drs/data/db;
+COPY requirements.txt requirements.txt
 RUN ["pip", "install", "-r", "requirements.txt"]
+COPY . .
 
 # Run
 WORKDIR /drs/bento_drs/chord_drs
