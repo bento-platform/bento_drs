@@ -1,4 +1,4 @@
-FROM ghcr.io/bento-platform/bento_base_image:python-debian-2022.10.11
+FROM ghcr.io/bento-platform/bento_base_image:python-debian-2022.12.06
 
 # TODO: change USER
 USER root
@@ -6,15 +6,17 @@ USER root
 RUN apt install gcc libffi-dev -y
 
 RUN echo "Building DRS in Production Mode";
-WORKDIR /drs/bento_drs
+WORKDIR /drs
 RUN mkdir /wes && \
-    mkdir -p /drs/bento_drs/data/obj && \
-    mkdir -p /drs/bento_drs/data/db;
+    mkdir -p /drs/data/obj && \
+    mkdir -p /drs/data/db
+
+# Install dependencies
 COPY requirements.txt requirements.txt
 RUN ["pip", "install", "-r", "requirements.txt"]
-COPY . .
 
-# Run
-WORKDIR /drs/bento_drs/chord_drs
-COPY startup.sh ./startup.sh
-CMD ["sh", "startup.sh"]
+# Copy only what's required for a production instance
+COPY chord_drs chord_drs
+COPY entrypoint.bash .
+
+ENTRYPOINT ["/bin/bash", "./entrypoint.bash"]

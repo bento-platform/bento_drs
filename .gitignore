@@ -11,10 +11,7 @@ chord_drs/startup.sh
 htmlcov/
 
 # IDE stuff
-.idea/$CACHE_FILE$
-.idea/dataSources*
-.idea/rSettings.xml
-.idea/workspace.xml
+.idea/*
 *.swp
 *.swo
 .vscode
