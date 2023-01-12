@@ -253,7 +253,7 @@ def object_download(object_id):
             return send_file(
                 drs_object.location,
                 mimetype=MIME_OCTET_STREAM,
-                attachment_filename=drs_object.name,
+                download_name=drs_object.name,
             )
 
         current_app.logger.debug(f"Found Range header: {range_header}")
@@ -309,7 +309,7 @@ def object_download(object_id):
             minio_obj["Body"],
             mimetype="application/octet-stream",
             as_attachment=True,
-            attachment_filename=drs_object.name
+            download_name=drs_object.name
         )
     )
 
