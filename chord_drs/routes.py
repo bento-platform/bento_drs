@@ -17,7 +17,7 @@ from typing import Optional
 from urllib.parse import urljoin, urlparse
 
 from chord_drs import __version__
-from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
+from chord_drs.constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from chord_drs.db import db
 from chord_drs.models import DrsObject, DrsBundle
@@ -153,24 +153,29 @@ def service_info():
         "description": "Data repository service (based on GA4GH's specs) for a Bento platform node.",
         "organization": {
             "name": "C3G",
-            "url": "http://c3g.ca"
+            "url": "https://www.computationalgenomics.ca"
         },
-        "contactUrl": "mailto:simon.chenard2@mcgill.ca",
+        "contactUrl": "mailto:info@c3g.ca",
         "version": __version__,
-        "environment": "prod"
-        }
+        "environment": "prod",
+        "bento": {
+            "serviceKind": BENTO_SERVICE_KIND,
+        },
+    }
 
     if not current_app.config["BENTO_DEBUG"]:
         return jsonify(info)
 
     info["environment"] = "dev"
     try:
-        res_tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"])
-        if res_tag:
-            info["git_tag"] = res_tag.decode().rstrip()
-        res_branch = subprocess.check_output(["git", "branch", "--show-current"])
-        if res_branch:
-            info["git_branch"] = res_branch.decode().rstrip()
+        if res_tag := subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"]):
+            res_tag_str = res_tag.decode().rstrip()
+            info["git_tag"] = res_tag_str
+            info["bento"]["gitTag"] = res_tag_str
+        if res_branch := subprocess.check_output(["git", "branch", "--show-current"]):
+            res_branch_str = res_branch.decode().strip()
+            info["git_branch"] = res_branch_str
+            info["bento"]["gitBranch"] = res_branch_str
 
     except Exception as e:
         except_name = type(e).__name__
@@ -248,7 +253,7 @@ def object_download(object_id):
             return send_file(
                 drs_object.location,
                 mimetype=MIME_OCTET_STREAM,
-                attachment_filename=drs_object.name,
+                download_name=drs_object.name,
             )
 
         current_app.logger.debug(f"Found Range header: {range_header}")
@@ -304,7 +309,7 @@ def object_download(object_id):
             minio_obj["Body"],
             mimetype="application/octet-stream",
             as_attachment=True,
-            attachment_filename=drs_object.name
+            download_name=drs_object.name
         )
     )
 

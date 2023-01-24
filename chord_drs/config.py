@@ -51,7 +51,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     CHORD_URL: Optional[str] = os.environ.get("CHORD_URL")
     CHORD_SERVICE_URL_BASE_PATH: Optional[str] = os.environ.get("SERVICE_URL_BASE_PATH")
-    SERVICE_ID: str = os.environ.get("SERVICE_ID", SERVICE_TYPE)
+    SERVICE_ID: str = os.environ.get("SERVICE_ID", ":".join(list(SERVICE_TYPE.values())[:2]))
     SERVICE_DATA_SOURCE: str = DATA_SOURCE_MINIO if MINIO_URL else DATA_SOURCE_LOCAL
     SERVICE_DATA: Optional[str] = None if MINIO_URL else SERVICE_DATA
     MINIO_URL: Optional[str] = MINIO_URL
