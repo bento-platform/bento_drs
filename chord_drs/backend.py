@@ -23,5 +23,5 @@ def get_backend() -> Optional[Backend]:
     return g.backend
 
 
-def close_backend(_e=None):
+def close_backend(_e=None) -> None:
     g.pop("backend", None)
