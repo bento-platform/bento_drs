@@ -337,7 +337,14 @@ def object_ingest():
 
     if deduplicate:
         # Get checksum of original file, and query database for objects that match
-        checksum = drs_file_checksum(obj_path)
+
+        try:
+            checksum = drs_file_checksum(obj_path)
+        except FileNotFoundError:
+            err = f"File not found at path {obj_path}"
+            logger.error(err)
+            return flask_errors.flask_bad_request_error(err)
+
         drs_object = DrsObject.query.filter_by(checksum=checksum).first()
         if drs_object:
             logger.info(f"Found duplicate DRS object via checksum (will deduplicate): {drs_object}")
