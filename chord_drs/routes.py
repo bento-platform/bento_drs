@@ -176,6 +176,8 @@ def service_info():
             res_branch_str = res_branch.decode().strip()
             info["git_branch"] = res_branch_str
             info["bento"]["gitBranch"] = res_branch_str
+        if res_commit := subprocess.check_output(["git", "rev-parse", "HEAD"]):
+            info["bento"]["gitCommit"] = res_commit.decode().strip()
 
     except Exception as e:
         except_name = type(e).__name__
