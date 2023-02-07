@@ -213,11 +213,11 @@ def test_object_ingest(client):
 
 def test_object_ingest_x2(client):
     data_1 = _ingest_one(client)
-    data_2 = _ingest_one(client)
-    assert data_1["id"] != data_2["id"]
+    data_2 = _ingest_one(client, data_1["id"])
+    assert json.dumps(data_1, sort_keys=True) == json.dumps(data_2, sort_keys=True)  # deduplicate is True by default
 
 
-def test_object_ingest_deduplicate(client):
+def test_object_ingest_no_deduplicate(client):
     data_1 = _ingest_one(client)
-    data_2 = _ingest_one(client, data_1["id"], {"deduplicate": True})
-    assert json.dumps(data_1, sort_keys=True) == json.dumps(data_2, sort_keys=True)
+    data_2 = _ingest_one(client, params={"deduplicate": False})
+    assert json.dumps(data_1, sort_keys=True) != json.dumps(data_2, sort_keys=True)
