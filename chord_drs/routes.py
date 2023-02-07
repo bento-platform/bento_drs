@@ -329,6 +329,7 @@ def object_ingest():
     obj_path: str = data.get("path")
 
     if not obj_path or not isinstance(obj_path, str):
+        logger.error(f"Missing or invalid path parameter in JSON request: {obj_path}")
         return flask_errors.flask_bad_request_error("Missing or invalid path parameter in JSON request")
 
     drs_object: Optional[DrsObject] = None
@@ -344,9 +345,9 @@ def object_ingest():
     if not drs_object:
         try:
             drs_object = DrsObject(location=obj_path)
-
             db.session.add(drs_object)
             db.session.commit()
+            logger.info(f"Added DRS object: {drs_object}")
         except Exception as e:  # TODO: More specific handling
             logger.error(f"Encountered exception during ingest: {e}")
             return flask_errors.flask_bad_request_error("Error while creating the object")
