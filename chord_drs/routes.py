@@ -329,14 +329,15 @@ def object_ingest():
     if not obj_path or not isinstance(obj_path, str):
         return flask_errors.flask_bad_request_error("Missing or invalid path parameter in JSON request")
 
-    # TODO: Should this always be the case?
-    deduplicate: bool = data.get("deduplicate", False)
-
     drs_object: Optional[DrsObject] = None
+    deduplicate: bool = data.get("deduplicate", True)  # Change for v0.9: default to True
+
     if deduplicate:
         # Get checksum of original file, and query database for objects that match
         checksum = drs_file_checksum(obj_path)
         drs_object = DrsObject.query.filter_by(checksum=checksum).first()
+        if drs_object:
+            logger.info(f"Found duplicate DRS object via checksum (will deduplicate): {drs_object}")
 
     if not drs_object:
         try:
