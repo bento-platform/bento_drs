@@ -84,6 +84,7 @@ def _test_object_and_download(client, obj, test_range=False):
         assert len(body) == 1900
 
         # Size is 2455, so these'll run off the end and return the whole thing after 100
+
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=100-19999"),))
         assert res.status_code == 206
         body = res.get_data(as_text=False)
@@ -97,6 +98,17 @@ def _test_object_and_download(client, obj, test_range=False):
         assert res.status_code == 206
         body = res.get_data(as_text=False)
         assert len(body) == 2455
+
+        # Test range error state
+
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes"),))
+        assert res.status_code == 400
+
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes="),))
+        assert res.status_code == 400
+
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bites=0-4"),))
+        assert res.status_code == 400
 
 
 def test_object_and_download_minio(client_minio, drs_object_minio):

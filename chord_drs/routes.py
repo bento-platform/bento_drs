@@ -261,18 +261,22 @@ def object_download(object_id):
             )
 
         logger.debug(f"Found Range header: {range_header}")
+        range_err = f"Malformatted range header: expected bytes=X-Y or bytes=X-, got {range_header}"
 
         rh_split = range_header.split("=")
         if len(rh_split) != 2 or rh_split[0] != "bytes":
-            err = f"Malformatted range header: expected bytes=X-Y or bytes=X-, got {range_header}"
-            logger.error(err)
-            return flask_errors.flask_bad_request_error(err)
+            logger.error(range_err)
+            return flask_errors.flask_bad_request_error(range_err)
 
         byte_range = rh_split[1].strip().split("-")
         logger.debug(f"Retrieving byte range {byte_range}")
 
-        start = int(byte_range[0])
-        end = int(byte_range[1]) if byte_range[1] else None
+        try:
+            start = int(byte_range[0])
+            end = int(byte_range[1]) if byte_range[1] else None
+        except (IndexError, ValueError):
+            logger.error(range_err)
+            return flask_errors.flask_bad_request_error(range_err)
 
         if end is not None and end < start:
             err = f"Invalid range header: end cannot be less than start (start={start}, end={end})"
