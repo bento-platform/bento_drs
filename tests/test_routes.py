@@ -101,13 +101,20 @@ def _test_object_and_download(client, obj, test_range=False):
 
         # Test range error state
 
+        # - no range, no equals
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes"),))
         assert res.status_code == 400
 
+        # - no range, with equals
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes="),))
         assert res.status_code == 400
 
+        # - typo for bytes
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bites=0-4"),))
+        assert res.status_code == 400
+
+        # - reversed interval
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=4-0"),))
         assert res.status_code == 400
 
 
