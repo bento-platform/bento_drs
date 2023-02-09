@@ -84,6 +84,7 @@ def _test_object_and_download(client, obj, test_range=False):
         assert len(body) == 1900
 
         # Size is 2455, so these'll run off the end and return the whole thing after 100
+
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=100-19999"),))
         assert res.status_code == 206
         body = res.get_data(as_text=False)
@@ -97,6 +98,24 @@ def _test_object_and_download(client, obj, test_range=False):
         assert res.status_code == 206
         body = res.get_data(as_text=False)
         assert len(body) == 2455
+
+        # Test range error state
+
+        # - no range, no equals
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes"),))
+        assert res.status_code == 400
+
+        # - no range, with equals
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes="),))
+        assert res.status_code == 400
+
+        # - typo for bytes
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bites=0-4"),))
+        assert res.status_code == 400
+
+        # - reversed interval
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=4-0"),))
+        assert res.status_code == 400
 
 
 def test_object_and_download_minio(client_minio, drs_object_minio):
@@ -213,11 +232,11 @@ def test_object_ingest(client):
 
 def test_object_ingest_x2(client):
     data_1 = _ingest_one(client)
-    data_2 = _ingest_one(client)
-    assert data_1["id"] != data_2["id"]
+    data_2 = _ingest_one(client, data_1["id"])
+    assert json.dumps(data_1, sort_keys=True) == json.dumps(data_2, sort_keys=True)  # deduplicate is True by default
 
 
-def test_object_ingest_deduplicate(client):
+def test_object_ingest_no_deduplicate(client):
     data_1 = _ingest_one(client)
-    data_2 = _ingest_one(client, data_1["id"], {"deduplicate": True})
-    assert json.dumps(data_1, sort_keys=True) == json.dumps(data_2, sort_keys=True)
+    data_2 = _ingest_one(client, params={"deduplicate": False})
+    assert json.dumps(data_1, sort_keys=True) != json.dumps(data_2, sort_keys=True)

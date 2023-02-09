@@ -9,7 +9,6 @@ from sqlalchemy.orm import relationship
 
 from chord_drs.backend import get_backend
 from chord_drs.backends.minio import MinioBackend
-from chord_drs.constants import SERVICE_NAME
 from chord_drs.db import db
 from chord_drs.utils import drs_file_checksum
 
@@ -77,7 +76,7 @@ class DrsObject(db.Model, DrsMixin):
         try:
             current_location = backend.save(location, new_filename)
         except Exception as e:
-            current_app.logger.error(f"[{SERVICE_NAME}] Encountered exception during DRS object creation: {e}")
+            current_app.logger.error(f"Encountered exception during DRS object creation: {e}")
             # TODO: implement more specific exception handling
             raise Exception("Well if the file is not saved... we can't do squat")
 

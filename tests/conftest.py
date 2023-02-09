@@ -19,6 +19,7 @@ SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
 NON_EXISTENT_DUMMY_FILE = os.path.join(BASEDIR, "potato")
 DUMMY_FILE = os.path.join(BASEDIR, "tests", "dummy_file.txt")
 DUMMY_DIRECTORY = os.path.join(APP_DIR, "migrations")
+EMPTY_FILE = os.path.join(BASEDIR, "tests", "empty_file.txt")
 
 
 @pytest.fixture

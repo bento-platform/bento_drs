@@ -33,7 +33,7 @@ def create_drs_bundle(location: str, parent: Optional[DrsBundle] = None) -> DrsB
     return bundle
 
 
-def create_drs_object(location: str, parent: Optional[DrsBundle] = None):
+def create_drs_object(location: str, parent: Optional[DrsBundle] = None) -> None:
     drs_object = DrsObject(location=location)
 
     if parent:
@@ -47,7 +47,7 @@ def create_drs_object(location: str, parent: Optional[DrsBundle] = None):
 @click.command("ingest")
 @click.argument("source")
 @with_appcontext
-def ingest(source: str):
+def ingest(source: str) -> None:
     """
     When provided with a file or a directory, this command will add these
     to our list of objects, to be served by the application.

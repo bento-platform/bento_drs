@@ -6,10 +6,11 @@
 
 A proof of concept based on [GA4GH's DRS specifications](https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-1.0.0/docs/).
 This flask application offers an interface to query files in such 
-a fashion: "drs://some-domain/some-ID".
+a fashion: `drs://some-domain/some-ID`.
 
 For storing the files, two methods are currently supported : in the current filesystem
 or inside a MinIO instance (which is a s3-like software).
+
 
 ## TODO / Future considerations
 
@@ -18,6 +19,7 @@ or inside a MinIO instance (which is a s3-like software).
  or to package objects into bundles.
  - Consider how to be aware of http vs https depending on the deployment setup
  (in singularity, docker, as is).
+
 
 ## Configuration
 
@@ -28,6 +30,7 @@ provide the missing values.
 ```bash
 cp .env-sample .env
 ```
+
 
 ## Running in Development
 
@@ -57,6 +60,7 @@ The Flask development server can be run with the following command:
 FLASK_DEBUG=True flask run
 ```
 
+
 ## Running Tests
 
 To run all tests and calculate coverage, run the following command:
@@ -69,6 +73,7 @@ Tox is configured to run both pytest and flake8, you may want to uncomment
 the second line of tox.ini (envlist = ...) so as to run these commands
 for multiple versions of Python.
 
+
 ## Deploying
 
 In production, the service should be deployed using a WSGI service like
@@ -78,6 +83,7 @@ With uWSGI you should point to chord_drs.app:application, the wsgi.py file
 at the root of the project is there to simplify executing the commands (such
 as "ingest")
 
+
 ## API
 
 ##### GET a single object
@@ -85,6 +91,8 @@ as "ingest")
 `/objects/<string:object_id>`
 
 `/ga4gh/drs/v1/objects/<string:object_id>`
+
+Returns a standard GA4GH record for the object.
 
 ##### GET search
 
@@ -105,9 +113,20 @@ partial match `/search?fuzzy_name=1001`
 
 e.g. POST body
 
-```bash
+```json
 {
-     "path": "examples/P-1001.hc.g.vcf.gz"
+  "path": "examples/P-1001.hc.g.vcf.gz"
+}
+```
+
+This will automatically deduplicate with existing DRS objects if the file matches.
+
+To ingest and force-create a duplicate record, provide the `deduplicate` parameter, set to `false`:
+
+```json
+{
+  "path": "examples/P-1001.hc.g.vcf.gz",
+  "deduplicate": false
 }
 ```
 
@@ -115,3 +134,5 @@ e.g. POST body
 ##### GET service info
 
 `/service-info`
+
+Returns a GA4GH+Bento-formatted service info response.

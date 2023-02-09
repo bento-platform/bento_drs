@@ -94,7 +94,7 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
     default_access_method = {
         "access_url": {
             "url": url_for("drs_service.object_download", object_id=drs_object.id, _external=True)
-            # No headers means that auth will have to be obtained via some
+            # No headers --> auth will have to be obtained via some
             # out-of-band method, or the object's contents are public. This
             # will depend on how the service is deployed.
         },
@@ -176,6 +176,8 @@ def service_info():
             res_branch_str = res_branch.decode().strip()
             info["git_branch"] = res_branch_str
             info["bento"]["gitBranch"] = res_branch_str
+        if res_commit := subprocess.check_output(["git", "rev-parse", "HEAD"]):
+            info["bento"]["gitCommit"] = res_commit.decode().strip()
 
     except Exception as e:
         except_name = type(e).__name__
@@ -187,8 +189,8 @@ def service_info():
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])
 def object_info(object_id: str):
-    drs_bundle = DrsBundle.query.filter_by(id=object_id).first()
-    drs_object = None
+    drs_bundle: Optional[DrsBundle] = DrsBundle.query.filter_by(id=object_id).first()
+    drs_object: Optional[DrsObject] = None
 
     if not drs_bundle:  # Only try hitting the database for an object if no bundle was found
         drs_object = DrsObject.query.filter_by(id=object_id).first()
@@ -196,21 +198,21 @@ def object_info(object_id: str):
         if not drs_object:
             return flask_errors.flask_not_found_error("No object found for this ID")
 
-    # Are we inside the bento singularity container? if so, provide local accessmethod
-    inside_container = request.headers.get("X-CHORD-Internal", "0") == "1"
-
     # Log X-CHORD-Internal header
-    current_app.logger.info(
-        f"[{SERVICE_NAME}] object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}"
-    )
+    current_app.logger.info(f"object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}")
+
+    # Are we inside the bento singularity container? if so, provide local access method
+    inside_container = request.headers.get("X-CHORD-Internal", "0") == "1"
 
     # The requester can specify object internal path to be added to the response
     use_internal_path = strtobool(request.args.get("internal_path", ""))
 
+    include_internal_path = inside_container or use_internal_path
+
     if drs_bundle:
-        response = build_bundle_json(drs_bundle, inside_container=(inside_container or use_internal_path))
+        response = build_bundle_json(drs_bundle, inside_container=include_internal_path)
     else:
-        response = build_object_json(drs_object, inside_container=(inside_container or use_internal_path))
+        response = build_object_json(drs_object, inside_container=include_internal_path)
 
     return jsonify(response)
 
@@ -237,6 +239,8 @@ def object_search():
 
 @drs_service.route("/objects/<string:object_id>/download", methods=["GET"])
 def object_download(object_id):
+    logger = current_app.logger
+
     try:
         drs_object = DrsObject.query.filter_by(id=object_id).one()
     except NoResultFound:
@@ -256,23 +260,27 @@ def object_download(object_id):
                 download_name=drs_object.name,
             )
 
-        current_app.logger.debug(f"Found Range header: {range_header}")
+        logger.debug(f"Found Range header: {range_header}")
+        range_err = f"Malformatted range header: expected bytes=X-Y or bytes=X-, got {range_header}"
 
         rh_split = range_header.split("=")
         if len(rh_split) != 2 or rh_split[0] != "bytes":
-            err = f"Malformatted range header: expected bytes=X-Y or bytes=X-, got {range_header}"
-            current_app.logger.error(err)
-            return flask_errors.flask_bad_request_error(err)
+            logger.error(range_err)
+            return flask_errors.flask_bad_request_error(range_err)
 
         byte_range = rh_split[1].strip().split("-")
-        current_app.logger.debug(f"Retrieving byte range {byte_range}")
+        logger.debug(f"Retrieving byte range {byte_range}")
 
-        start = int(byte_range[0])
-        end = int(byte_range[1]) if byte_range[1] else None
+        try:
+            start = int(byte_range[0])
+            end = int(byte_range[1]) if byte_range[1] else None
+        except (IndexError, ValueError):
+            logger.error(range_err)
+            return flask_errors.flask_bad_request_error(range_err)
 
         if end is not None and end < start:
             err = f"Invalid range header: end cannot be less than start (start={start}, end={end})"
-            current_app.logger.error(err)
+            logger.error(err)
             return flask_errors.flask_bad_request_error(err)
 
         def generate_bytes():
@@ -282,7 +290,7 @@ def object_download(object_id):
 
                 # Then, read in either CHUNK_SIZE byte segments or however many bytes are left to send, whichever is
                 # left. This avoids filling memory with the contents of large files.
-                byte_offset = start
+                byte_offset: int = start
                 while True:
                     # Add a 1 to the amount to read if it's below chunk size, because the last coordinate is inclusive.
                     data = fh2.read(min(CHUNK_SIZE, (end + 1 - byte_offset) if end is not None else CHUNK_SIZE))
@@ -319,30 +327,40 @@ def object_download(object_id):
 
 @drs_service.route("/private/ingest", methods=["POST"])
 def object_ingest():
+    logger = current_app.logger
     data = request.json or {}
 
     obj_path: str = data.get("path")
 
     if not obj_path or not isinstance(obj_path, str):
+        logger.error(f"Missing or invalid path parameter in JSON request: {obj_path}")
         return flask_errors.flask_bad_request_error("Missing or invalid path parameter in JSON request")
 
-    # TODO: Should this always be the case?
-    deduplicate: bool = data.get("deduplicate", False)
-
     drs_object: Optional[DrsObject] = None
+    deduplicate: bool = data.get("deduplicate", True)  # Change for v0.9: default to True
+
     if deduplicate:
         # Get checksum of original file, and query database for objects that match
-        checksum = drs_file_checksum(obj_path)
+
+        try:
+            checksum = drs_file_checksum(obj_path)
+        except FileNotFoundError:
+            err = f"File not found at path {obj_path}"
+            logger.error(err)
+            return flask_errors.flask_bad_request_error(err)
+
         drs_object = DrsObject.query.filter_by(checksum=checksum).first()
+        if drs_object:
+            logger.info(f"Found duplicate DRS object via checksum (will deduplicate): {drs_object}")
 
     if not drs_object:
         try:
             drs_object = DrsObject(location=obj_path)
-
             db.session.add(drs_object)
             db.session.commit()
+            logger.info(f"Added DRS object: {drs_object}")
         except Exception as e:  # TODO: More specific handling
-            current_app.logger.error(f"[{SERVICE_NAME}] Encountered exception during ingest: {e}")
+            logger.error(f"Encountered exception during ingest: {e}")
             return flask_errors.flask_bad_request_error("Error while creating the object")
 
     response = build_object_json(drs_object)
