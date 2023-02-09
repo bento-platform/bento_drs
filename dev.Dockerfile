@@ -1,4 +1,4 @@
-FROM ghcr.io/bento-platform/bento_base_image:python-debian-2022.12.06
+FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.02.09
 
 # TODO: change USER
 USER root
