@@ -1,6 +1,8 @@
 FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.02.21
 
-RUN apt install gcc libffi-dev -y
+RUN apt-get update -y && \
+    apt-get install gcc libffi-dev -y && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /drs
 RUN mkdir /wes
