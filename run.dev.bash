@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# CWD: /drs
+
 # Set .gitconfig for development
 /set_gitconfig.bash
 
