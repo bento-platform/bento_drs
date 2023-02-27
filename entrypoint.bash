@@ -1,18 +1,17 @@
 #!/bin/bash
 
-# CWD: /drs
+cd /drs || exit
 
+# Create bento_user + home
+source /create_service_user.bash
+
+# Make data directories if needed
+# TODO: Don't hardcode these; this should be determined by an environment variable
 mkdir -p /drs/data/db
 mkdir -p /drs/data/obj
 
-export FLASK_APP="chord_drs.app:application"
-if [ -z "${INTERNAL_PORT}" ]; then
-  # Set default internal port to 5000
-  export INTERNAL_PORT=5000
-fi
+# Fix permissions on /drs
+chown -R bento_user:bento_user /drs
 
-flask db upgrade
-
-# using 1 worker, multiple threads
-# see https://stackoverflow.com/questions/38425620/gunicorn-workers-and-threads
-gunicorn "${FLASK_APP}" -w 1 --threads $(expr 2 \* $(nproc --all) + 1) -b "0.0.0.0:${INTERNAL_PORT}"
+# Drop into bento_user from root and execute the CMD specified for the image
+exec gosu bento_user "$@"

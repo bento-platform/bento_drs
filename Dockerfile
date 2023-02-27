@@ -1,22 +1,20 @@
-FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.02.09
+FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.02.27
 
-# TODO: change USER
-USER root
+RUN apt-get update -y && \
+    apt-get install gcc libffi-dev -y && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN apt install gcc libffi-dev -y
-
-RUN echo "Building DRS in Production Mode";
 WORKDIR /drs
-RUN mkdir /wes && \
-    mkdir -p /drs/data/obj && \
-    mkdir -p /drs/data/db
+RUN mkdir /wes
 
 # Install dependencies
-COPY requirements.txt requirements.txt
-RUN ["pip", "install", "-r", "requirements.txt"]
+COPY requirements.txt .
+RUN pip install --no-cache-dir gunicorn==20.1.0 -r requirements.txt
 
 # Copy only what's required for a production instance
 COPY chord_drs chord_drs
 COPY entrypoint.bash .
+COPY run.bash .
 
 ENTRYPOINT ["/bin/bash", "./entrypoint.bash"]
+CMD ["/bin/bash", "./run.bash"]
