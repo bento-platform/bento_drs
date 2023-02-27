@@ -1,5 +1,4 @@
 import os
-import subprocess
 
 from bento_lib.responses import flask_errors
 from flask import Flask
