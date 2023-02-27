@@ -46,9 +46,6 @@ with application.app_context():
     if not application.config["CHORD_URL"]:
         metrics.init_app(application)
 
-    if application.config["BENTO_DEBUG"]:
-        subprocess.run(["git", "config", "--global", "--add", "safe.directory", str(APP_DIR)])
-
 # # debugger section
 # Ensure 'debugpy' is installed (via requirements.txt or manually)
 DEBUG = os.environ.get("FLASK_DEBUG", "false").strip().lower() in ("true", "1")
