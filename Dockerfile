@@ -9,7 +9,7 @@ RUN mkdir /wes
 
 # Install dependencies
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir gunicorn==20.1.0 -r requirements.txt
 
 # Copy only what's required for a production instance
 COPY chord_drs chord_drs

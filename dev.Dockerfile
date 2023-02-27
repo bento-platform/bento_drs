@@ -9,7 +9,7 @@ RUN mkdir /wes
 
 # Install dependencies
 COPY requirements.txt .
-RUN pip install debugpy -r requirements.txt
+RUN pip install --no-cache-dir debugpy -r requirements.txt
 
 # Copy in just the entrypoint + runner so we have somewhere to start
 COPY entrypoint.bash .
