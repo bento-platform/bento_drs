@@ -14,7 +14,7 @@ from flask import (
 )
 from sqlalchemy import or_
 from sqlalchemy.orm.exc import NoResultFound
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 from werkzeug.exceptions import NotFound
 
@@ -23,6 +23,7 @@ from chord_drs.constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from chord_drs.db import db
 from chord_drs.models import DrsObject, DrsBundle
+from chord_drs.types import DRSAccessMethodDict, DRSContentsDict, DRSObjectDict
 from chord_drs.utils import drs_file_checksum
 
 
@@ -58,20 +59,31 @@ def create_drs_uri(object_id: str) -> str:
     return f"drs://{get_drs_base_path()}/{object_id}"
 
 
-def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False) -> dict:
-    content = []
-    bundles = DrsBundle.query.filter_by(parent_bundle=drs_bundle).all()
+def build_contents(bundle: DrsBundle, inside_container: bool, expand: bool) -> List[DRSContentsDict]:
+    content: List[DRSContentsDict] = []
+    bundles = DrsBundle.query.filter_by(parent_bundle=bundle).all()
 
-    for bundle in bundles:
-        obj_json = build_bundle_json(bundle, inside_container=inside_container)
-        content.append(obj_json)
+    for b in bundles:
+        content.append({
+            **({"contents": build_contents(b, inside_container, expand)} if expand else {}),
+            "drs_uri": create_drs_uri(b.id),
+            "id": b.id,
+            "name": b.name,  # TODO: Can overwrite... see spec
+        })
 
-    for child in drs_bundle.objects:
-        obj_json = build_blob_json(child, inside_container=inside_container)
-        content.append(obj_json)
+    for c in bundle.objects:
+        content.append({
+            "drs_uri": create_drs_uri(c.id),
+            "id": c.id,
+            "name": c.name,  # TODO: Can overwrite... see spec
+        })
 
+    return content
+
+
+def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False, expand: bool = False) -> DRSObjectDict:
     return {
-        "contents": content,
+        "contents": build_contents(drs_bundle, inside_container, expand),
         "checksums": [
             {
                 "checksum": drs_bundle.checksum,
@@ -81,22 +93,21 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False) -> 
         "created_time": f"{drs_bundle.created.isoformat('T')}Z",
         "size": drs_bundle.size,
         "name": drs_bundle.name,
-        # Description should always be a string (even though it's nullable in the database for now, unfortunately):
-        "description": drs_bundle.description or "",
+        # Description should be excluded if null in the database
+        **({"description": drs_bundle.description} if drs_bundle.description is not None else {}),
         "id": drs_bundle.id,
         "self_uri": create_drs_uri(drs_bundle.id)
     }
 
 
-def build_blob_json(drs_blob: DrsObject, inside_container: bool = False) -> dict:
-    # TODO: This access type is wrong in the case of http (non-secure)
-    # TODO: I'll change it to http for now, will think of a way to fix this
+def build_blob_json(drs_blob: DrsObject, inside_container: bool = False) -> DRSObjectDict:
     data_source = current_app.config["SERVICE_DATA_SOURCE"]
-    default_access_method = {
+
+    default_access_method: DRSAccessMethodDict = {
         "access_url": {
             # url_for external was giving weird results - build the URL by hand instead using the internal url_for
             "url": urllib.parse.urljoin(urllib.parse.urljoin(
-                current_app.config["CHORD_URL"],
+                str(current_app.config["CHORD_URL"]),  # str cast to shut up the IDE type-checker
                 current_app.config["CHORD_SERVICE_URL_BASE_PATH"].rstrip("/") + "/",
             ), url_for("drs_service.object_download", object_id=drs_blob.id).lstrip("/"))
             # No headers --> auth will have to be obtained via some
@@ -106,28 +117,22 @@ def build_blob_json(drs_blob: DrsObject, inside_container: bool = False) -> dict
         "type": "http",
     }
 
+    access_methods: List[DRSAccessMethodDict] = [default_access_method]
+
     if inside_container and data_source == DATA_SOURCE_LOCAL:
-        access_methods = [
-            default_access_method,
-            {
-                "access_url": {
-                    "url": f"file://{drs_blob.location}",
-                },
-                "type": "file",
-            }
-        ]
+        access_methods.append({
+            "access_url": {
+                "url": f"file://{drs_blob.location}",
+            },
+            "type": "file",
+        })
     elif data_source == DATA_SOURCE_MINIO:
-        access_methods = [
-            default_access_method,
-            {
-                "access_url": {
-                    "url": drs_blob.location,
-                },
-                "type": "s3",
-            }
-        ]
-    else:
-        access_methods = [default_access_method]
+        access_methods.append({
+            "access_url": {
+                "url": drs_blob.location,
+            },
+            "type": "s3",
+        })
 
     return {
         "access_methods": access_methods,
@@ -140,8 +145,8 @@ def build_blob_json(drs_blob: DrsObject, inside_container: bool = False) -> dict
         "created_time": f"{drs_blob.created.isoformat('T')}Z",
         "size": drs_blob.size,
         "name": drs_blob.name,
-        # Description should always be a string (even though it's nullable in the database for now, unfortunately):
-        "description": drs_blob.description or "",
+        # Description should be excluded if null in the database
+        **({"description": drs_blob.description} if drs_blob.description is not None else {}),
         "id": drs_blob.id,
         "self_uri": create_drs_uri(drs_blob.id)
     }
@@ -204,6 +209,8 @@ def get_drs_object(object_id: str) -> Tuple[Optional[Union[DrsObject, DrsBundle]
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])
 def object_info(object_id: str):
+    expand = request.args.get("expand") in ("true", "1", "yes")
+
     drs_object, is_bundle = get_drs_object(object_id)
 
     if not drs_object:
@@ -219,7 +226,7 @@ def object_info(object_id: str):
     include_internal_path = inside_container or use_internal_path
 
     if is_bundle:
-        return jsonify(build_bundle_json(drs_object, inside_container=include_internal_path))
+        return jsonify(build_bundle_json(drs_object, inside_container=include_internal_path, expand=expand))
 
     return jsonify(build_blob_json(drs_object, inside_container=include_internal_path))
 
