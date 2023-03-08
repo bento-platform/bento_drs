@@ -94,7 +94,11 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
     data_source = current_app.config["SERVICE_DATA_SOURCE"]
     default_access_method = {
         "access_url": {
-            "url": url_for("drs_service.object_download", object_id=drs_object.id, _external=True)
+            # url_for external was giving weird results - build the URL by hand instead using the internal url_for
+            "url": urllib.parse.urljoin(urllib.parse.urljoin(
+                current_app.config["CHORD_URL"],
+                current_app.config["CHORD_SERVICE_URL_BASE_PATH"].rstrip("/") + "/",
+            ), url_for("drs_service.object_download", object_id=drs_object.id).lstrip("/"))
             # No headers --> auth will have to be obtained via some
             # out-of-band method, or the object's contents are public. This
             # will depend on how the service is deployed.
