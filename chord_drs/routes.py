@@ -66,10 +66,10 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False) -> 
         content.append(obj_json)
 
     for child in drs_bundle.objects:
-        obj_json = build_object_json(child, inside_container=inside_container)
+        obj_json = build_blob_json(child, inside_container=inside_container)
         content.append(obj_json)
 
-    response = {
+    return {
         "contents": content,
         "checksums": [
             {
@@ -85,10 +85,8 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False) -> 
         "self_uri": create_drs_uri(drs_bundle.id)
     }
 
-    return response
 
-
-def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> dict:
+def build_blob_json(drs_blob: DrsObject, inside_container: bool = False) -> dict:
     # TODO: This access type is wrong in the case of http (non-secure)
     # TODO: I'll change it to http for now, will think of a way to fix this
     data_source = current_app.config["SERVICE_DATA_SOURCE"]
@@ -98,7 +96,7 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
             "url": urllib.parse.urljoin(urllib.parse.urljoin(
                 current_app.config["CHORD_URL"],
                 current_app.config["CHORD_SERVICE_URL_BASE_PATH"].rstrip("/") + "/",
-            ), url_for("drs_service.object_download", object_id=drs_object.id).lstrip("/"))
+            ), url_for("drs_service.object_download", object_id=drs_blob.id).lstrip("/"))
             # No headers --> auth will have to be obtained via some
             # out-of-band method, or the object's contents are public. This
             # will depend on how the service is deployed.
@@ -111,7 +109,7 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
             default_access_method,
             {
                 "access_url": {
-                    "url": f"file://{drs_object.location}"
+                    "url": f"file://{drs_blob.location}"
                 },
                 "type": "file"
             }
@@ -121,7 +119,7 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
             default_access_method,
             {
                 "access_url": {
-                    "url": drs_object.location
+                    "url": drs_blob.location
                 },
                 "type": "s3"
             }
@@ -129,23 +127,21 @@ def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> 
     else:
         access_methods = [default_access_method]
 
-    response = {
+    return {
         "access_methods": access_methods,
         "checksums": [
             {
-                "checksum": drs_object.checksum,
+                "checksum": drs_blob.checksum,
                 "type": "sha-256"
             },
         ],
-        "created_time": f"{drs_object.created.isoformat('T')}Z",
-        "size": drs_object.size,
-        "name": drs_object.name,
-        "description": drs_object.description,
-        "id": drs_object.id,
-        "self_uri": create_drs_uri(drs_object.id)
+        "created_time": f"{drs_blob.created.isoformat('T')}Z",
+        "size": drs_blob.size,
+        "name": drs_blob.name,
+        "description": drs_blob.description,
+        "id": drs_blob.id,
+        "self_uri": create_drs_uri(drs_blob.id)
     }
-
-    return response
 
 
 @drs_service.route("/service-info", methods=["GET"])
@@ -195,12 +191,11 @@ def service_info():
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])
 def object_info(object_id: str):
     drs_bundle: Optional[DrsBundle] = DrsBundle.query.filter_by(id=object_id).first()
-    drs_object: Optional[DrsObject] = None
+    drs_blob: Optional[DrsObject] = None
 
     if not drs_bundle:  # Only try hitting the database for an object if no bundle was found
-        drs_object = DrsObject.query.filter_by(id=object_id).first()
-
-        if not drs_object:
+        drs_blob = DrsObject.query.filter_by(id=object_id).first()
+        if not drs_blob:
             return flask_errors.flask_not_found_error("No object found for this ID")
 
     # Log X-CHORD-Internal header
@@ -208,18 +203,16 @@ def object_info(object_id: str):
 
     # Are we inside the bento singularity container? if so, provide local access method
     inside_container = request.headers.get("X-CHORD-Internal", "0") == "1"
-
     # The requester can specify object internal path to be added to the response
     use_internal_path = strtobool(request.args.get("internal_path", ""))
-
     include_internal_path = inside_container or use_internal_path
 
     if drs_bundle:
-        response = build_bundle_json(drs_bundle, inside_container=include_internal_path)
+        object_json = build_bundle_json(drs_bundle, inside_container=include_internal_path)
     else:
-        response = build_object_json(drs_object, inside_container=include_internal_path)
+        object_json = build_blob_json(drs_blob, inside_container=include_internal_path)
 
-    return jsonify(response)
+    return jsonify(object_json)
 
 
 @drs_service.route("/search", methods=["GET"])
@@ -248,7 +241,7 @@ def object_search():
         return flask_errors.flask_bad_request_error("Missing GET search terms (name | fuzzy_name | q)")
 
     for obj in objects:
-        response.append(build_object_json(obj, strtobool(internal_path)))
+        response.append(build_blob_json(obj, strtobool(internal_path)))
 
     return jsonify(response)
 
@@ -256,6 +249,8 @@ def object_search():
 @drs_service.route("/objects/<string:object_id>/download", methods=["GET"])
 def object_download(object_id):
     logger = current_app.logger
+
+    # TODO: Bundle download
 
     try:
         drs_object = DrsObject.query.filter_by(id=object_id).one()
@@ -379,6 +374,6 @@ def object_ingest():
             logger.error(f"Encountered exception during ingest: {e}")
             return flask_errors.flask_bad_request_error("Error while creating the object")
 
-    response = build_object_json(drs_object)
+    response = build_blob_json(drs_object)
 
     return response, 201
