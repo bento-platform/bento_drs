@@ -1,5 +1,6 @@
 import bento_lib
 import json
+import pytest
 
 from jsonschema import validate
 from tests.conftest import NON_EXISTENT_DUMMY_FILE, DUMMY_FILE
@@ -181,29 +182,40 @@ def test_bundle_and_download(client, drs_bundle):
     assert res.content_length == obj["size"]
 
 
-def test_search_object_empty(client, drs_bundle):
+def test_search_bad_query(client, drs_bundle):
     res = client.get("/search")
-
     assert res.status_code == 400
 
-    for url in ("/search?name=asd", "/search?fuzzy_name=asd"):
-        res = client.get(url)
-        data = res.get_json()
 
-        assert res.status_code == 200
-        assert len(data) == 0
+@pytest.mark.parametrize("url", (
+    "/search?name=asd",
+    "/search?fuzzy_name=asd",
+))
+def test_search_object_empty(client, drs_bundle, url):
+    res = client.get(url)
+    data = res.get_json()
+
+    assert res.status_code == 200
+    assert len(data) == 0
 
 
-def test_search_object(client, drs_bundle):
-    for url in ("/search?name=alembic.ini", "/search?fuzzy_name=mbic", "/search?name=alembic.ini&internal_path=1"):
-        res = client.get(url)
-        data = res.get_json()
-        has_internal_path = "internal_path" in url
+@pytest.mark.parametrize("url", (
+    "/search?name=alembic.ini",
+    "/search?fuzzy_name=mbic",
+    "/search?name=alembic.ini&internal_path=1",
+    "/search?q=alembic.ini",
+    "/search?q=mbic.i",
+    "/search?q=alembic.ini&internal_path=1",
+))
+def test_search_object(client, drs_bundle, url):
+    res = client.get(url)
+    data = res.get_json()
+    has_internal_path = "internal_path" in url
 
-        assert res.status_code == 200
-        assert len(data) == 1
+    assert res.status_code == 200
+    assert len(data) == 1
 
-        validate_object_fields(data[0], with_internal_path=has_internal_path)
+    validate_object_fields(data[0], with_internal_path=has_internal_path)
 
 
 def test_object_ingest_fail(client):

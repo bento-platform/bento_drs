@@ -12,6 +12,7 @@ from flask import (
     send_file,
     make_response
 )
+from sqlalchemy import or_
 from sqlalchemy.orm.exc import NoResultFound
 from typing import Optional
 from urllib.parse import urljoin, urlparse
@@ -219,17 +220,28 @@ def object_info(object_id: str):
 
 @drs_service.route("/search", methods=["GET"])
 def object_search():
+    # TODO: Enable search for bundles too
+
     response = []
+
     name = request.args.get("name")
     fuzzy_name = request.args.get("fuzzy_name")
+    search_q = request.args.get("q")
     internal_path = request.args.get("internal_path", "")
 
     if name:
         objects = DrsObject.query.filter_by(name=name).all()
     elif fuzzy_name:
         objects = DrsObject.query.filter(DrsObject.name.contains(fuzzy_name)).all()
+    elif search_q:
+        objects = DrsObject.query.filter(or_(
+            DrsObject.id.contains(search_q),
+            DrsObject.name.contains(search_q),
+            DrsObject.checksum.contains(search_q),
+            DrsObject.description.contains(search_q),
+        ))
     else:
-        return flask_errors.flask_bad_request_error("Missing GET search terms (either name or fuzzy_name)")
+        return flask_errors.flask_bad_request_error("Missing GET search terms (name | fuzzy_name | q)")
 
     for obj in objects:
         response.append(build_object_json(obj, strtobool(internal_path)))
