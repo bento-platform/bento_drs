@@ -47,21 +47,12 @@ if MINIO_SECRET_KEY_FILE:
             MINIO_PASSWORD = f.read().strip()
 
 
-CHORD_URL_ENV = os.environ.get("CHORD_URL")
-SERVICE_URL_BASE_PATH_ENV = os.environ.get("SERVICE_URL_BASE_PATH", "")
-
-
 class Config:
     SQLALCHEMY_DATABASE_URI = "sqlite:///" + str(Path(os.path.join(BASEDIR, "db.sqlite3")).expanduser().resolve())
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    CHORD_URL: Optional[str] = CHORD_URL_ENV
-    CHORD_SERVICE_URL_BASE_PATH: str = SERVICE_URL_BASE_PATH_ENV
-
-    # For generating URLS within Flask using, e.g., url_for
-    SERVER_NAME: str = urlparse(CHORD_URL_ENV).netloc if CHORD_URL_ENV else "127.0.0.1"
-    PREFERRED_URL_SCHEME: str = urlparse(CHORD_URL_ENV).scheme if CHORD_URL_ENV else "http"
-    APPLICATION_ROOT: str = SERVICE_URL_BASE_PATH_ENV + "/"
+    CHORD_URL: str = os.environ.get("CHORD_URL", "http://127.0.0.1/")
+    CHORD_SERVICE_URL_BASE_PATH: str = os.environ.get("SERVICE_URL_BASE_PATH", "")
 
     SERVICE_ID: str = os.environ.get("SERVICE_ID", ":".join(list(SERVICE_TYPE.values())[:2]))
     SERVICE_DATA_SOURCE: str = DATA_SOURCE_MINIO if MINIO_URL else DATA_SOURCE_LOCAL
@@ -75,9 +66,6 @@ class Config:
 
 
 print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
-print(f"[{SERVICE_NAME}]    application root {Config.APPLICATION_ROOT}", flush=True)
-print(f"[{SERVICE_NAME}]         server name {Config.SERVER_NAME}", flush=True)
-print(f"[{SERVICE_NAME}]          URL scheme {Config.PREFERRED_URL_SCHEME}", flush=True)
 print(f"[{SERVICE_NAME}]         data source {Config.SERVICE_DATA_SOURCE}")
 print(f"[{SERVICE_NAME}]           data path {Config.SERVICE_DATA}")
 print(f"[{SERVICE_NAME}]           minio URL {Config.MINIO_URL}", flush=True)
