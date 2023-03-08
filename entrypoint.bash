@@ -10,8 +10,9 @@ source /create_service_user.bash
 mkdir -p /drs/data/db
 mkdir -p /drs/data/obj
 
-# Fix permissions on /drs
+# Fix permissions on /drs and /env
 chown -R bento_user:bento_user /drs
+chown -R bento_user:bento_user /env
 
 # Drop into bento_user from root and execute the CMD specified for the image
 exec gosu bento_user "$@"
