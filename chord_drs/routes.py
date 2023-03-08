@@ -80,7 +80,8 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False) -> 
         "created_time": f"{drs_bundle.created.isoformat('T')}Z",
         "size": drs_bundle.size,
         "name": drs_bundle.name,
-        "description": drs_bundle.description,
+        # Description should always be a string (even though it's nullable in the database for now, unfortunately):
+        "description": drs_bundle.description or "",
         "id": drs_bundle.id,
         "self_uri": create_drs_uri(drs_bundle.id)
     }
@@ -138,7 +139,8 @@ def build_blob_json(drs_blob: DrsObject, inside_container: bool = False) -> dict
         "created_time": f"{drs_blob.created.isoformat('T')}Z",
         "size": drs_blob.size,
         "name": drs_blob.name,
-        "description": drs_blob.description,
+        # Description should always be a string (even though it's nullable in the database for now, unfortunately):
+        "description": drs_blob.description or "",
         "id": drs_blob.id,
         "self_uri": create_drs_uri(drs_blob.id)
     }
