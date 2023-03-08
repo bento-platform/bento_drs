@@ -44,17 +44,3 @@ application.teardown_appcontext(close_backend)
 with application.app_context():
     if not application.config["CHORD_URL"]:
         metrics.init_app(application)
-
-# # debugger section
-# Ensure 'debugpy' is installed (via requirements.txt or manually)
-DEBUG = os.environ.get("FLASK_DEBUG", "false").strip().lower() in ("true", "1")
-if DEBUG:
-    try:
-        # noinspection PyPackageRequirements
-        import debugpy
-        debugger_port = int(os.environ.get("DEBUGGER_PORT", "5678"))
-        debugpy.listen(("0.0.0.0", debugger_port))
-        application.logger.info("Debugger attached")
-    except ImportError:
-        application.logger.warning("Module debugpy not found. To enable VSCode debugging, run `pip install debugpy`")
-# # end debugger section
