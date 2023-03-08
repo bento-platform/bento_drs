@@ -22,10 +22,12 @@ application.config.from_object(Config)
 # - Generic catch-all
 application.register_error_handler(
     Exception,
-    flask_errors.flask_error_wrap_with_traceback(flask_errors.flask_internal_server_error, service_name=SERVICE_NAME)
-)
-application.register_error_handler(BadRequest, flask_errors.flask_error_wrap(flask_errors.flask_bad_request_error))
-application.register_error_handler(NotFound, flask_errors.flask_error_wrap(flask_errors.flask_not_found_error))
+    flask_errors.flask_error_wrap_with_traceback(flask_errors.flask_internal_server_error, service_name=SERVICE_NAME,
+                                                 drs_compat=True))
+application.register_error_handler(
+    BadRequest, flask_errors.flask_error_wrap(flask_errors.flask_bad_request_error, drs_compat=True))
+application.register_error_handler(
+    NotFound, lambda e: flask_errors.flask_error_wrap(flask_errors.flask_not_found_error, str(e), drs_compat=True)(e))
 
 # Attach the database to the application and run migrations if needed
 db.init_app(application)
