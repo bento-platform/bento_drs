@@ -75,7 +75,7 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False) -> 
         "checksums": [
             {
                 "checksum": drs_bundle.checksum,
-                "type": "sha-256"
+                "type": "sha-256",
             },
         ],
         "created_time": f"{drs_bundle.created.isoformat('T')}Z",
@@ -103,7 +103,7 @@ def build_blob_json(drs_blob: DrsObject, inside_container: bool = False) -> dict
             # out-of-band method, or the object's contents are public. This
             # will depend on how the service is deployed.
         },
-        "type": "http"
+        "type": "http",
     }
 
     if inside_container and data_source == DATA_SOURCE_LOCAL:
@@ -111,9 +111,9 @@ def build_blob_json(drs_blob: DrsObject, inside_container: bool = False) -> dict
             default_access_method,
             {
                 "access_url": {
-                    "url": f"file://{drs_blob.location}"
+                    "url": f"file://{drs_blob.location}",
                 },
-                "type": "file"
+                "type": "file",
             }
         ]
     elif data_source == DATA_SOURCE_MINIO:
@@ -121,9 +121,9 @@ def build_blob_json(drs_blob: DrsObject, inside_container: bool = False) -> dict
             default_access_method,
             {
                 "access_url": {
-                    "url": drs_blob.location
+                    "url": drs_blob.location,
                 },
-                "type": "s3"
+                "type": "s3",
             }
         ]
     else:
@@ -134,7 +134,7 @@ def build_blob_json(drs_blob: DrsObject, inside_container: bool = False) -> dict
         "checksums": [
             {
                 "checksum": drs_blob.checksum,
-                "type": "sha-256"
+                "type": "sha-256",
             },
         ],
         "created_time": f"{drs_blob.created.isoformat('T')}Z",
