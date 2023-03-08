@@ -14,8 +14,9 @@ from flask import (
 )
 from sqlalchemy import or_
 from sqlalchemy.orm.exc import NoResultFound
-from typing import Optional
+from typing import Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
+from werkzeug.exceptions import NotFound
 
 from chord_drs import __version__
 from chord_drs.constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
@@ -189,16 +190,24 @@ def service_info():
     return jsonify(info)
 
 
+def get_drs_object(object_id: str) -> Tuple[Optional[Union[DrsObject, DrsBundle]], bool]:
+    if drs_bundle := DrsBundle.query.filter_by(id=object_id).first():
+        return drs_bundle, True
+
+    # Only try hitting the database for an object if no bundle was found
+    if drs_blob := DrsObject.query.filter_by(id=object_id).first():
+        return drs_blob, False
+
+    return None, False
+
+
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])
 def object_info(object_id: str):
-    drs_bundle: Optional[DrsBundle] = DrsBundle.query.filter_by(id=object_id).first()
-    drs_blob: Optional[DrsObject] = None
+    drs_object, is_bundle = get_drs_object(object_id)
 
-    if not drs_bundle:  # Only try hitting the database for an object if no bundle was found
-        drs_blob = DrsObject.query.filter_by(id=object_id).first()
-        if not drs_blob:
-            return flask_errors.flask_not_found_error("No object found for this ID")
+    if not drs_object:
+        raise NotFound("No object found for this ID")
 
     # Log X-CHORD-Internal header
     current_app.logger.info(f"object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}")
@@ -209,12 +218,26 @@ def object_info(object_id: str):
     use_internal_path = strtobool(request.args.get("internal_path", ""))
     include_internal_path = inside_container or use_internal_path
 
-    if drs_bundle:
-        object_json = build_bundle_json(drs_bundle, inside_container=include_internal_path)
-    else:
-        object_json = build_blob_json(drs_blob, inside_container=include_internal_path)
+    if is_bundle:
+        return jsonify(build_bundle_json(drs_object, inside_container=include_internal_path))
 
-    return jsonify(object_json)
+    return jsonify(build_blob_json(drs_object, inside_container=include_internal_path))
+
+
+@drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
+@drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
+def object_access(object_id: str, access_id: str):
+    drs_object, is_bundle = get_drs_object(object_id)
+
+    if not drs_object:
+        raise NotFound("No object found for this ID")
+
+    # We explicitly do not support access_id-based accesses; all of them will be 'not found'
+    # since we don't provide access IDs
+
+    # TODO: Eventually generate one-time signed URLs or something?
+
+    raise NotFound(f"No access ID '{access_id}' exists for object '{object_id}'")
 
 
 @drs_service.route("/search", methods=["GET"])
