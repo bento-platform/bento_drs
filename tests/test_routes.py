@@ -161,7 +161,7 @@ def test_bundle_and_download(client, drs_bundle):
     data = res.get_json()
 
     assert res.status_code == 200
-    assert "access_methods" not in data
+    assert "access_methods" not in data  # TODO: there should be access_methods for bundles... although it is spec-opt.
     # issue again with the number of files ingested when ran locally vs travis-ci
     assert "contents" in data and len(data["contents"]) > 0
     assert "name" in data and data["name"] == drs_bundle.name
@@ -176,10 +176,15 @@ def test_bundle_and_download(client, drs_bundle):
     # an object and not a bundle
     obj = data["contents"][-1]
 
-    res = client.get(obj["access_methods"][0]["access_url"]["url"])
-
+    # Fetch nested object record by ID
+    res = client.get(f"/objects/{obj['id']}")
     assert res.status_code == 200
-    assert res.content_length == obj["size"]
+    nested_obj = res.get_json()
+
+    # Fetch nested object bytes
+    res = client.get(nested_obj["access_methods"][0]["access_url"]["url"])
+    assert res.status_code == 200
+    assert res.content_length == nested_obj["size"]
 
 
 def test_search_bad_query(client, drs_bundle):
