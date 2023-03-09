@@ -24,7 +24,7 @@ class DrsMixin:
 
 
 class DrsBundle(db.Model, DrsMixin):
-    ___tablename__ = "drs_bundle"
+    __tablename__ = "drs_bundle"
 
     id = db.Column(db.String, primary_key=True)
     parent_bundle_id = db.Column(db.Integer, db.ForeignKey("drs_bundle.id"))
@@ -54,7 +54,7 @@ class DrsBundle(db.Model, DrsMixin):
 
 
 class DrsBlob(db.Model, DrsMixin):
-    ___tablename__ = "drs_object"
+    __tablename__ = "drs_object"
 
     id = db.Column(db.String, primary_key=True)
     bundle_id = db.Column(db.Integer, db.ForeignKey(DrsBundle.id), nullable=True)
