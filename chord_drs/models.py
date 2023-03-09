@@ -25,10 +25,11 @@ class DrsMixin:
 
 class DrsBundle(db.Model, DrsMixin):
     ___tablename__ = "drs_bundle"
+
     id = db.Column(db.String, primary_key=True)
     parent_bundle_id = db.Column(db.Integer, db.ForeignKey("drs_bundle.id"))
     parent_bundle = relationship("DrsBundle", remote_side=[id])
-    objects = relationship("DrsObject", cascade="all, delete-orphan", backref="bundle")
+    objects = relationship("DrsBlob", cascade="all, delete-orphan", backref="bundle")
 
     def __init__(self, *args, **kwargs):
         self.id = str(uuid4())
@@ -52,7 +53,9 @@ class DrsBundle(db.Model, DrsMixin):
         self.size = total_size
 
 
-class DrsObject(db.Model, DrsMixin):
+class DrsBlob(db.Model, DrsMixin):
+    ___tablename__ = "drs_object"
+
     id = db.Column(db.String, primary_key=True)
     bundle_id = db.Column(db.Integer, db.ForeignKey(DrsBundle.id), nullable=True)
     location = db.Column(db.String(500), nullable=False)

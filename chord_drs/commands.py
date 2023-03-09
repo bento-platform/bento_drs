@@ -8,7 +8,7 @@ from flask.cli import with_appcontext
 from typing import Optional
 
 from chord_drs.db import db
-from chord_drs.models import DrsObject, DrsBundle
+from chord_drs.models import DrsBlob, DrsBundle
 
 
 def create_drs_bundle(location: str, parent: Optional[DrsBundle] = None) -> DrsBundle:
@@ -34,7 +34,7 @@ def create_drs_bundle(location: str, parent: Optional[DrsBundle] = None) -> DrsB
 
 
 def create_drs_blob(location: str, parent: Optional[DrsBundle] = None) -> None:
-    drs_blob = DrsObject(location=location)
+    drs_blob = DrsBlob(location=location)
 
     if parent:
         drs_blob.bundle = parent

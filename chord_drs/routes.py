@@ -22,7 +22,7 @@ from chord_drs import __version__
 from chord_drs.constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from chord_drs.db import db
-from chord_drs.models import DrsObject, DrsBundle
+from chord_drs.models import DrsBlob, DrsBundle
 from chord_drs.types import DRSAccessMethodDict, DRSContentsDict, DRSObjectDict
 from chord_drs.utils import drs_file_checksum
 
@@ -100,7 +100,7 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False, exp
     }
 
 
-def build_blob_json(drs_blob: DrsObject, inside_container: bool = False) -> DRSObjectDict:
+def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObjectDict:
     data_source = current_app.config["SERVICE_DATA_SOURCE"]
 
     default_access_method: DRSAccessMethodDict = {
@@ -195,12 +195,12 @@ def service_info():
     return jsonify(info)
 
 
-def get_drs_object(object_id: str) -> Tuple[Optional[Union[DrsObject, DrsBundle]], bool]:
+def get_drs_object(object_id: str) -> Tuple[Optional[Union[DrsBlob, DrsBundle]], bool]:
     if drs_bundle := DrsBundle.query.filter_by(id=object_id).first():
         return drs_bundle, True
 
     # Only try hitting the database for an object if no bundle was found
-    if drs_blob := DrsObject.query.filter_by(id=object_id).first():
+    if drs_blob := DrsBlob.query.filter_by(id=object_id).first():
         return drs_blob, False
 
     return None, False
@@ -259,15 +259,15 @@ def object_search():
     internal_path = request.args.get("internal_path", "")
 
     if name:
-        objects = DrsObject.query.filter_by(name=name).all()
+        objects = DrsBlob.query.filter_by(name=name).all()
     elif fuzzy_name:
-        objects = DrsObject.query.filter(DrsObject.name.contains(fuzzy_name)).all()
+        objects = DrsBlob.query.filter(DrsBlob.name.contains(fuzzy_name)).all()
     elif search_q:
-        objects = DrsObject.query.filter(or_(
-            DrsObject.id.contains(search_q),
-            DrsObject.name.contains(search_q),
-            DrsObject.checksum.contains(search_q),
-            DrsObject.description.contains(search_q),
+        objects = DrsBlob.query.filter(or_(
+            DrsBlob.id.contains(search_q),
+            DrsBlob.name.contains(search_q),
+            DrsBlob.checksum.contains(search_q),
+            DrsBlob.description.contains(search_q),
         ))
     else:
         return flask_errors.flask_bad_request_error("Missing GET search terms (name | fuzzy_name | q)")
@@ -285,7 +285,7 @@ def object_download(object_id):
     # TODO: Bundle download
 
     try:
-        drs_object = DrsObject.query.filter_by(id=object_id).one()
+        drs_object = DrsBlob.query.filter_by(id=object_id).one()
     except NoResultFound:
         return flask_errors.flask_not_found_error("No object found for this ID")
 
@@ -379,7 +379,7 @@ def object_ingest():
         logger.error(f"Missing or invalid path parameter in JSON request: {obj_path}")
         return flask_errors.flask_bad_request_error("Missing or invalid path parameter in JSON request")
 
-    drs_object: Optional[DrsObject] = None
+    drs_object: Optional[DrsBlob] = None
     deduplicate: bool = data.get("deduplicate", True)  # Change for v0.9: default to True
 
     if deduplicate:
@@ -392,13 +392,13 @@ def object_ingest():
             logger.error(err)
             return flask_errors.flask_bad_request_error(err)
 
-        drs_object = DrsObject.query.filter_by(checksum=checksum).first()
+        drs_object = DrsBlob.query.filter_by(checksum=checksum).first()
         if drs_object:
             logger.info(f"Found duplicate DRS object via checksum (will deduplicate): {drs_object}")
 
     if not drs_object:
         try:
-            drs_object = DrsObject(location=obj_path)
+            drs_object = DrsBlob(location=obj_path)
             db.session.add(drs_object)
             db.session.commit()
             logger.info(f"Added DRS object: {drs_object}")

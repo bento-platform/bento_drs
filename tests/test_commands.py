@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 from chord_drs.commands import ingest
-from chord_drs.models import DrsObject, DrsBundle
+from chord_drs.models import DrsBlob, DrsBundle
 from tests.conftest import (
     NON_EXISTENT_DUMMY_FILE,
     DUMMY_FILE,
@@ -21,7 +21,7 @@ def test_ingest(client_local):
     result = runner.invoke(ingest, [DUMMY_FILE])
 
     filename = DUMMY_FILE.split('/')[-1]
-    obj = DrsObject.query.filter_by(name=filename).first()
+    obj = DrsBlob.query.filter_by(name=filename).first()
 
     assert result.exit_code == 0
     assert obj.name == filename
