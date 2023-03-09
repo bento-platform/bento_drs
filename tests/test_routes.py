@@ -45,13 +45,16 @@ def test_service_info(client):
 
 def test_object_fail(client):
     res = client.get(f"/objects/{NON_EXISTENT_ID}")
-
     assert res.status_code == 404
 
 
 def test_object_download_fail(client):
     res = client.get(f"/objects/{NON_EXISTENT_ID}/download")
+    assert res.status_code == 404
 
+
+def test_object_access_fail(client):
+    res = client.get(f"/objects/{NON_EXISTENT_ID}/access/no_access")
     assert res.status_code == 404
 
 
@@ -61,6 +64,10 @@ def _test_object_and_download(client, obj, test_range=False):
 
     assert res.status_code == 200
     validate_object_fields(data, existing_id=obj.id)
+
+    # Check that we don't have access via an access ID (since we don't generate them)
+    res = client.get(f"/objects/{obj.id}/access/no_access")
+    assert res.status_code == 404
 
     # Download the object
     res = client.get(data["access_methods"][0]["access_url"]["url"])
