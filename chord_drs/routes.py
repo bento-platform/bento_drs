@@ -16,7 +16,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm.exc import NoResultFound
 from typing import List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
-from werkzeug.exceptions import NotFound
+from werkzeug.exceptions import BadRequest, NotFound, InternalServerError
 
 from chord_drs import __version__
 from chord_drs.constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
@@ -36,6 +36,11 @@ drs_service = Blueprint("drs_service", __name__)
 
 def strtobool(val: str):
     return val.lower() in ("yes", "true", "t", "1", "on")
+
+
+def bad_request_and_log(err: str) -> BadRequest:
+    current_app.logger.error(err)
+    return BadRequest(err)
 
 
 def get_drs_base_path():
@@ -217,7 +222,7 @@ def object_info(object_id: str):
         raise NotFound("No object found for this ID")
 
     # Log X-CHORD-Internal header
-    current_app.logger.info(f"object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}")
+    current_app.logger.debug(f"object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}")
 
     # Are we inside the bento singularity container? if so, provide local access method
     inside_container = request.headers.get("X-CHORD-Internal", "0") == "1"
@@ -270,7 +275,7 @@ def object_search():
             DrsBlob.description.contains(search_q),
         ))
     else:
-        return flask_errors.flask_bad_request_error("Missing GET search terms (name | fuzzy_name | q)")
+        raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
 
     for obj in objects:
         response.append(build_blob_json(obj, strtobool(internal_path)))
@@ -308,8 +313,7 @@ def object_download(object_id):
 
         rh_split = range_header.split("=")
         if len(rh_split) != 2 or rh_split[0] != "bytes":
-            logger.error(range_err)
-            return flask_errors.flask_bad_request_error(range_err)
+            raise bad_request_and_log(range_err)
 
         byte_range = rh_split[1].strip().split("-")
         logger.debug(f"Retrieving byte range {byte_range}")
@@ -318,13 +322,10 @@ def object_download(object_id):
             start = int(byte_range[0])
             end = int(byte_range[1]) if byte_range[1] else None
         except (IndexError, ValueError):
-            logger.error(range_err)
-            return flask_errors.flask_bad_request_error(range_err)
+            raise bad_request_and_log(range_err)
 
         if end is not None and end < start:
-            err = f"Invalid range header: end cannot be less than start (start={start}, end={end})"
-            logger.error(err)
-            return flask_errors.flask_bad_request_error(err)
+            raise bad_request_and_log(f"Invalid range header: end cannot be less than start (start={start}, end={end})")
 
         def generate_bytes():
             with open(drs_object.location, "rb") as fh2:
@@ -376,8 +377,7 @@ def object_ingest():
     obj_path: str = data.get("path")
 
     if not obj_path or not isinstance(obj_path, str):
-        logger.error(f"Missing or invalid path parameter in JSON request: {obj_path}")
-        return flask_errors.flask_bad_request_error("Missing or invalid path parameter in JSON request")
+        raise bad_request_and_log(f"Missing or invalid path parameter in JSON request: {obj_path}")
 
     drs_object: Optional[DrsBlob] = None
     deduplicate: bool = data.get("deduplicate", True)  # Change for v0.9: default to True
@@ -388,9 +388,7 @@ def object_ingest():
         try:
             checksum = drs_file_checksum(obj_path)
         except FileNotFoundError:
-            err = f"File not found at path {obj_path}"
-            logger.error(err)
-            return flask_errors.flask_bad_request_error(err)
+            raise bad_request_and_log(f"File not found at path {obj_path}")
 
         drs_object = DrsBlob.query.filter_by(checksum=checksum).first()
         if drs_object:
@@ -404,7 +402,7 @@ def object_ingest():
             logger.info(f"Added DRS object: {drs_object}")
         except Exception as e:  # TODO: More specific handling
             logger.error(f"Encountered exception during ingest: {e}")
-            return flask_errors.flask_bad_request_error("Error while creating the object")
+            raise InternalServerError("Error while creating the object")
 
     response = build_blob_json(drs_object)
 
