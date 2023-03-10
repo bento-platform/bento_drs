@@ -23,7 +23,7 @@ application.config.from_object(Config)
 application.register_error_handler(
     Exception,
     flask_errors.flask_error_wrap_with_traceback(flask_errors.flask_internal_server_error, service_name=SERVICE_NAME,
-                                                 drs_compat=True))
+                                                 drs_compat=True, logger=application.logger))
 application.register_error_handler(
     BadRequest, flask_errors.flask_error_wrap(flask_errors.flask_bad_request_error, drs_compat=True))
 application.register_error_handler(
