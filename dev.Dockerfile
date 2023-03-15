@@ -17,5 +17,5 @@ COPY run.dev.bash .
 
 # Don't copy any code in - the dev compose file will mount the repo
 
-ENTRYPOINT ["/bin/bash", "./entrypoint.bash"]
-CMD ["/bin/bash", "./run.dev.bash"]
+ENTRYPOINT ["/bin/bash", "/drs/entrypoint.bash"]
+CMD ["/bin/bash", "/drs/run.dev.bash"]

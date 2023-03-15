@@ -16,5 +16,5 @@ COPY chord_drs chord_drs
 COPY entrypoint.bash .
 COPY run.bash .
 
-ENTRYPOINT ["/bin/bash", "./entrypoint.bash"]
-CMD ["/bin/bash", "./run.bash"]
+ENTRYPOINT ["/bin/bash", "/drs/entrypoint.bash"]
+CMD ["/bin/bash", "/drs/run.bash"]
