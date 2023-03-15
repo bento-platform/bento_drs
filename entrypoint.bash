@@ -5,12 +5,7 @@ cd /drs || exit
 # Create bento_user + home
 source /create_service_user.bash
 
-# Make data directories if needed
-# TODO: Don't hardcode these; this should be determined soley by the environment variable
-mkdir -p /drs/data/db
-mkdir -p /drs/data/obj
-
-# Fix permissions on /drs and /env
+# Fix permissions on /drs and /env; make data directories if needed
 chown -R bento_user:bento_user /drs
 chown -R bento_user:bento_user /env
 if [[ -z "${DATABASE}" ]]; then
