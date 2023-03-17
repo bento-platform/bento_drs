@@ -1,5 +1,6 @@
 import bento_lib
 import json
+import pytest
 
 from jsonschema import validate
 from tests.conftest import NON_EXISTENT_DUMMY_FILE, DUMMY_FILE
@@ -44,13 +45,16 @@ def test_service_info(client):
 
 def test_object_fail(client):
     res = client.get(f"/objects/{NON_EXISTENT_ID}")
-
     assert res.status_code == 404
 
 
 def test_object_download_fail(client):
     res = client.get(f"/objects/{NON_EXISTENT_ID}/download")
+    assert res.status_code == 404
 
+
+def test_object_access_fail(client):
+    res = client.get(f"/objects/{NON_EXISTENT_ID}/access/no_access")
     assert res.status_code == 404
 
 
@@ -60,6 +64,10 @@ def _test_object_and_download(client, obj, test_range=False):
 
     assert res.status_code == 200
     validate_object_fields(data, existing_id=obj.id)
+
+    # Check that we don't have access via an access ID (since we don't generate them)
+    res = client.get(f"/objects/{obj.id}/access/no_access")
+    assert res.status_code == 404
 
     # Download the object
     res = client.get(data["access_methods"][0]["access_url"]["url"])
@@ -160,7 +168,7 @@ def test_bundle_and_download(client, drs_bundle):
     data = res.get_json()
 
     assert res.status_code == 200
-    assert "access_methods" not in data
+    assert "access_methods" not in data  # TODO: there should be access_methods for bundles... although it is spec-opt.
     # issue again with the number of files ingested when ran locally vs travis-ci
     assert "contents" in data and len(data["contents"]) > 0
     assert "name" in data and data["name"] == drs_bundle.name
@@ -175,35 +183,51 @@ def test_bundle_and_download(client, drs_bundle):
     # an object and not a bundle
     obj = data["contents"][-1]
 
-    res = client.get(obj["access_methods"][0]["access_url"]["url"])
-
+    # Fetch nested object record by ID
+    res = client.get(f"/objects/{obj['id']}")
     assert res.status_code == 200
-    assert res.content_length == obj["size"]
+    nested_obj = res.get_json()
+
+    # Fetch nested object bytes
+    res = client.get(nested_obj["access_methods"][0]["access_url"]["url"])
+    assert res.status_code == 200
+    assert res.content_length == nested_obj["size"]
 
 
-def test_search_object_empty(client, drs_bundle):
+def test_search_bad_query(client, drs_bundle):
     res = client.get("/search")
-
     assert res.status_code == 400
 
-    for url in ("/search?name=asd", "/search?fuzzy_name=asd"):
-        res = client.get(url)
-        data = res.get_json()
 
-        assert res.status_code == 200
-        assert len(data) == 0
+@pytest.mark.parametrize("url", (
+    "/search?name=asd",
+    "/search?fuzzy_name=asd",
+))
+def test_search_object_empty(client, drs_bundle, url):
+    res = client.get(url)
+    data = res.get_json()
+
+    assert res.status_code == 200
+    assert len(data) == 0
 
 
-def test_search_object(client, drs_bundle):
-    for url in ("/search?name=alembic.ini", "/search?fuzzy_name=mbic", "/search?name=alembic.ini&internal_path=1"):
-        res = client.get(url)
-        data = res.get_json()
-        has_internal_path = "internal_path" in url
+@pytest.mark.parametrize("url", (
+    "/search?name=alembic.ini",
+    "/search?fuzzy_name=mbic",
+    "/search?name=alembic.ini&internal_path=1",
+    "/search?q=alembic.ini",
+    "/search?q=mbic.i",
+    "/search?q=alembic.ini&internal_path=1",
+))
+def test_search_object(client, drs_bundle, url):
+    res = client.get(url)
+    data = res.get_json()
+    has_internal_path = "internal_path" in url
 
-        assert res.status_code == 200
-        assert len(data) == 1
+    assert res.status_code == 200
+    assert len(data) == 1
 
-        validate_object_fields(data[0], with_internal_path=has_internal_path)
+    validate_object_fields(data[0], with_internal_path=has_internal_path)
 
 
 def test_object_ingest_fail(client):

@@ -11,7 +11,7 @@ from chord_drs.backends.base import FakeBackend
 from chord_drs.backends.minio import MinioBackend
 from chord_drs.config import BASEDIR, APP_DIR
 from chord_drs.commands import create_drs_bundle
-from chord_drs.models import DrsObject
+from chord_drs.models import DrsBlob
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 
 
@@ -69,7 +69,7 @@ def client(request):
 
 @pytest.fixture
 def drs_object():
-    drs_object = DrsObject(location=DUMMY_FILE)
+    drs_object = DrsBlob(location=DUMMY_FILE)
 
     db.session.add(drs_object)
     db.session.commit()
@@ -88,7 +88,7 @@ def drs_bundle():
 
 @pytest.fixture
 def drs_object_minio():
-    drs_object = DrsObject(location=DUMMY_FILE)
+    drs_object = DrsBlob(location=DUMMY_FILE)
 
     db.session.add(drs_object)
     db.session.commit()

@@ -22,10 +22,12 @@ application.config.from_object(Config)
 # - Generic catch-all
 application.register_error_handler(
     Exception,
-    flask_errors.flask_error_wrap_with_traceback(flask_errors.flask_internal_server_error, service_name=SERVICE_NAME)
-)
-application.register_error_handler(BadRequest, flask_errors.flask_error_wrap(flask_errors.flask_bad_request_error))
-application.register_error_handler(NotFound, flask_errors.flask_error_wrap(flask_errors.flask_not_found_error))
+    flask_errors.flask_error_wrap_with_traceback(flask_errors.flask_internal_server_error, service_name=SERVICE_NAME,
+                                                 drs_compat=True, logger=application.logger))
+application.register_error_handler(
+    BadRequest, flask_errors.flask_error_wrap(flask_errors.flask_bad_request_error, drs_compat=True))
+application.register_error_handler(
+    NotFound, lambda e: flask_errors.flask_error_wrap(flask_errors.flask_not_found_error, str(e), drs_compat=True)(e))
 
 # Attach the database to the application and run migrations if needed
 db.init_app(application)
@@ -44,17 +46,3 @@ application.teardown_appcontext(close_backend)
 with application.app_context():
     if not application.config["CHORD_URL"]:
         metrics.init_app(application)
-
-# # debugger section
-# Ensure 'debugpy' is installed (via requirements.txt or manually)
-DEBUG = os.environ.get("FLASK_DEBUG", "false").strip().lower() in ("true", "1")
-if DEBUG:
-    try:
-        # noinspection PyPackageRequirements
-        import debugpy
-        debugger_port = int(os.environ.get("DEBUGGER_PORT", "5678"))
-        debugpy.listen(("0.0.0.0", debugger_port))
-        application.logger.info("Debugger attached")
-    except ImportError:
-        application.logger.warning("Module debugpy not found. To enable VSCode debugging, run `pip install debugpy`")
-# # end debugger section

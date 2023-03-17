@@ -49,8 +49,10 @@ if MINIO_SECRET_KEY_FILE:
 class Config:
     SQLALCHEMY_DATABASE_URI = "sqlite:///" + str(Path(os.path.join(BASEDIR, "db.sqlite3")).expanduser().resolve())
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    CHORD_URL: Optional[str] = os.environ.get("CHORD_URL")
-    CHORD_SERVICE_URL_BASE_PATH: Optional[str] = os.environ.get("SERVICE_URL_BASE_PATH")
+
+    CHORD_URL: str = os.environ.get("CHORD_URL", "http://127.0.0.1/")
+    CHORD_SERVICE_URL_BASE_PATH: str = os.environ.get("SERVICE_URL_BASE_PATH", "")
+
     SERVICE_ID: str = os.environ.get("SERVICE_ID", ":".join(list(SERVICE_TYPE.values())[:2]))
     SERVICE_DATA_SOURCE: str = DATA_SOURCE_MINIO if MINIO_URL else DATA_SOURCE_LOCAL
     SERVICE_DATA: Optional[str] = None if MINIO_URL else SERVICE_DATA
@@ -65,4 +67,4 @@ class Config:
 print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
 print(f"[{SERVICE_NAME}]         data source {Config.SERVICE_DATA_SOURCE}")
 print(f"[{SERVICE_NAME}]           data path {Config.SERVICE_DATA}")
-print(f"[{SERVICE_NAME}]           minio url {Config.MINIO_URL}", flush=True)
+print(f"[{SERVICE_NAME}]           minio URL {Config.MINIO_URL}", flush=True)

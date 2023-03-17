@@ -12,15 +12,18 @@ from flask import (
     send_file,
     make_response
 )
+from sqlalchemy import or_
 from sqlalchemy.orm.exc import NoResultFound
-from typing import Optional
+from typing import List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
+from werkzeug.exceptions import BadRequest, NotFound, InternalServerError
 
 from chord_drs import __version__
 from chord_drs.constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from chord_drs.db import db
-from chord_drs.models import DrsObject, DrsBundle
+from chord_drs.models import DrsBlob, DrsBundle
+from chord_drs.types import DRSAccessMethodDict, DRSContentsDict, DRSObjectDict
 from chord_drs.utils import drs_file_checksum
 
 
@@ -33,6 +36,11 @@ drs_service = Blueprint("drs_service", __name__)
 
 def strtobool(val: str):
     return val.lower() in ("yes", "true", "t", "1", "on")
+
+
+def bad_request_and_log(err: str) -> BadRequest:
+    current_app.logger.error(err)
+    return BadRequest(err)
 
 
 def get_drs_base_path():
@@ -56,91 +64,97 @@ def create_drs_uri(object_id: str) -> str:
     return f"drs://{get_drs_base_path()}/{object_id}"
 
 
-def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False) -> dict:
-    content = []
-    bundles = DrsBundle.query.filter_by(parent_bundle=drs_bundle).all()
+def build_contents(bundle: DrsBundle, inside_container: bool, expand: bool) -> List[DRSContentsDict]:
+    content: List[DRSContentsDict] = []
+    bundles = DrsBundle.query.filter_by(parent_bundle=bundle).all()
 
-    for bundle in bundles:
-        obj_json = build_bundle_json(bundle, inside_container=inside_container)
-        content.append(obj_json)
+    for b in bundles:
+        content.append({
+            **({"contents": build_contents(b, inside_container, expand)} if expand else {}),
+            "drs_uri": create_drs_uri(b.id),
+            "id": b.id,
+            "name": b.name,  # TODO: Can overwrite... see spec
+        })
 
-    for child in drs_bundle.objects:
-        obj_json = build_object_json(child, inside_container=inside_container)
-        content.append(obj_json)
+    for c in bundle.objects:
+        content.append({
+            "drs_uri": create_drs_uri(c.id),
+            "id": c.id,
+            "name": c.name,  # TODO: Can overwrite... see spec
+        })
 
-    response = {
-        "contents": content,
+    return content
+
+
+def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False, expand: bool = False) -> DRSObjectDict:
+    return {
+        "contents": build_contents(drs_bundle, inside_container, expand),
         "checksums": [
             {
                 "checksum": drs_bundle.checksum,
-                "type": "sha-256"
+                "type": "sha-256",
             },
         ],
         "created_time": f"{drs_bundle.created.isoformat('T')}Z",
         "size": drs_bundle.size,
         "name": drs_bundle.name,
-        "description": drs_bundle.description,
+        # Description should be excluded if null in the database
+        **({"description": drs_bundle.description} if drs_bundle.description is not None else {}),
         "id": drs_bundle.id,
         "self_uri": create_drs_uri(drs_bundle.id)
     }
 
-    return response
 
-
-def build_object_json(drs_object: DrsObject, inside_container: bool = False) -> dict:
-    # TODO: This access type is wrong in the case of http (non-secure)
-    # TODO: I'll change it to http for now, will think of a way to fix this
+def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObjectDict:
     data_source = current_app.config["SERVICE_DATA_SOURCE"]
-    default_access_method = {
+
+    default_access_method: DRSAccessMethodDict = {
         "access_url": {
-            "url": url_for("drs_service.object_download", object_id=drs_object.id, _external=True)
+            # url_for external was giving weird results - build the URL by hand instead using the internal url_for
+            "url": urllib.parse.urljoin(urllib.parse.urljoin(
+                str(current_app.config["CHORD_URL"]),  # str cast to shut up the IDE type-checker
+                current_app.config["CHORD_SERVICE_URL_BASE_PATH"].rstrip("/") + "/",
+            ), url_for("drs_service.object_download", object_id=drs_blob.id).lstrip("/"))
             # No headers --> auth will have to be obtained via some
             # out-of-band method, or the object's contents are public. This
             # will depend on how the service is deployed.
         },
-        "type": "http"
+        "type": "http",
     }
 
-    if inside_container and data_source == DATA_SOURCE_LOCAL:
-        access_methods = [
-            default_access_method,
-            {
-                "access_url": {
-                    "url": f"file://{drs_object.location}"
-                },
-                "type": "file"
-            }
-        ]
-    elif data_source == DATA_SOURCE_MINIO:
-        access_methods = [
-            default_access_method,
-            {
-                "access_url": {
-                    "url": drs_object.location
-                },
-                "type": "s3"
-            }
-        ]
-    else:
-        access_methods = [default_access_method]
+    access_methods: List[DRSAccessMethodDict] = [default_access_method]
 
-    response = {
+    if inside_container and data_source == DATA_SOURCE_LOCAL:
+        access_methods.append({
+            "access_url": {
+                "url": f"file://{drs_blob.location}",
+            },
+            "type": "file",
+        })
+    elif data_source == DATA_SOURCE_MINIO:
+        access_methods.append({
+            "access_url": {
+                "url": drs_blob.location,
+            },
+            "type": "s3",
+        })
+
+    return {
         "access_methods": access_methods,
         "checksums": [
             {
-                "checksum": drs_object.checksum,
-                "type": "sha-256"
+                "checksum": drs_blob.checksum,
+                "type": "sha-256",
             },
         ],
-        "created_time": f"{drs_object.created.isoformat('T')}Z",
-        "size": drs_object.size,
-        "name": drs_object.name,
-        "description": drs_object.description,
-        "id": drs_object.id,
-        "self_uri": create_drs_uri(drs_object.id)
+        "created_time": f"{drs_blob.created.isoformat('T')}Z",
+        "size": drs_blob.size,
+        "name": drs_blob.name,
+        # Description should be excluded if null in the database
+        **({"description": drs_blob.description} if drs_blob.description is not None else {}),
+        "id": drs_blob.id,
+        "self_uri": create_drs_uri(drs_blob.id)
     }
-
-    return response
 
 
 @drs_service.route("/service-info", methods=["GET"])
@@ -186,53 +200,85 @@ def service_info():
     return jsonify(info)
 
 
+def get_drs_object(object_id: str) -> Tuple[Optional[Union[DrsBlob, DrsBundle]], bool]:
+    if drs_bundle := DrsBundle.query.filter_by(id=object_id).first():
+        return drs_bundle, True
+
+    # Only try hitting the database for an object if no bundle was found
+    if drs_blob := DrsBlob.query.filter_by(id=object_id).first():
+        return drs_blob, False
+
+    return None, False
+
+
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])
 def object_info(object_id: str):
-    drs_bundle: Optional[DrsBundle] = DrsBundle.query.filter_by(id=object_id).first()
-    drs_object: Optional[DrsObject] = None
+    expand = request.args.get("expand") in ("true", "1", "yes")
 
-    if not drs_bundle:  # Only try hitting the database for an object if no bundle was found
-        drs_object = DrsObject.query.filter_by(id=object_id).first()
+    drs_object, is_bundle = get_drs_object(object_id)
 
-        if not drs_object:
-            return flask_errors.flask_not_found_error("No object found for this ID")
+    if not drs_object:
+        raise NotFound("No object found for this ID")
 
     # Log X-CHORD-Internal header
-    current_app.logger.info(f"object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}")
+    current_app.logger.debug(f"object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}")
 
     # Are we inside the bento singularity container? if so, provide local access method
     inside_container = request.headers.get("X-CHORD-Internal", "0") == "1"
-
     # The requester can specify object internal path to be added to the response
     use_internal_path = strtobool(request.args.get("internal_path", ""))
-
     include_internal_path = inside_container or use_internal_path
 
-    if drs_bundle:
-        response = build_bundle_json(drs_bundle, inside_container=include_internal_path)
-    else:
-        response = build_object_json(drs_object, inside_container=include_internal_path)
+    if is_bundle:
+        return jsonify(build_bundle_json(drs_object, inside_container=include_internal_path, expand=expand))
 
-    return jsonify(response)
+    return jsonify(build_blob_json(drs_object, inside_container=include_internal_path))
+
+
+@drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
+@drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
+def object_access(object_id: str, access_id: str):
+    drs_object, is_bundle = get_drs_object(object_id)
+
+    if not drs_object:
+        raise NotFound("No object found for this ID")
+
+    # We explicitly do not support access_id-based accesses; all of them will be 'not found'
+    # since we don't provide access IDs
+
+    # TODO: Eventually generate one-time signed URLs or something?
+
+    raise NotFound(f"No access ID '{access_id}' exists for object '{object_id}'")
 
 
 @drs_service.route("/search", methods=["GET"])
 def object_search():
+    # TODO: Enable search for bundles too
+
     response = []
+
     name = request.args.get("name")
     fuzzy_name = request.args.get("fuzzy_name")
+    search_q = request.args.get("q")
     internal_path = request.args.get("internal_path", "")
 
     if name:
-        objects = DrsObject.query.filter_by(name=name).all()
+        objects = DrsBlob.query.filter_by(name=name).all()
     elif fuzzy_name:
-        objects = DrsObject.query.filter(DrsObject.name.contains(fuzzy_name)).all()
+        objects = DrsBlob.query.filter(DrsBlob.name.contains(fuzzy_name)).all()
+    elif search_q:
+        objects = DrsBlob.query.filter(or_(
+            DrsBlob.id.contains(search_q),
+            DrsBlob.name.contains(search_q),
+            DrsBlob.checksum.contains(search_q),
+            DrsBlob.description.contains(search_q),
+        ))
     else:
-        return flask_errors.flask_bad_request_error("Missing GET search terms (either name or fuzzy_name)")
+        raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
 
     for obj in objects:
-        response.append(build_object_json(obj, strtobool(internal_path)))
+        response.append(build_blob_json(obj, strtobool(internal_path)))
 
     return jsonify(response)
 
@@ -241,8 +287,10 @@ def object_search():
 def object_download(object_id):
     logger = current_app.logger
 
+    # TODO: Bundle download
+
     try:
-        drs_object = DrsObject.query.filter_by(id=object_id).one()
+        drs_object = DrsBlob.query.filter_by(id=object_id).one()
     except NoResultFound:
         return flask_errors.flask_not_found_error("No object found for this ID")
 
@@ -265,8 +313,7 @@ def object_download(object_id):
 
         rh_split = range_header.split("=")
         if len(rh_split) != 2 or rh_split[0] != "bytes":
-            logger.error(range_err)
-            return flask_errors.flask_bad_request_error(range_err)
+            raise bad_request_and_log(range_err)
 
         byte_range = rh_split[1].strip().split("-")
         logger.debug(f"Retrieving byte range {byte_range}")
@@ -275,13 +322,10 @@ def object_download(object_id):
             start = int(byte_range[0])
             end = int(byte_range[1]) if byte_range[1] else None
         except (IndexError, ValueError):
-            logger.error(range_err)
-            return flask_errors.flask_bad_request_error(range_err)
+            raise bad_request_and_log(range_err)
 
         if end is not None and end < start:
-            err = f"Invalid range header: end cannot be less than start (start={start}, end={end})"
-            logger.error(err)
-            return flask_errors.flask_bad_request_error(err)
+            raise bad_request_and_log(f"Invalid range header: end cannot be less than start (start={start}, end={end})")
 
         def generate_bytes():
             with open(drs_object.location, "rb") as fh2:
@@ -333,10 +377,9 @@ def object_ingest():
     obj_path: str = data.get("path")
 
     if not obj_path or not isinstance(obj_path, str):
-        logger.error(f"Missing or invalid path parameter in JSON request: {obj_path}")
-        return flask_errors.flask_bad_request_error("Missing or invalid path parameter in JSON request")
+        raise bad_request_and_log(f"Missing or invalid path parameter in JSON request: {obj_path}")
 
-    drs_object: Optional[DrsObject] = None
+    drs_object: Optional[DrsBlob] = None
     deduplicate: bool = data.get("deduplicate", True)  # Change for v0.9: default to True
 
     if deduplicate:
@@ -345,24 +388,22 @@ def object_ingest():
         try:
             checksum = drs_file_checksum(obj_path)
         except FileNotFoundError:
-            err = f"File not found at path {obj_path}"
-            logger.error(err)
-            return flask_errors.flask_bad_request_error(err)
+            raise bad_request_and_log(f"File not found at path {obj_path}")
 
-        drs_object = DrsObject.query.filter_by(checksum=checksum).first()
+        drs_object = DrsBlob.query.filter_by(checksum=checksum).first()
         if drs_object:
             logger.info(f"Found duplicate DRS object via checksum (will deduplicate): {drs_object}")
 
     if not drs_object:
         try:
-            drs_object = DrsObject(location=obj_path)
+            drs_object = DrsBlob(location=obj_path)
             db.session.add(drs_object)
             db.session.commit()
             logger.info(f"Added DRS object: {drs_object}")
         except Exception as e:  # TODO: More specific handling
             logger.error(f"Encountered exception during ingest: {e}")
-            return flask_errors.flask_bad_request_error("Error while creating the object")
+            raise InternalServerError("Error while creating the object")
 
-    response = build_object_json(drs_object)
+    response = build_blob_json(drs_object)
 
     return response, 201

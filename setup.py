@@ -14,15 +14,15 @@ setuptools.setup(
     name=config["package"]["name"],
     version=config["package"]["version"],
 
-    python_requires=">=3.6",
+    python_requires=">=3.8",
     install_requires=[
         "boto3>=1.18.34,<1.19",
-        "bento_lib[flask]==5.3.0",
-        "Flask>=2.2.2,<2.3",
+        "bento_lib[flask]==6.0.0",
+        "Flask>=2.2.3,<2.3",
         "Flask-SQLAlchemy>=2.5.1,<2.6",
         "Flask-Migrate>=3.1.0,<3.2",
         "prometheus_flask_exporter>=0.21.0,<0.22",
-        "python-dotenv>=0.21.0,<0.22",
+        "python-dotenv>=1.0.0,<1.1",
         "SQLAlchemy>=1.4.46,<1.5"
     ],
 

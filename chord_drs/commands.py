@@ -8,7 +8,7 @@ from flask.cli import with_appcontext
 from typing import Optional
 
 from chord_drs.db import db
-from chord_drs.models import DrsObject, DrsBundle
+from chord_drs.models import DrsBlob, DrsBundle
 
 
 def create_drs_bundle(location: str, parent: Optional[DrsBundle] = None) -> DrsBundle:
@@ -21,7 +21,7 @@ def create_drs_bundle(location: str, parent: Optional[DrsBundle] = None) -> DrsB
         f = os.path.abspath(os.path.join(location, f))
 
         if os.path.isfile(f):
-            create_drs_object(f, parent=bundle)
+            create_drs_blob(f, parent=bundle)
         else:
             create_drs_bundle(f, parent=bundle)
 
@@ -33,15 +33,15 @@ def create_drs_bundle(location: str, parent: Optional[DrsBundle] = None) -> DrsB
     return bundle
 
 
-def create_drs_object(location: str, parent: Optional[DrsBundle] = None) -> None:
-    drs_object = DrsObject(location=location)
+def create_drs_blob(location: str, parent: Optional[DrsBundle] = None) -> None:
+    drs_blob = DrsBlob(location=location)
 
     if parent:
-        drs_object.bundle = parent
+        drs_blob.bundle = parent
 
-    db.session.add(drs_object)
+    db.session.add(drs_blob)
 
-    current_app.logger.info(f"Created a new object, filename: {drs_object.location} ID : {drs_object.id}")
+    current_app.logger.info(f"Created a new blob, filename: {drs_blob.location} ID : {drs_blob.id}")
 
 
 @click.command("ingest")
@@ -65,7 +65,7 @@ def ingest(source: str) -> None:
     source = os.path.abspath(source)
 
     if os.path.isfile(source):
-        create_drs_object(source)
+        create_drs_blob(source)
     else:
         create_drs_bundle(source)
 

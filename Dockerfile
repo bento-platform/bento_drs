@@ -1,4 +1,4 @@
-FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.02.27
+FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.03.06
 
 RUN apt-get update -y && \
     apt-get install gcc libffi-dev -y && \
@@ -16,5 +16,5 @@ COPY chord_drs chord_drs
 COPY entrypoint.bash .
 COPY run.bash .
 
-ENTRYPOINT ["/bin/bash", "./entrypoint.bash"]
-CMD ["/bin/bash", "./run.bash"]
+ENTRYPOINT ["/bin/bash", "/drs/entrypoint.bash"]
+CMD ["/bin/bash", "/drs/run.bash"]
