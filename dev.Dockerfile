@@ -1,4 +1,4 @@
-FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.03.06
+FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.03.21
 
 LABEL org.opencontainers.image.description="Local development image for Bento DRS."
 LABEL devcontainer.metadata='[{ \
@@ -20,7 +20,7 @@ RUN mkdir /wes
 
 # Install dependencies
 COPY requirements.txt .
-RUN source /env/bin/activate && pip install --no-cache-dir debugpy -r requirements.txt
+RUN pip install --no-cache-dir debugpy -r requirements.txt
 
 # Copy in just the entrypoint + runner so we have somewhere to start
 COPY entrypoint.bash .
