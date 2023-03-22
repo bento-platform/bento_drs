@@ -2,9 +2,6 @@
 
 # CWD: /drs
 
-# Set .gitconfig for development
-/set_gitconfig.bash
-
 export FLASK_ENV='development'
 export FLASK_APP='chord_drs.app:application'
 
