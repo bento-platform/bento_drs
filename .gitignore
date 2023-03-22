@@ -14,7 +14,8 @@ htmlcov/
 .idea/*
 *.swp
 *.swo
-.vscode
+.vscode/*
+!.vscode/launch.json
 
 # others
 *.pyc

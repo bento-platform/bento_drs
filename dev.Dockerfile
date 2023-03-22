@@ -1,4 +1,15 @@
-FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.03.06
+FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.03.22
+
+LABEL org.opencontainers.image.description="Local development image for Bento DRS."
+LABEL devcontainer.metadata='[{ \
+  "remoteUser": "bento_user", \
+  "customizations": { \
+    "vscode": { \
+      "extensions": ["ms-python.python", "eamodio.gitlens"], \
+      "settings": {"workspaceFolder": "/drs"} \
+    } \
+  } \
+}]'
 
 RUN apt-get update -y && \
     apt-get install libffi-dev -y && \
@@ -9,7 +20,7 @@ RUN mkdir /wes
 
 # Install dependencies
 COPY requirements.txt .
-RUN source /env/bin/activate && pip install --no-cache-dir debugpy -r requirements.txt
+RUN pip install --no-cache-dir debugpy -r requirements.txt
 
 # Copy in just the entrypoint + runner so we have somewhere to start
 COPY entrypoint.bash .

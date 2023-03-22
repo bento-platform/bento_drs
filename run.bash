@@ -3,11 +3,11 @@
 # CWD: /drs
 
 export FLASK_APP="chord_drs.app:application"
-if [[ -z "${INTERNAL_PORT}" ]]; then
-  # Set default internal port to 5000
-  export INTERNAL_PORT=5000
-fi
 
+# Set default internal port to 5000
+: "${INTERNAL_PORT:=5000}"
+
+# Run migrations if necessary
 flask db upgrade
 
 # using 1 worker, multiple threads
