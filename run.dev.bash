@@ -13,6 +13,7 @@ export FLASK_APP='chord_drs.app:application'
 
 python -m pip install --no-cache-dir -r requirements.txt
 
+# Run migrations if necessary
 flask db upgrade
 
 python -m debugpy --listen "0.0.0.0:${DEBUGGER_PORT}" -m flask run \
