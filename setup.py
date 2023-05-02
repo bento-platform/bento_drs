@@ -18,7 +18,7 @@ setuptools.setup(
     install_requires=[
         "boto3>=1.18.34,<1.19",
         "bento_lib[flask]==6.0.0",
-        "Flask>=2.2.3,<2.3",
+        "Flask>=2.2.3,<2.4",
         "Flask-SQLAlchemy>=2.5.1,<2.6",
         "Flask-Migrate>=3.1.0,<3.2",
         "prometheus_flask_exporter>=0.21.0,<0.22",
