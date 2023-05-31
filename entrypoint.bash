@@ -14,15 +14,20 @@ fi
 
 # Use the database and object folder path variables more directly to create them
 # and set their permissions.
+echo "${DATABASE}"
 if [[ -z "${DATABASE}" ]]; then
   # DATABASE is a folder; confusing naming
   mkdir -p "${DATABASE}"
   chown -R bento_user:bento_user "${DATABASE}"
+  echo "db dir created"
 fi
+
+echo "${DATA}"
 if [[ -z "${DATA}" ]]; then
   # DATA is another folder; confusing naming
   mkdir -p "${DATA}"
   chown -R bento_user:bento_user "${DATA}"
+  echo "data dir created"
 fi
 
 # Set .gitconfig for development, since we're overriding the base image entrypoint
