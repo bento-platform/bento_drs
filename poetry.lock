@@ -172,28 +172,28 @@ tests-no-zope = ["cloudpickle", "hypothesis", "mypy (>=1.1.1)", "pympler", "pyte
 
 [[package]]
 name = "bento-lib"
-version = "6.0.0"
+version = "7.0.0"
 description = "A set of common utilities and helpers for Bento platform services."
 optional = false
-python-versions = ">=3.8.1"
+python-versions = ">=3.10.0"
 files = [
-    {file = "bento_lib-6.0.0-py3-none-any.whl", hash = "sha256:b4e143aaf3c1932dbd3c4cb2b9e7faa8ad443ccca1c470c3c74e040ffa2818bb"},
-    {file = "bento_lib-6.0.0.tar.gz", hash = "sha256:48517078bcbbb5da4b69e8cf49615325b472a9f7d91eea6d39ba14c6789e541b"},
+    {file = "bento_lib-7.0.0-py3-none-any.whl", hash = "sha256:b6e42ca367e352206a6a1687ce5023c1c0a756d8c9a442f8861030cc7d18c0ba"},
+    {file = "bento_lib-7.0.0.tar.gz", hash = "sha256:8a18ea27709ea3b6f860f0db683712c4ee3b7a568ad5cb017ecd2917b9cea936"},
 ]
 
 [package.dependencies]
 aiohttp = ">=3.8.4,<4"
-Flask = {version = ">=2.2.3,<3", optional = true, markers = "extra == \"flask\""}
+Flask = {version = ">=2.2.5,<3", optional = true, markers = "extra == \"flask\""}
 jsonschema = ">=4.17.3,<5"
 psycopg2-binary = ">=2.9.5,<3.0"
-redis = ">=4.5.1,<5.0"
+redis = ">=4.5.4,<5.0"
 requests = ">=2.28.1,<3"
 Werkzeug = ">=2.2.3,<3"
 
 [package.extras]
-django = ["Django (>=4.1.7,<5)", "djangorestframework (>=3.14.0,<3.15)"]
-flask = ["Flask (>=2.2.3,<3)"]
-quart = ["quart (>=0.18.3,<0.19)"]
+django = ["Django (>=4.2.1,<5)", "djangorestframework (>=3.14.0,<3.15)"]
+fastapi = ["fastapi (>=0.95.2,<0.98)"]
+flask = ["Flask (>=2.2.5,<3)"]
 
 [[package]]
 name = "boto3"
@@ -1921,4 +1921,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "cc2f77aa9f36d287f239336f5c3b001afa1f0ce852b0c45e36bd3e3f8e51cd2a"
+content-hash = "a27b106e4b1004b8f8195a7af5bbf67ab4a713e188eab0ae4c01f983a14daa72"
