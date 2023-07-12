@@ -13,7 +13,7 @@ from flask import (
     make_response
 )
 from sqlalchemy import or_
-from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import NoResultFound
 from typing import List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 from werkzeug.exceptions import BadRequest, NotFound, InternalServerError
