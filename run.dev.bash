@@ -2,6 +2,9 @@
 
 # CWD: /drs
 
+# Update dependencies and install module locally
+/poetry_user_install_dev.bash
+
 export FLASK_ENV='development'
 export FLASK_APP='chord_drs.app:application'
 
@@ -10,8 +13,6 @@ export FLASK_APP='chord_drs.app:application'
 
 # Set internal debug port, falling back to default in a Bento deployment
 : "${DEBUGGER_PORT:=5682}"
-
-python -m pip install --no-cache-dir -r requirements.txt
 
 # Run migrations if necessary
 flask db upgrade
