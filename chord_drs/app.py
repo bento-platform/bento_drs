@@ -5,13 +5,14 @@ from flask import Flask
 from flask_migrate import Migrate
 from werkzeug.exceptions import BadRequest, NotFound
 
-from chord_drs.backend import close_backend
-from chord_drs.commands import ingest
-from chord_drs.config import Config, APP_DIR
-from chord_drs.constants import SERVICE_NAME
-from chord_drs.db import db
-from chord_drs.metrics import metrics
-from chord_drs.routes import drs_service
+from .backend import close_backend
+from .commands import ingest
+from .config import Config, APP_DIR
+from .constants import SERVICE_NAME
+from .db import db
+from .metrics import metrics
+from .routes import drs_service
+
 
 MIGRATION_DIR = os.path.join(APP_DIR, "migrations")
 

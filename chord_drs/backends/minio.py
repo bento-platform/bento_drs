@@ -1,7 +1,9 @@
 import boto3
+
 from flask import current_app
 from urllib.parse import urlparse
-from chord_drs.backends.base import Backend
+
+from .base import Backend
 
 
 __all__ = ["MinioBackend"]

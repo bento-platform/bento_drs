@@ -1,16 +1,16 @@
 import os
+from flask import current_app
 from hashlib import sha256
 from pathlib import Path
-from urllib.parse import urlparse
-from uuid import uuid4
-from flask import current_app
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from urllib.parse import urlparse
+from uuid import uuid4
 
-from chord_drs.backend import get_backend
-from chord_drs.backends.minio import MinioBackend
-from chord_drs.db import db
-from chord_drs.utils import drs_file_checksum
+from .backend import get_backend
+from .backends.minio import MinioBackend
+from .db import db
+from .utils import drs_file_checksum
 
 
 class DrsMixin:

@@ -5,13 +5,12 @@ import os
 from click import ClickException
 from flask import current_app
 from flask.cli import with_appcontext
-from typing import Optional
 
-from chord_drs.db import db
-from chord_drs.models import DrsBlob, DrsBundle
+from .db import db
+from .models import DrsBlob, DrsBundle
 
 
-def create_drs_bundle(location: str, parent: Optional[DrsBundle] = None) -> DrsBundle:
+def create_drs_bundle(location: str, parent: DrsBundle | None = None) -> DrsBundle:
     bundle = DrsBundle(name=os.path.basename(location))
 
     if parent:
@@ -33,7 +32,7 @@ def create_drs_bundle(location: str, parent: Optional[DrsBundle] = None) -> DrsB
     return bundle
 
 
-def create_drs_blob(location: str, parent: Optional[DrsBundle] = None) -> None:
+def create_drs_blob(location: str, parent: DrsBundle | None = None) -> None:
     drs_blob = DrsBlob(location=location)
 
     if parent:

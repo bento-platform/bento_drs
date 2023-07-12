@@ -14,17 +14,16 @@ from flask import (
 )
 from sqlalchemy import or_
 from sqlalchemy.exc import NoResultFound
-from typing import List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlparse
 from werkzeug.exceptions import BadRequest, NotFound, InternalServerError
 
-from chord_drs import __version__
-from chord_drs.constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
-from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
-from chord_drs.db import db
-from chord_drs.models import DrsBlob, DrsBundle
-from chord_drs.types import DRSAccessMethodDict, DRSContentsDict, DRSObjectDict
-from chord_drs.utils import drs_file_checksum
+from . import __version__
+from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
+from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
+from .db import db
+from .models import DrsBlob, DrsBundle
+from .types import DRSAccessMethodDict, DRSContentsDict, DRSObjectDict
+from .utils import drs_file_checksum
 
 
 RE_STARTING_SLASH = re.compile(r"^/")
@@ -64,8 +63,8 @@ def create_drs_uri(object_id: str) -> str:
     return f"drs://{get_drs_base_path()}/{object_id}"
 
 
-def build_contents(bundle: DrsBundle, inside_container: bool, expand: bool) -> List[DRSContentsDict]:
-    content: List[DRSContentsDict] = []
+def build_contents(bundle: DrsBundle, inside_container: bool, expand: bool) -> list[DRSContentsDict]:
+    content: list[DRSContentsDict] = []
     bundles = DrsBundle.query.filter_by(parent_bundle=bundle).all()
 
     for b in bundles:
@@ -122,7 +121,7 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
         "type": "http",
     }
 
-    access_methods: List[DRSAccessMethodDict] = [default_access_method]
+    access_methods: list[DRSAccessMethodDict] = [default_access_method]
 
     if inside_container and data_source == DATA_SOURCE_LOCAL:
         access_methods.append({
@@ -200,7 +199,7 @@ def service_info():
     return jsonify(info)
 
 
-def get_drs_object(object_id: str) -> Tuple[Optional[Union[DrsBlob, DrsBundle]], bool]:
+def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
     if drs_bundle := DrsBundle.query.filter_by(id=object_id).first():
         return drs_bundle, True
 
@@ -379,7 +378,7 @@ def object_ingest():
     if not obj_path or not isinstance(obj_path, str):
         raise bad_request_and_log(f"Missing or invalid path parameter in JSON request: {obj_path}")
 
-    drs_object: Optional[DrsBlob] = None
+    drs_object: DrsBlob | None = None
     deduplicate: bool = data.get("deduplicate", True)  # Change for v0.9: default to True
 
     if deduplicate:
