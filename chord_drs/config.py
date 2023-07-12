@@ -50,7 +50,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = "sqlite:///" + str(Path(os.path.join(BASEDIR, "db.sqlite3")).expanduser().resolve())
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    CHORD_URL: str = os.environ.get("CHORD_URL", "http://127.0.0.1/")
+    CHORD_URL: str = os.environ.get("BENTO_URL", os.environ.get("CHORD_URL", "http://127.0.0.1/"))
     CHORD_SERVICE_URL_BASE_PATH: str = os.environ.get("SERVICE_URL_BASE_PATH", "")
 
     SERVICE_ID: str = os.environ.get("SERVICE_ID", ":".join(list(SERVICE_TYPE.values())[:2]))
