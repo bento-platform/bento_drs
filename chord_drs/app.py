@@ -5,6 +5,7 @@ from flask import Flask
 from flask_migrate import Migrate
 from werkzeug.exceptions import BadRequest, NotFound
 
+from .authz import authz_middleware
 from .backend import close_backend
 from .commands import ingest
 from .config import Config, APP_DIR
@@ -18,6 +19,9 @@ MIGRATION_DIR = os.path.join(APP_DIR, "migrations")
 
 application = Flask(__name__)
 application.config.from_object(Config)
+
+# Attach authz middleware to Flask instance
+authz_middleware.attach(application)
 
 # Register exception handlers, to return nice JSON responses
 # - Generic catch-all

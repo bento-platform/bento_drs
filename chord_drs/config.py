@@ -3,8 +3,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from chord_drs.constants import SERVICE_NAME, SERVICE_TYPE
-from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
+from .constants import SERVICE_NAME, SERVICE_TYPE
+from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
+from .logger import logger
 
 
 __all__ = [
@@ -17,11 +18,24 @@ __all__ = [
 load_dotenv()
 
 
+def _get_from_environ_or_fail(var: str) -> str:
+    if (val := os.environ.get(var, "")) == "":
+        logger.critical(f"{var} must be set")
+        exit(1)
+    return val
+
+
+TRUTH_VALUES = ("true", "1")
+
 APP_DIR = Path(__file__).resolve().parents[0]
 
 # when deployed inside chord_singularity, DATABASE will be set
 BASEDIR = os.environ.get("DATABASE", APP_DIR.parent)
 SERVICE_DATA = Path(os.environ.get("DATA", os.path.join(Path.home(), "chord_drs_data"))).expanduser().resolve()
+
+# Authorization variables
+AUTHZ_ENABLED = os.environ.get("AUTHZ_ENABLED", "true").strip().lower() in TRUTH_VALUES
+AUTHZ_URL: str = _get_from_environ_or_fail("BENTO_AUTHZ_SERVICE_URL").strip().rstrip("/")
 
 # MinIO-related, check if the credentials have been provided in a file
 MINIO_URL = os.environ.get("MINIO_URL")
@@ -59,7 +73,11 @@ class Config:
     MINIO_USERNAME: str | None = MINIO_USERNAME
     MINIO_PASSWORD: str | None = MINIO_PASSWORD
     MINIO_BUCKET: str | None = os.environ.get("MINIO_BUCKET") if MINIO_URL else None
-    BENTO_DEBUG = os.environ.get("BENTO_DEBUG", os.environ.get("FLASK_DEBUG")).strip().lower() in ("true", "1")
+    BENTO_DEBUG = os.environ.get("BENTO_DEBUG", os.environ.get("FLASK_DEBUG")).strip().lower() in TRUTH_VALUES
+
+    # Authn/z-related configuration
+    AUTHZ_URL: str = AUTHZ_URL
+    AUTHZ_ENABLED: bool = AUTHZ_ENABLED
 
 
 print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
