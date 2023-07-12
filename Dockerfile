@@ -19,6 +19,7 @@ COPY chord_drs chord_drs
 COPY entrypoint.bash .
 COPY run.bash .
 COPY LICENSE .
+COPY README.md .
 
 # Install the module itself, locally (similar to `pip install -e .`)
 RUN poetry install --without dev
