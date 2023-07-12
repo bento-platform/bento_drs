@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -55,13 +54,12 @@ class Config:
 
     SERVICE_ID: str = os.environ.get("SERVICE_ID", ":".join(list(SERVICE_TYPE.values())[:2]))
     SERVICE_DATA_SOURCE: str = DATA_SOURCE_MINIO if MINIO_URL else DATA_SOURCE_LOCAL
-    SERVICE_DATA: Optional[str] = None if MINIO_URL else SERVICE_DATA
-    MINIO_URL: Optional[str] = MINIO_URL
-    MINIO_USERNAME: Optional[str] = MINIO_USERNAME
-    MINIO_PASSWORD: Optional[str] = MINIO_PASSWORD
-    MINIO_BUCKET: Optional[str] = os.environ.get("MINIO_BUCKET") if MINIO_URL else None
-    BENTO_DEBUG = os.environ.get("FLASK_DEBUG", os.environ.get("FLASK_ENV", "production")).strip().lower() in (
-        'true', '1', 'development')
+    SERVICE_DATA: str | None = None if MINIO_URL else SERVICE_DATA
+    MINIO_URL: str | None = MINIO_URL
+    MINIO_USERNAME: str | None = MINIO_USERNAME
+    MINIO_PASSWORD: str | None = MINIO_PASSWORD
+    MINIO_BUCKET: str | None = os.environ.get("MINIO_BUCKET") if MINIO_URL else None
+    BENTO_DEBUG = os.environ.get("BENTO_DEBUG", os.environ.get("FLASK_DEBUG")).strip().lower() in ("true", "1")
 
 
 print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
