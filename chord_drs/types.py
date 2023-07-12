@@ -1,4 +1,4 @@
-from typing import TypedDict, NotRequired
+from typing import TypedDict
 
 __all__ = [
     "DRSAccessURLDict",
@@ -8,17 +8,25 @@ __all__ = [
     "DRSObjectDict",
 ]
 
+# TODO: py3.11: new TypedDict required pattern
 
-class DRSAccessURLDict(TypedDict):
+
+class _DRSAccessURLDictBase(TypedDict):
     url: str
-    headers: NotRequired[list[str]]  # TODO: The schema is very unclear with this
 
 
-class DRSAccessMethodDict(TypedDict):
+class DRSAccessURLDict(_DRSAccessURLDictBase, total=False):
+    headers: list[str]  # TODO: The schema is very unclear with this
+
+
+class _DRSAccessMethodDictBase(TypedDict):
     type: str
-    access_id: NotRequired[str]
-    access_url: NotRequired[DRSAccessURLDict]
-    region: NotRequired[str]
+
+
+class DRSAccessMethodDict(_DRSAccessMethodDictBase, total=False):
+    access_id: str
+    access_url: DRSAccessURLDict
+    region: str
 
 
 class DRSChecksumDict(TypedDict):
@@ -26,25 +34,30 @@ class DRSChecksumDict(TypedDict):
     type: str
 
 
-class DRSContentsDict(TypedDict):
-    name: str
-    id: NotRequired[str]
-    drs_uri: NotRequired[str]
-    contents: NotRequired[list["DRSContentsDict"]]
-
-
-class DRSObjectDict(TypedDict):
+class _DRSObjectDictBase(TypedDict):
     id: str
     checksums: list[DRSChecksumDict]
     created_time: str
     size: int
     self_uri: str
 
-    access_methods: NotRequired[list[DRSAccessMethodDict]]
-    name: NotRequired[str]
-    description: NotRequired[str]
-    updated_time: NotRequired[str]
-    version: NotRequired[str]
-    mime_type: NotRequired[str]
-    contents: NotRequired[list[DRSContentsDict]]
-    aliases: NotRequired[list[str]]
+
+class _DRSContentsDictBase(TypedDict):
+    name: str
+
+
+class DRSContentsDict(_DRSContentsDictBase, total=False):
+    id: str
+    drs_uri: str
+    contents: list["DRSContentsDict"]
+
+
+class DRSObjectDict(_DRSObjectDictBase, total=False):
+    access_methods: list[DRSAccessMethodDict]
+    name: str
+    description: str
+    updated_time: str
+    version: str
+    mime_type: str
+    contents: list[DRSContentsDict]
+    aliases: list[str]
