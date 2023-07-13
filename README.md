@@ -38,26 +38,26 @@ Development dependencies are described in `requirements.txt` and can be
 installed using the following command:
 
 ```bash
-pip install -r requirements.txt
+poetry install
 ```
 
-Afterwards we need to setup the DB:
+Afterward, we need to set up the DB:
 
 ```bash
-flask db upgrade
+poetry run flask db upgrade
 ```
 
 Most likely you will want to load some objects to serve through this service.
 This can be done with this command (ingestion is recursive for directories):
 
 ```bash
-flask ingest $A_FILE_OR_A_DIRECTORY
+poetry run flask ingest $A_FILE_OR_A_DIRECTORY
 ```
 
 The Flask development server can be run with the following command:
 
 ```bash
-FLASK_DEBUG=True flask run
+FLASK_DEBUG=True poetry run flask run
 ```
 
 
@@ -66,7 +66,7 @@ FLASK_DEBUG=True flask run
 To run all tests and calculate coverage, run the following command:
 
 ```bash
-tox
+poetry run tox
 ```
 
 Tox is configured to run both pytest and flake8, you may want to uncomment
