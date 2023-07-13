@@ -3,7 +3,7 @@ import json
 import pytest
 
 from jsonschema import validate
-from tests.conftest import NON_EXISTENT_DUMMY_FILE, DUMMY_FILE
+from tests.conftest import non_existant_dummy_file_path, dummy_file_path
 from chord_drs.app import application
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 
@@ -230,18 +230,18 @@ def test_search_object(client, drs_bundle, url):
     validate_object_fields(data[0], with_internal_path=has_internal_path)
 
 
-def test_object_ingest_fail(client):
-    res = client.post("/private/ingest", json={"wrong_arg": "some_path"})
-
+def test_object_ingest_fail_1(client):
+    res = client.post("/private/ingest", data={"wrong_arg": "some_path"})
     assert res.status_code == 400
 
-    res = client.post("/private/ingest", json={"path": NON_EXISTENT_DUMMY_FILE})
 
+def test_object_ingest_fail_2(client):
+    res = client.post("/private/ingest", data={"path": non_existant_dummy_file_path()})
     assert res.status_code == 400
 
 
 def _ingest_one(client, existing_id=None, params=None):
-    res = client.post("/private/ingest", json={"path": DUMMY_FILE, **(params or {})})
+    res = client.post("/private/ingest", data={"path": dummy_file_path(), **(params or {})})
     data = res.get_json()
 
     assert res.status_code == 201

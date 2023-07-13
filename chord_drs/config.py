@@ -27,7 +27,7 @@ def _get_from_environ_or_fail(var: str) -> str:
 
 TRUTH_VALUES = ("true", "1")
 
-APP_DIR = Path(__file__).resolve().parents[0]
+APP_DIR = Path(__file__).resolve().parent
 
 # when deployed inside chord_singularity, DATABASE will be set
 BASEDIR = os.environ.get("DATABASE", APP_DIR.parent)

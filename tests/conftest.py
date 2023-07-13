@@ -1,29 +1,54 @@
-import os
-
 import boto3
+import os
+import pytest
+
 from flask import g
 from moto import mock_s3
-import pytest
 from pytest_lazyfixture import lazy_fixture
 
-from chord_drs.app import application, db
+# Must only be imports that don't import authz/app/config/db
 from chord_drs.backends.base import FakeBackend
 from chord_drs.backends.minio import MinioBackend
-from chord_drs.config import BASEDIR, APP_DIR
-from chord_drs.commands import create_drs_bundle
-from chord_drs.models import DrsBlob
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 
 
+AUTHZ_URL = "http://bento-authz.local"
 SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
-NON_EXISTENT_DUMMY_FILE = os.path.join(BASEDIR, "potato")
-DUMMY_FILE = os.path.join(BASEDIR, "tests", "dummy_file.txt")
-DUMMY_DIRECTORY = os.path.join(APP_DIR, "migrations")
-EMPTY_FILE = os.path.join(BASEDIR, "tests", "empty_file.txt")
+
+DUMMY_PROJECT_ID = "b1738ea3-6ea7-4f43-a13f-51f4398818c4"
+DUMMY_DATASET_ID = "c96aa217-e07d-4d52-8c5c-df03f054fd3d"
+
+DATA_TYPE_PHENOPACKET = "phenopacket"
+
+
+def non_existant_dummy_file_path():  # Function rather than constant so we can set environ first
+    from chord_drs.config import BASEDIR
+    return os.path.join(BASEDIR, "potato")
+
+
+def dummy_file_path():  # Function rather than constant so we can set environ first
+    from chord_drs.config import BASEDIR
+    import sys
+    print(BASEDIR, file=sys.stderr)
+    return os.path.join(BASEDIR, "tests", "dummy_file.txt")
+
+
+def dummy_directory_path():  # Function rather than constant so we can set environ first
+    from chord_drs.config import APP_DIR
+    return os.path.join(APP_DIR, "migrations")
+
+
+def empty_file_path():  # Function rather than constant so we can set environ first
+    from chord_drs.config import BASEDIR
+    return os.path.join(BASEDIR, "tests", "empty_file.txt")
 
 
 @pytest.fixture
 def client_minio():
+    os.environ["AUTHZ_URL"] = AUTHZ_URL
+
+    from chord_drs.app import application, db
+
     bucket_name = "test"
     application.config["MINIO_URL"] = "http://127.0.0.1:9000"
     application.config["MINIO_BUCKET"] = bucket_name
@@ -45,6 +70,10 @@ def client_minio():
 
 @pytest.fixture
 def client_local():
+    os.environ["AUTHZ_URL"] = AUTHZ_URL
+
+    from chord_drs.app import application, db
+
     application.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
     application.config["SERVICE_DATA_SOURCE"] = DATA_SOURCE_LOCAL
 
@@ -69,7 +98,17 @@ def client(request):
 
 @pytest.fixture
 def drs_object():
-    drs_object = DrsBlob(location=DUMMY_FILE)
+    os.environ["AUTHZ_URL"] = AUTHZ_URL
+
+    from chord_drs.app import db
+    from chord_drs.models import DrsBlob
+
+    drs_object = DrsBlob(
+        location=dummy_file_path(),
+        project_id=DUMMY_PROJECT_ID,
+        dataset_id=DUMMY_DATASET_ID,
+        data_type=DATA_TYPE_PHENOPACKET,
+    )
 
     db.session.add(drs_object)
     db.session.commit()
@@ -79,7 +118,17 @@ def drs_object():
 
 @pytest.fixture
 def drs_bundle():
-    bundle = create_drs_bundle(DUMMY_DIRECTORY)
+    os.environ["AUTHZ_URL"] = AUTHZ_URL
+
+    from chord_drs.app import db
+    from chord_drs.commands import create_drs_bundle
+
+    bundle = create_drs_bundle(
+        dummy_directory_path(),
+        project_id=DUMMY_PROJECT_ID,
+        dataset_id=DUMMY_DATASET_ID,
+        data_type=DATA_TYPE_PHENOPACKET,
+    )
 
     db.session.commit()
 
@@ -88,7 +137,17 @@ def drs_bundle():
 
 @pytest.fixture
 def drs_object_minio():
-    drs_object = DrsBlob(location=DUMMY_FILE)
+    os.environ["AUTHZ_URL"] = AUTHZ_URL
+
+    from chord_drs.app import db
+    from chord_drs.models import DrsBlob
+
+    drs_object = DrsBlob(
+        location=dummy_file_path(),
+        project_id=DUMMY_PROJECT_ID,
+        dataset_id=DUMMY_DATASET_ID,
+        data_type=DATA_TYPE_PHENOPACKET,
+    )
 
     db.session.add(drs_object)
     db.session.commit()
@@ -98,8 +157,18 @@ def drs_object_minio():
 
 @pytest.fixture
 def drs_bundle_minio():
+    os.environ["AUTHZ_URL"] = AUTHZ_URL
+
+    from chord_drs.app import db
+    from chord_drs.commands import create_drs_bundle
+
     with mock_s3():
-        bundle = create_drs_bundle(DUMMY_DIRECTORY)
+        bundle = create_drs_bundle(
+            dummy_directory_path(),
+            project_id=DUMMY_PROJECT_ID,
+            dataset_id=DUMMY_DATASET_ID,
+            data_type=DATA_TYPE_PHENOPACKET,
+        )
 
         db.session.commit()
 
