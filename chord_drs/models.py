@@ -14,8 +14,7 @@ from .utils import drs_file_checksum
 
 
 class DrsMixin:
-    # TODO: tried refactoring the id inside this mixin except
-    # sqlalchemy is confused when using DrsMixin.id for remote_side below
+    # IDs (PKs) must remain outside the mixin!
     created = db.Column(db.DateTime, server_default=func.now())
     checksum = db.Column(db.String(64), nullable=False)
     size = db.Column(db.Integer, default=0)
