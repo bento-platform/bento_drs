@@ -441,7 +441,7 @@ def object_ingest():
     # TODO: What to do with deduplication if project/... ID isn't the same?
 
     logger = current_app.logger
-    data = request.data or {}
+    data = request.form or {}
 
     deduplicate: bool = strtobool(data.get("deduplicate", "true"))  # Change for v0.9: default to True
     obj_path: str | None = data.get("path")
@@ -450,7 +450,7 @@ def object_ingest():
     data_type: str | None = data.get("data_type")
     file = request.files.get("file")
 
-    if obj_path is not None and isinstance(obj_path, str):
+    if obj_path is not None and not isinstance(obj_path, str):
         raise bad_request_and_log(f"Invalid path parameter in ingest request: {obj_path}")
     elif (obj_path is not None and file is not None) or (obj_path is None and file is None):
         raise bad_request_and_log("Must specify exactly one of path or file contents")
@@ -508,5 +508,5 @@ def object_ingest():
         return build_blob_json(drs_object), 201
 
     finally:
-        tfh.close()
+        os.close(tfh)
         os.remove(t_obj_path)
