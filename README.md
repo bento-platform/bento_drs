@@ -111,24 +111,22 @@ partial match `/search?fuzzy_name=1001`
 
 `/private/ingest`
 
-e.g. POST body
+e.g. POST body (multipart form-encoded)
 
-```json
-{
-  "path": "examples/P-1001.hc.g.vcf.gz"
-}
+```
+path=examples/P-1001.hc.g.vcf.gz
 ```
 
 This will automatically deduplicate with existing DRS objects if the file matches.
 
 To ingest and force-create a duplicate record, provide the `deduplicate` parameter, set to `false`:
 
-```json
-{
-  "path": "examples/P-1001.hc.g.vcf.gz",
-  "deduplicate": false
-}
 ```
+path=examples/P-1001.hc.g.vcf.gz&deduplicate=false
+```
+
+If `path` is left out and instead a file is provided, the file will be uploaded instead
+of copied from the specified local filesystem path.
 
 
 ##### GET service info
