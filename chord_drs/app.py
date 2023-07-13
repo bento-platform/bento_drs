@@ -3,7 +3,7 @@ import os
 from bento_lib.responses import flask_errors
 from flask import Flask
 from flask_migrate import Migrate
-from werkzeug.exceptions import BadRequest, NotFound
+from werkzeug.exceptions import BadRequest, Forbidden, NotFound
 
 from .authz import authz_middleware
 from .backend import close_backend
@@ -31,6 +31,8 @@ application.register_error_handler(
                                                  drs_compat=True, logger=application.logger))
 application.register_error_handler(
     BadRequest, flask_errors.flask_error_wrap(flask_errors.flask_bad_request_error, drs_compat=True))
+application.register_error_handler(
+    Forbidden, flask_errors.flask_error_wrap(flask_errors.flask_forbidden_error, drs_compat=True))
 application.register_error_handler(
     NotFound, lambda e: flask_errors.flask_error_wrap(flask_errors.flask_not_found_error, str(e), drs_compat=True)(e))
 
