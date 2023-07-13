@@ -1,6 +1,8 @@
 import re
 import urllib.parse
+import os
 import subprocess
+import tempfile
 
 from flask import (
     Blueprint,
@@ -436,40 +438,75 @@ def object_download(object_id: str):
 def object_ingest():
     # TODO: Permissions
     # TODO: If a parent is specified, make sure we have permissions to ingest into it? How to reconcile?
+    # TODO: What to do with deduplication if project/... ID isn't the same?
 
     logger = current_app.logger
-    data = request.json or {}
+    data = request.data or {}
 
-    obj_path: str = data.get("path")
+    deduplicate: bool = strtobool(data.get("deduplicate", "true"))  # Change for v0.9: default to True
+    obj_path: str | None = data.get("path")
+    project_id: str | None = data.get("project_id")
+    dataset_id: str | None = data.get("dataset_id")
+    data_type: str | None = data.get("data_type")
+    file = request.files.get("file")
 
-    if not obj_path or not isinstance(obj_path, str):
-        raise bad_request_and_log(f"Missing or invalid path parameter in JSON request: {obj_path}")
+    if obj_path is not None and isinstance(obj_path, str):
+        raise bad_request_and_log(f"Invalid path parameter in ingest request: {obj_path}")
+    elif (obj_path is not None and file is not None) or (obj_path is None and file is None):
+        raise bad_request_and_log("Must specify exactly one of path or file contents")
 
     drs_object: DrsBlob | None = None
-    deduplicate: bool = data.get("deduplicate", True)  # Change for v0.9: default to True
+    existing_file_path: str | None = None
 
-    if deduplicate:
-        # Get checksum of original file, and query database for objects that match
+    tfh, t_obj_path = tempfile.mkstemp()
+    try:
+        if file:
+            file.save(tfh)
+            obj_path = t_obj_path
 
-        try:
-            checksum = drs_file_checksum(obj_path)
-        except FileNotFoundError:
-            raise bad_request_and_log(f"File not found at path {obj_path}")
+        if deduplicate:
+            # Get checksum of original file, and query database for objects that match
 
-        drs_object = DrsBlob.query.filter_by(checksum=checksum).first()
-        if drs_object:
-            logger.info(f"Found duplicate DRS object via checksum (will deduplicate): {drs_object}")
+            try:
+                checksum = drs_file_checksum(obj_path)
+            except FileNotFoundError:
+                raise bad_request_and_log(f"File not found at path {obj_path}")
 
-    if not drs_object:
-        try:
-            drs_object = DrsBlob(location=obj_path)
-            db.session.add(drs_object)
-            db.session.commit()
-            logger.info(f"Added DRS object: {drs_object}")
-        except Exception as e:  # TODO: More specific handling
-            logger.error(f"Encountered exception during ingest: {e}")
-            raise InternalServerError("Error while creating the object")
+            # Currently, we require exact permissions compatibility for deduplication of IDs.
+            # It might be possible to relax this a bit, but we can't fully relax this for two reasons:
+            #  - we would need to keep track of sets of permissions for each DRS object
+            #  - certain attacks may be performable by creating a second project/dataset in a semi-public instance
+            #    and seeing which files are DRS ID duplicates.
+            # However, we can actually deduplicate the files on the filesystem as these are more opaque.
 
-    response = build_blob_json(drs_object)
+            candidate_drs_object: DrsBlob | None = DrsBlob.query.filter_by(checksum=checksum).first()
 
-    return response, 201
+            if candidate_drs_object is not None:
+                if candidate_drs_object.project_id == project_id and candidate_drs_object.dataset_id == dataset_id and \
+                        candidate_drs_object.data_type == data_type:
+                    logger.info(f"Found duplicate DRS object via checksum (will fully deduplicate): {drs_object}")
+                    drs_object = candidate_drs_object
+                else:
+                    logger.info(f"Found duplicate DRS object via checksum (will deduplicate JUST bytes): {drs_object}")
+                    existing_file_path = candidate_drs_object.location
+
+        if not drs_object:
+            try:
+                drs_object = DrsBlob(
+                    **(dict(current_location=existing_file_path) if existing_file_path else dict(location=obj_path)),
+                    project_id=project_id,
+                    dataset_id=dataset_id,
+                    data_type=data_type,
+                )
+                db.session.add(drs_object)
+                db.session.commit()
+                logger.info(f"Added DRS object: {drs_object}")
+            except Exception as e:  # TODO: More specific handling
+                logger.error(f"Encountered exception during ingest: {e}")
+                raise InternalServerError("Error while creating the object")
+
+        return build_blob_json(drs_object), 201
+
+    finally:
+        tfh.close()
+        os.remove(t_obj_path)
