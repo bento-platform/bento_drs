@@ -35,6 +35,9 @@ class DrsBundle(db.Model, DrsMixin):
         super().__init__(*args, **kwargs)
 
     def update_checksum_and_size(self):
+        # For bundle checksumming logic, see the `checksums` field in
+        # https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-1.3.0/docs/#tag/DrsObjectModel
+
         checksums = []
         total_size = 0
 
