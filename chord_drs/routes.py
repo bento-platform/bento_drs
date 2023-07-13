@@ -2,7 +2,6 @@ import re
 import urllib.parse
 import subprocess
 
-from bento_lib.responses import flask_errors
 from flask import (
     Blueprint,
     current_app,
@@ -13,12 +12,11 @@ from flask import (
     make_response
 )
 from sqlalchemy import or_
-from sqlalchemy.exc import NoResultFound
 from urllib.parse import urljoin, urlparse
-from werkzeug.exceptions import BadRequest, NotFound, InternalServerError
+from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError
 
 from . import __version__
-from .authz import authz_middleware
+from .authz import authz_middleware, PERMISSION_VIEW_DATA
 from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from .db import db
@@ -34,8 +32,74 @@ CHUNK_SIZE = 1024 * 16  # Read 16 KB at a time
 drs_service = Blueprint("drs_service", __name__)
 
 
-def strtobool(val: str):
+def strtobool(val: str) -> bool:
     return val.lower() in ("yes", "true", "t", "1", "on")
+
+
+def forbidden() -> Forbidden:
+    authz_middleware.mark_authz_done(request)
+    return Forbidden()
+
+
+def check_everything_permission(permission: str) -> bool:
+    if not current_app.config["AUTHZ_ENABLED"]:
+        return True
+
+    return authz_middleware.authz_post(request, "/policy/evaluate", body={
+        "requested_resource": {"everything": True},
+        "required_permissions": [permission],
+    }).json()["result"]
+
+
+def check_objects_permission(drs_objs: list[DrsBlob | DrsBundle], permission: str) -> tuple[bool, ...]:
+    if not current_app.config["AUTHZ_ENABLED"]:
+        return tuple([True] * len(drs_objs))  # Assume we have permission for everything if authz disabled
+
+    requested_resources = []
+
+    for drs_obj in drs_objs:
+        project = drs_obj.project_id
+        dataset = drs_obj.dataset_id
+        data_type = drs_obj.data_type
+
+        if project is not None:
+            requested_resources.append({
+                "project": project,
+                **({"dataset": dataset} if dataset is not None else {}),
+                **({"data_type": data_type} if data_type is not None else {}),
+            })
+        else:  # Either truly some kind of global object or just bad fields, in either case resort to {everything}
+            requested_resources.append({"everything": True})
+
+    return authz_middleware.authz_post(request, "/policy/evaluate", body={
+        "requested_resource": requested_resources,
+        "required_permissions": [permission],
+    }).json()["result"]
+
+
+def fetch_and_check_object_permissions(object_id: str) -> tuple[DrsBlob | DrsBundle, bool]:
+    view_data_everything = check_everything_permission(PERMISSION_VIEW_DATA)
+
+    drs_object, is_bundle = get_drs_object(object_id)
+
+    if not drs_object:
+        authz_middleware.mark_authz_done(request)
+        if current_app.config["AUTHZ_ENABLED"] and not view_data_everything:  # Don't leak if this object exists
+            raise forbidden()
+        raise NotFound("No object found for this ID")
+
+    # Check permissions -------------------------------------------------
+    if view_data_everything:
+        # Good to go already!
+        authz_middleware.mark_authz_done(request)
+    else:
+        p = check_objects_permission([drs_object], PERMISSION_VIEW_DATA)
+        authz_middleware.mark_authz_done(request)
+        if not (p and p[0]):
+            raise forbidden()
+    # -------------------------------------------------------------------
+
+    return drs_object, is_bundle
 
 
 def bad_request_and_log(err: str) -> BadRequest:
@@ -217,10 +281,7 @@ def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
 def object_info(object_id: str):
     expand = request.args.get("expand") in ("true", "1", "yes")
 
-    drs_object, is_bundle = get_drs_object(object_id)
-
-    if not drs_object:
-        raise NotFound("No object found for this ID")
+    drs_object, is_bundle = fetch_and_check_object_permissions(object_id)
 
     # Log X-CHORD-Internal header
     current_app.logger.debug(f"object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}")
@@ -240,9 +301,7 @@ def object_info(object_id: str):
 @drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 def object_access(object_id: str, access_id: str):
-    drs_object, is_bundle = get_drs_object(object_id)
-
-    if not drs_object:
+    if not fetch_and_check_object_permissions(object_id)[0]:
         raise NotFound("No object found for this ID")
 
     # We explicitly do not support access_id-based accesses; all of them will be 'not found'
@@ -276,24 +335,27 @@ def object_search():
             DrsBlob.description.contains(search_q),
         ))
     else:
+        authz_middleware.mark_authz_done(request)
         raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
 
-    for obj in objects:
-        response.append(build_blob_json(obj, strtobool(internal_path)))
+    for obj, p in zip(objects, check_objects_permission([objects], PERMISSION_VIEW_DATA)):
+        if p:  # Only include the blob in the search results if we have permissions to view it.
+            response.append(build_blob_json(obj, strtobool(internal_path)))
 
+    authz_middleware.mark_authz_done(request)
     return jsonify(response)
 
 
 @drs_service.route("/objects/<string:object_id>/download", methods=["GET"])
-def object_download(object_id):
+def object_download(object_id: str):
     logger = current_app.logger
 
     # TODO: Bundle download
 
-    try:
-        drs_object = DrsBlob.query.filter_by(id=object_id).one()
-    except NoResultFound:
-        return flask_errors.flask_not_found_error("No object found for this ID")
+    drs_object, is_bundle = fetch_and_check_object_permissions(object_id)
+
+    if is_bundle:
+        raise BadRequest("Bundle download is currently unsupported")
 
     minio_obj = drs_object.return_minio_object()
 
@@ -372,6 +434,9 @@ def object_download(object_id):
 
 @drs_service.route("/private/ingest", methods=["POST"])
 def object_ingest():
+    # TODO: Permissions
+    # TODO: If a parent is specified, make sure we have permissions to ingest into it? How to reconcile?
+
     logger = current_app.logger
     data = request.json or {}
 
