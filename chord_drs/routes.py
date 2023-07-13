@@ -18,6 +18,7 @@ from urllib.parse import urljoin, urlparse
 from werkzeug.exceptions import BadRequest, NotFound, InternalServerError
 
 from . import __version__
+from .authz import authz_middleware
 from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from .db import db
@@ -157,6 +158,7 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
 
 
 @drs_service.route("/service-info", methods=["GET"])
+@authz_middleware.deco_public_endpoint
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
     info = {
