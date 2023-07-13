@@ -73,7 +73,7 @@ class Config:
     MINIO_USERNAME: str | None = MINIO_USERNAME
     MINIO_PASSWORD: str | None = MINIO_PASSWORD
     MINIO_BUCKET: str | None = os.environ.get("MINIO_BUCKET") if MINIO_URL else None
-    BENTO_DEBUG = os.environ.get("BENTO_DEBUG", os.environ.get("FLASK_DEBUG")).strip().lower() in TRUTH_VALUES
+    BENTO_DEBUG = os.environ.get("BENTO_DEBUG", os.environ.get("FLASK_DEBUG", "false")).strip().lower() in TRUTH_VALUES
 
     # Authn/z-related configuration
     AUTHZ_URL: str = AUTHZ_URL
