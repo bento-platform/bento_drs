@@ -20,6 +20,11 @@ class DrsMixin:
     size = db.Column(db.Integer, default=0)
     name = db.Column(db.String(250), nullable=True)
     description = db.Column(db.String(1000), nullable=True)
+    # Permissions/Bento-specific project & dataset tagging for DRS items
+    # TODO: Make some of these not nullable in the future:
+    project_id = db.Column(db.String(64), nullable=True)  # Nullable for backwards-compatibility
+    dataset_id = db.Column(db.String(64), nullable=True)  # Nullable for backwards-compatibility / project-only stuff?
+    data_type = db.Column(db.String(24), nullable=True)  # NULL if multi-data type or something else
 
 
 class DrsBundle(db.Model, DrsMixin):
