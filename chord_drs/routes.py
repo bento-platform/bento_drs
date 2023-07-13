@@ -318,10 +318,10 @@ def object_search():
 
     response = []
 
-    name = request.args.get("name")
-    fuzzy_name = request.args.get("fuzzy_name")
-    search_q = request.args.get("q")
-    internal_path = request.args.get("internal_path", "")
+    name: str | None = request.args.get("name")
+    fuzzy_name: str | None = request.args.get("fuzzy_name")
+    search_q: str | None = request.args.get("q")
+    internal_path: bool = strtobool(request.args.get("internal_path", ""))
 
     if name:
         objects = DrsBlob.query.filter_by(name=name).all()
@@ -340,7 +340,7 @@ def object_search():
 
     for obj, p in zip(objects, check_objects_permission([objects], PERMISSION_VIEW_DATA)):
         if p:  # Only include the blob in the search results if we have permissions to view it.
-            response.append(build_blob_json(obj, strtobool(internal_path)))
+            response.append(build_blob_json(obj, internal_path))
 
     authz_middleware.mark_authz_done(request)
     return jsonify(response)
