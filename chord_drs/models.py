@@ -68,33 +68,39 @@ class DrsBlob(db.Model, DrsMixin):
     location = db.Column(db.String(500), nullable=False)
 
     def __init__(self, *args, **kwargs):
-        location = kwargs.get("location")
-        p = Path(location)
+        current_location = kwargs.get("current_location")  # If set, we are deduplicating with an existing file object
 
-        if not p.exists():
-            # TODO: we will need to account for URLs at some point
-            raise Exception("Provided file path does not exists")
+        if current_location:
+            del kwargs["current_location"]
+        else:
+            location = kwargs.get("location")
 
-        self.id = str(uuid4())
-        self.name = p.name
-        new_filename = f"{self.id[:12]}-{p.name}"
+            p = Path(location)
 
-        backend = get_backend()
+            if not p.exists():
+                # TODO: we will need to account for URLs at some point
+                raise Exception("Provided file path does not exists")
 
-        if not backend:
-            raise Exception("The backend for this instance is not properly configured.")
-        try:
-            current_location = backend.save(location, new_filename)
-        except Exception as e:
-            current_app.logger.error(f"Encountered exception during DRS object creation: {e}")
-            # TODO: implement more specific exception handling
-            raise Exception("Well if the file is not saved... we can't do squat")
+            self.id = str(uuid4())
+            self.name = p.name
+            new_filename = f"{self.id[:12]}-{p.name}"
+
+            backend = get_backend()
+
+            if not backend:
+                raise Exception("The backend for this instance is not properly configured.")
+            try:
+                current_location = backend.save(location, new_filename)
+            except Exception as e:
+                current_app.logger.error(f"Encountered exception during DRS object creation: {e}")
+                # TODO: implement more specific exception handling
+                raise Exception("Well if the file is not saved... we can't do squat")
 
         self.location = current_location
         del kwargs["location"]
 
-        self.size = os.path.getsize(location)
-        self.checksum = drs_file_checksum(location)
+        self.size = os.path.getsize(current_location)
+        self.checksum = drs_file_checksum(current_location)
 
         super().__init__(*args, **kwargs)
 
