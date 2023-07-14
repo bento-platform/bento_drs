@@ -2,9 +2,9 @@ import bento_lib
 import json
 import pytest
 
+from flask import current_app
 from jsonschema import validate
 from tests.conftest import non_existant_dummy_file_path, dummy_file_path
-from chord_drs.app import application
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 
 
@@ -12,8 +12,8 @@ NON_EXISTENT_ID = "123"
 
 
 def validate_object_fields(data, existing_id=None, with_internal_path=False):
-    is_local = application.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_LOCAL
-    is_minio = application.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_MINIO
+    is_local = current_app.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_LOCAL
+    is_minio = current_app.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_MINIO
 
     assert "contents" not in data
     assert "access_methods" in data
