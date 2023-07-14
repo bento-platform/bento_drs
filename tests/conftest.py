@@ -44,7 +44,7 @@ def empty_file_path():  # Function rather than constant so we can set environ fi
 
 @pytest.fixture
 def client_minio():
-    os.environ["AUTHZ_URL"] = AUTHZ_URL
+    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import application, db
 
@@ -69,7 +69,7 @@ def client_minio():
 
 @pytest.fixture
 def client_local():
-    os.environ["AUTHZ_URL"] = AUTHZ_URL
+    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
     os.environ["DATA"] = str((pathlib.Path(__file__).parent / "data").absolute())
 
     from chord_drs.app import application, db
@@ -98,7 +98,7 @@ def client(request):
 
 @pytest.fixture
 def drs_object():
-    os.environ["AUTHZ_URL"] = AUTHZ_URL
+    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import db
     from chord_drs.models import DrsBlob
@@ -118,7 +118,7 @@ def drs_object():
 
 @pytest.fixture
 def drs_bundle():
-    os.environ["AUTHZ_URL"] = AUTHZ_URL
+    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import db
     from chord_drs.commands import create_drs_bundle
@@ -137,7 +137,7 @@ def drs_bundle():
 
 @pytest.fixture
 def drs_object_minio():
-    os.environ["AUTHZ_URL"] = AUTHZ_URL
+    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import db
     from chord_drs.models import DrsBlob
@@ -157,7 +157,7 @@ def drs_object_minio():
 
 @pytest.fixture
 def drs_bundle_minio():
-    os.environ["AUTHZ_URL"] = AUTHZ_URL
+    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import db
     from chord_drs.commands import create_drs_bundle
