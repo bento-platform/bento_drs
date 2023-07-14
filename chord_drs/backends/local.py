@@ -1,7 +1,6 @@
-import os
-
 from shutil import copy
 from flask import current_app
+from pathlib import Path
 
 from .base import Backend
 
@@ -16,12 +15,11 @@ class LocalBackend(Backend):
     specified by the DATA var env, the default being in ~/chord_drs_data
     """
     def __init__(self):
-        self.base_location = current_app.config["SERVICE_DATA"]
-        # We can use makedirs, since resolve has been called in config.py
-        os.makedirs(self.base_location, exist_ok=True)
+        self.base_location = Path(current_app.config["SERVICE_DATA"])
+        # We can use mkdir, since resolve has been called in config.py
+        self.base_location.mkdir(exist_ok=True)
 
-    def save(self, current_location: str, filename: str) -> str:
-        new_location = os.path.join(self.base_location, filename)
+    def save(self, current_location: str | Path, filename: str) -> str:
+        new_location = self.base_location / filename
         copy(current_location, new_location)
-
-        return new_location
+        return str(new_location.absolute())

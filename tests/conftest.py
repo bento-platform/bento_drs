@@ -1,5 +1,6 @@
 import boto3
 import os
+import pathlib
 import pytest
 
 from flask import g
@@ -21,26 +22,24 @@ DUMMY_DATASET_ID = "c96aa217-e07d-4d52-8c5c-df03f054fd3d"
 DATA_TYPE_PHENOPACKET = "phenopacket"
 
 
-def non_existant_dummy_file_path():  # Function rather than constant so we can set environ first
-    from chord_drs.config import BASEDIR
-    return os.path.join(BASEDIR, "potato")
-
-
-def dummy_file_path():  # Function rather than constant so we can set environ first
-    from chord_drs.config import BASEDIR
-    import sys
-    print(BASEDIR, file=sys.stderr)
-    return os.path.join(BASEDIR, "tests", "dummy_file.txt")
-
-
-def dummy_directory_path():  # Function rather than constant so we can set environ first
+def non_existant_dummy_file_path() -> str:  # Function rather than constant so we can set environ first
     from chord_drs.config import APP_DIR
-    return os.path.join(APP_DIR, "migrations")
+    return str(APP_DIR.parent / "potato")
+
+
+def dummy_file_path() -> str:  # Function rather than constant so we can set environ first
+    from chord_drs.config import APP_DIR
+    return str(APP_DIR.parent / "tests" / "dummy_file.txt")
+
+
+def dummy_directory_path() -> str:  # Function rather than constant so we can set environ first
+    from chord_drs.config import APP_DIR
+    return str(APP_DIR / "migrations")
 
 
 def empty_file_path():  # Function rather than constant so we can set environ first
-    from chord_drs.config import BASEDIR
-    return os.path.join(BASEDIR, "tests", "empty_file.txt")
+    from chord_drs.config import APP_DIR
+    return str(APP_DIR.parent / "tests" / "empty_file.txt")
 
 
 @pytest.fixture
@@ -71,6 +70,7 @@ def client_minio():
 @pytest.fixture
 def client_local():
     os.environ["AUTHZ_URL"] = AUTHZ_URL
+    os.environ["DATA"] = str((pathlib.Path(__file__).parent / "data").absolute())
 
     from chord_drs.app import application, db
 

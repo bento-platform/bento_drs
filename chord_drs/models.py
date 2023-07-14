@@ -71,16 +71,12 @@ class DrsBlob(db.Model, DrsMixin):
         # If set, we are deduplicating with an existing file object
         object_to_copy: DrsBlob | None = kwargs.get("object_to_copy")
 
-        blob_location: str
-        blob_size: int
-        blob_checksum: str
-
         if object_to_copy:
             self.name = object_to_copy.name
             self.location = object_to_copy.location
             self.size = object_to_copy.size
             self.checksum = object_to_copy.checksum
-            del kwargs["record_to_copy"]
+            del kwargs["object_to_copy"]
         else:
             location = kwargs.get("location")
 
