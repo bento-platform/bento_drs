@@ -68,10 +68,19 @@ class DrsBlob(db.Model, DrsMixin):
     location = db.Column(db.String(500), nullable=False)
 
     def __init__(self, *args, **kwargs):
-        current_location = kwargs.get("current_location")  # If set, we are deduplicating with an existing file object
+        # If set, we are deduplicating with an existing file object
+        object_to_copy: DrsBlob | None = kwargs.get("object_to_copy")
 
-        if current_location:
-            del kwargs["current_location"]
+        blob_location: str
+        blob_size: int
+        blob_checksum: str
+
+        if object_to_copy:
+            self.name = object_to_copy.name
+            self.location = object_to_copy.location
+            self.size = object_to_copy.size
+            self.checksum = object_to_copy.checksum
+            del kwargs["record_to_copy"]
         else:
             location = kwargs.get("location")
 
@@ -90,17 +99,16 @@ class DrsBlob(db.Model, DrsMixin):
             if not backend:
                 raise Exception("The backend for this instance is not properly configured.")
             try:
-                current_location = backend.save(location, new_filename)
+                self.location = backend.save(location, new_filename)
+                self.size = os.path.getsize(p)
+                self.checksum = drs_file_checksum(location)
             except Exception as e:
                 current_app.logger.error(f"Encountered exception during DRS object creation: {e}")
                 # TODO: implement more specific exception handling
                 raise Exception("Well if the file is not saved... we can't do squat")
 
-        self.location = current_location
-        del kwargs["location"]
-
-        self.size = os.path.getsize(current_location)
-        self.checksum = drs_file_checksum(current_location)
+        if "location" in kwargs:
+            del kwargs["location"]
 
         super().__init__(*args, **kwargs)
 

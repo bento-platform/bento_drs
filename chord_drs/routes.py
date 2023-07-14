@@ -455,8 +455,8 @@ def object_ingest():
     elif (obj_path is not None and file is not None) or (obj_path is None and file is None):
         raise bad_request_and_log("Must specify exactly one of path or file contents")
 
-    drs_object: DrsBlob | None = None
-    existing_file_path: str | None = None
+    drs_object: DrsBlob | None = None  # either the new object, or the object to fully reuse
+    object_to_copy: DrsBlob | None = None
 
     tfh, t_obj_path = tempfile.mkstemp()
     try:
@@ -488,12 +488,12 @@ def object_ingest():
                     drs_object = candidate_drs_object
                 else:
                     logger.info(f"Found duplicate DRS object via checksum (will deduplicate JUST bytes): {drs_object}")
-                    existing_file_path = candidate_drs_object.location
+                    object_to_copy = candidate_drs_object
 
         if not drs_object:
             try:
                 drs_object = DrsBlob(
-                    **(dict(current_location=existing_file_path) if existing_file_path else dict(location=obj_path)),
+                    **(dict(object_to_copy=object_to_copy) if object_to_copy else dict(location=obj_path)),
                     project_id=project_id,
                     dataset_id=dataset_id,
                     data_type=data_type,
