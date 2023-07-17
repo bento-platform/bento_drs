@@ -18,7 +18,7 @@ from urllib.parse import urljoin, urlparse
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError
 
 from . import __version__
-from .authz import authz_middleware, PERMISSION_VIEW_DATA
+from .authz import authz_middleware, PERMISSION_VIEW_DATA, PERMISSION_INGEST_DATA
 from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from .db import db
@@ -53,28 +53,30 @@ def check_everything_permission(permission: str) -> bool:
     })["result"]
 
 
+def get_requested_resource_from_params(project_id: str | None, dataset_id: str | None, data_type: str | None) -> dict:
+    if project_id is not None:
+        return {
+            "project": project_id,
+            **({"dataset": dataset_id} if dataset_id is not None else {}),
+            **({"data_type": data_type} if data_type is not None else {}),
+        }
+    else:  # Either truly some kind of global object or just bad fields, in either case resort to {everything}
+        return {"everything": True}
+
+
 def check_objects_permission(drs_objs: list[DrsBlob | DrsBundle], permission: str) -> tuple[bool, ...]:
     if not current_app.config["AUTHZ_ENABLED"]:
         return tuple([True] * len(drs_objs))  # Assume we have permission for everything if authz disabled
 
-    requested_resources = []
-
-    for drs_obj in drs_objs:
-        project = drs_obj.project_id
-        dataset = drs_obj.dataset_id
-        data_type = drs_obj.data_type
-
-        if project is not None:
-            requested_resources.append({
-                "project": project,
-                **({"dataset": dataset} if dataset is not None else {}),
-                **({"data_type": data_type} if data_type is not None else {}),
-            })
-        else:  # Either truly some kind of global object or just bad fields, in either case resort to {everything}
-            requested_resources.append({"everything": True})
-
     return authz_middleware.authz_post(request, "/policy/evaluate", body={
-        "requested_resource": requested_resources,
+        "requested_resource": [
+            get_requested_resource_from_params(
+                drs_obj.project_id,
+                drs_obj.dataset_id,
+                drs_obj.data_type,
+            )
+            for drs_obj in drs_objs
+        ],
         "required_permissions": [permission],
     })["result"]
 
@@ -438,9 +440,8 @@ def object_download(object_id: str):
 
 @drs_service.route("/private/ingest", methods=["POST"])
 def object_ingest():
-    # TODO: Permissions
+    # TODO: Enable specifying a parent bundle
     # TODO: If a parent is specified, make sure we have permissions to ingest into it? How to reconcile?
-    # TODO: What to do with deduplication if project/... ID isn't the same?
 
     logger = current_app.logger
     data = request.form or {}
@@ -451,6 +452,23 @@ def object_ingest():
     dataset_id: str | None = data.get("dataset_id")
     data_type: str | None = data.get("data_type")
     file = request.files.get("file")
+
+    has_permission: bool
+    if current_app.config["AUTHZ_ENABLED"]:
+        has_permission = authz_middleware.authz_post(request, "/policy/evaluate", body={
+            "requested_resource": get_requested_resource_from_params(
+                project_id,
+                dataset_id,
+                data_type,
+            ),
+            "required_permissions": [PERMISSION_INGEST_DATA],
+        })["result"]
+    else:
+        has_permission = True
+
+    authz_middleware.mark_authz_done(request)
+    if not has_permission:
+        raise Forbidden("Forbidden")
 
     if obj_path is not None and not isinstance(obj_path, str):
         raise bad_request_log_mark(f"Invalid path parameter in ingest request: {obj_path}")
