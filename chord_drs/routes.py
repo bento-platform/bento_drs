@@ -50,7 +50,7 @@ def check_everything_permission(permission: str) -> bool:
     return authz_middleware.authz_post(request, "/policy/evaluate", body={
         "requested_resource": {"everything": True},
         "required_permissions": [permission],
-    }).json()["result"]
+    })["result"]
 
 
 def check_objects_permission(drs_objs: list[DrsBlob | DrsBundle], permission: str) -> tuple[bool, ...]:
@@ -76,7 +76,7 @@ def check_objects_permission(drs_objs: list[DrsBlob | DrsBundle], permission: st
     return authz_middleware.authz_post(request, "/policy/evaluate", body={
         "requested_resource": requested_resources,
         "required_permissions": [permission],
-    }).json()["result"]
+    })["result"]
 
 
 def fetch_and_check_object_permissions(object_id: str) -> tuple[DrsBlob | DrsBundle, bool]:
