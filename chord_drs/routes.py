@@ -503,6 +503,7 @@ def object_ingest():
                 db.session.commit()
                 logger.info(f"Added DRS object: {drs_object}")
             except Exception as e:  # TODO: More specific handling
+                authz_middleware.mark_authz_done(request)
                 logger.error(f"Encountered exception during ingest: {e}")
                 raise InternalServerError("Error while creating the object")
 
