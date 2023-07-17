@@ -341,7 +341,7 @@ def object_search():
         authz_middleware.mark_authz_done(request)
         raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
 
-    for obj, p in zip(objects, check_objects_permission([objects], PERMISSION_VIEW_DATA)):
+    for obj, p in zip(objects, check_objects_permission(list(objects), PERMISSION_VIEW_DATA)):
         if p:  # Only include the blob in the search results if we have permissions to view it.
             response.append(build_blob_json(obj, internal_path))
 
