@@ -391,7 +391,8 @@ def object_download(object_id: str):
             raise bad_request_log_mark(range_err)
 
         if end is not None and end < start:
-            raise bad_request_log_mark(f"Invalid range header: end cannot be less than start (start={start}, end={end})")
+            raise bad_request_log_mark(
+                f"Invalid range header: end cannot be less than start (start={start}, end={end})")
 
         def generate_bytes():
             with open(drs_object.location, "rb") as fh2:
