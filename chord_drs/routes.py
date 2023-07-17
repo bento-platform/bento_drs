@@ -104,7 +104,8 @@ def fetch_and_check_object_permissions(object_id: str) -> tuple[DrsBlob | DrsBun
     return drs_object, is_bundle
 
 
-def bad_request_and_log(err: str) -> BadRequest:
+def bad_request_log_mark(err: str) -> BadRequest:
+    authz_middleware.mark_authz_done(request)
     current_app.logger.error(err)
     return BadRequest(err)
 
@@ -378,7 +379,7 @@ def object_download(object_id: str):
 
         rh_split = range_header.split("=")
         if len(rh_split) != 2 or rh_split[0] != "bytes":
-            raise bad_request_and_log(range_err)
+            raise bad_request_log_mark(range_err)
 
         byte_range = rh_split[1].strip().split("-")
         logger.debug(f"Retrieving byte range {byte_range}")
@@ -387,10 +388,10 @@ def object_download(object_id: str):
             start = int(byte_range[0])
             end = int(byte_range[1]) if byte_range[1] else None
         except (IndexError, ValueError):
-            raise bad_request_and_log(range_err)
+            raise bad_request_log_mark(range_err)
 
         if end is not None and end < start:
-            raise bad_request_and_log(f"Invalid range header: end cannot be less than start (start={start}, end={end})")
+            raise bad_request_log_mark(f"Invalid range header: end cannot be less than start (start={start}, end={end})")
 
         def generate_bytes():
             with open(drs_object.location, "rb") as fh2:
@@ -451,9 +452,9 @@ def object_ingest():
     file = request.files.get("file")
 
     if obj_path is not None and not isinstance(obj_path, str):
-        raise bad_request_and_log(f"Invalid path parameter in ingest request: {obj_path}")
+        raise bad_request_log_mark(f"Invalid path parameter in ingest request: {obj_path}")
     elif (obj_path is not None and file is not None) or (obj_path is None and file is None):
-        raise bad_request_and_log("Must specify exactly one of path or file contents")
+        raise bad_request_log_mark("Must specify exactly one of path or file contents")
 
     drs_object: DrsBlob | None = None  # either the new object, or the object to fully reuse
     object_to_copy: DrsBlob | None = None
@@ -470,7 +471,7 @@ def object_ingest():
             try:
                 checksum = drs_file_checksum(obj_path)
             except FileNotFoundError:
-                raise bad_request_and_log(f"File not found at path {obj_path}")
+                raise bad_request_log_mark(f"File not found at path {obj_path}")
 
             # Currently, we require exact permissions compatibility for deduplication of IDs.
             # It might be possible to relax this a bit, but we can't fully relax this for two reasons:
