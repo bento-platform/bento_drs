@@ -168,6 +168,7 @@ def drs_bundle_minio():
             project_id=DUMMY_PROJECT_ID,
             dataset_id=DUMMY_DATASET_ID,
             data_type=DATA_TYPE_PHENOPACKET,
+            exclude=frozenset({"versions", "__pycache__"}),
         )
 
         db.session.commit()

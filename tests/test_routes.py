@@ -1,10 +1,11 @@
 import bento_lib
 import json
 import pytest
+import responses
 
 from flask import current_app
 from jsonschema import validate
-from tests.conftest import non_existant_dummy_file_path, dummy_file_path
+from tests.conftest import AUTHZ_URL, non_existant_dummy_file_path, dummy_file_path
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 
 
@@ -43,17 +44,27 @@ def test_service_info(client):
     validate(data, bento_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
 
 
+def authz_everything_true(count=1):
+    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [True] * count})
+
+
+@responses.activate
 def test_object_fail(client):
+    authz_everything_true()
     res = client.get(f"/objects/{NON_EXISTENT_ID}")
     assert res.status_code == 404
 
 
+@responses.activate
 def test_object_download_fail(client):
+    authz_everything_true()
     res = client.get(f"/objects/{NON_EXISTENT_ID}/download")
     assert res.status_code == 404
 
 
+@responses.activate
 def test_object_access_fail(client):
+    authz_everything_true()
     res = client.get(f"/objects/{NON_EXISTENT_ID}/access/no_access")
     assert res.status_code == 404
 
@@ -126,20 +137,29 @@ def _test_object_and_download(client, obj, test_range=False):
         assert res.status_code == 400
 
 
+@responses.activate
 def test_object_and_download_minio(client_minio, drs_object_minio):
+    authz_everything_true()
     _test_object_and_download(client_minio, drs_object_minio)
 
 
+@responses.activate
 def test_object_and_download(client, drs_object):
+    authz_everything_true()
     _test_object_and_download(client, drs_object)
 
 
+@responses.activate
 def test_object_and_download_with_ranges(client_local, drs_object):
+    authz_everything_true()
     # Only local backend supports ranges for now
     _test_object_and_download(client_local, drs_object, test_range=True)
 
 
+@responses.activate
 def test_object_inside_bento(client, drs_object):
+    authz_everything_true()
+
     res = client.get(f"/objects/{drs_object.id}", headers={'X-CHORD-Internal': '1'})
     data = res.get_json()
 
@@ -147,7 +167,10 @@ def test_object_inside_bento(client, drs_object):
     assert len(data["access_methods"]) == 2
 
 
+@responses.activate
 def test_object_with_internal_path(client, drs_object):
+    authz_everything_true()
+
     res = client.get(f"/objects/{drs_object.id}?internal_path=1")
     data = res.get_json()
 
@@ -155,7 +178,10 @@ def test_object_with_internal_path(client, drs_object):
     validate_object_fields(data, with_internal_path=True)
 
 
+@responses.activate
 def test_object_with_disabled_internal_path(client, drs_object):
+    authz_everything_true()
+
     res = client.get(f"/objects/{drs_object.id}?internal_path=0")
     data = res.get_json()
 
@@ -163,7 +189,10 @@ def test_object_with_disabled_internal_path(client, drs_object):
     validate_object_fields(data, with_internal_path=False)
 
 
+@responses.activate
 def test_bundle_and_download(client, drs_bundle):
+    authz_everything_true()
+
     res = client.get(f"/objects/{drs_bundle.id}")
     data = res.get_json()
 
@@ -194,16 +223,22 @@ def test_bundle_and_download(client, drs_bundle):
     assert res.content_length == nested_obj["size"]
 
 
+@responses.activate
 def test_search_bad_query(client, drs_bundle):
+    authz_everything_true()
+
     res = client.get("/search")
     assert res.status_code == 400
 
 
+@responses.activate
 @pytest.mark.parametrize("url", (
     "/search?name=asd",
     "/search?fuzzy_name=asd",
 ))
 def test_search_object_empty(client, drs_bundle, url):
+    authz_everything_true(count=len(drs_bundle.objects))
+
     res = client.get(url)
     data = res.get_json()
 
@@ -211,6 +246,7 @@ def test_search_object_empty(client, drs_bundle, url):
     assert len(data) == 0
 
 
+@responses.activate
 @pytest.mark.parametrize("url", (
     "/search?name=alembic.ini",
     "/search?fuzzy_name=mbic",
@@ -220,6 +256,8 @@ def test_search_object_empty(client, drs_bundle, url):
     "/search?q=alembic.ini&internal_path=1",
 ))
 def test_search_object(client, drs_bundle, url):
+    authz_everything_true(count=len(drs_bundle.objects))  # TODO: + 1 once we can search bundles
+
     res = client.get(url)
     data = res.get_json()
     has_internal_path = "internal_path" in url
@@ -230,12 +268,16 @@ def test_search_object(client, drs_bundle, url):
     validate_object_fields(data[0], with_internal_path=has_internal_path)
 
 
+@responses.activate
 def test_object_ingest_fail_1(client):
+    authz_everything_true()
     res = client.post("/private/ingest", data={"wrong_arg": "some_path"})
     assert res.status_code == 400
 
 
+@responses.activate
 def test_object_ingest_fail_2(client):
+    authz_everything_true()
     res = client.post("/private/ingest", data={"path": non_existant_dummy_file_path()})
     assert res.status_code == 400
 
@@ -250,17 +292,29 @@ def _ingest_one(client, existing_id=None, params=None):
     return data
 
 
+@responses.activate
 def test_object_ingest(client):
+    authz_everything_true()
     _ingest_one(client)
 
 
+@responses.activate
 def test_object_ingest_x2(client):
+    authz_everything_true()
     data_1 = _ingest_one(client)
+
+    authz_everything_true()
     data_2 = _ingest_one(client, data_1["id"])
+
     assert json.dumps(data_1, sort_keys=True) == json.dumps(data_2, sort_keys=True)  # deduplicate is True by default
 
 
+@responses.activate
 def test_object_ingest_no_deduplicate(client):
+    authz_everything_true()
     data_1 = _ingest_one(client)
+
+    authz_everything_true()
     data_2 = _ingest_one(client, params={"deduplicate": False})
+
     assert json.dumps(data_1, sort_keys=True) != json.dumps(data_2, sort_keys=True)

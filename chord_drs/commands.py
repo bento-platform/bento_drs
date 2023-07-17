@@ -16,6 +16,7 @@ def create_drs_bundle(
     project_id: str | None = None,
     dataset_id: str | None = None,
     data_type: str | None = None,
+    exclude: frozenset[str] = frozenset({}),
 ) -> DrsBundle:
     perms_kwargs = {"project_id": project_id, "dataset_id": dataset_id, "data_type": data_type}
 
@@ -25,6 +26,9 @@ def create_drs_bundle(
         bundle.parent_bundle = parent
 
     for f in os.listdir(location):
+        if exclude and f in exclude:
+            continue
+
         f = os.path.abspath(os.path.join(location, f))
 
         if os.path.isfile(f):
