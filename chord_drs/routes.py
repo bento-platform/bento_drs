@@ -115,8 +115,8 @@ def bad_request_log_mark(err: str) -> BadRequest:
 def get_drs_base_path() -> str:
     base_path = request.host
 
-    if current_app.config["SERVICE_BASE_URL"]:
-        parsed_service_url = urlparse(current_app.config["get_drs_base_path"])
+    if service_base_url := current_app.config["SERVICE_BASE_URL"]:
+        parsed_service_url = urlparse(service_base_url)
         base_path = f"{parsed_service_url.netloc}{parsed_service_url.path}"
 
     return base_path
