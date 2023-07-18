@@ -14,7 +14,7 @@ from flask import (
     make_response
 )
 from sqlalchemy import or_
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError
 
 from . import __version__
