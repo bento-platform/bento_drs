@@ -112,19 +112,12 @@ def bad_request_log_mark(err: str) -> BadRequest:
     return BadRequest(err)
 
 
-def get_drs_base_path():
+def get_drs_base_path() -> str:
     base_path = request.host
 
-    if current_app.config["CHORD_URL"]:
-        parsed_chord_url = urlparse(current_app.config["CHORD_URL"])
-        base_path = f"{parsed_chord_url.netloc}{parsed_chord_url.path}"
-
-        if current_app.config["CHORD_SERVICE_URL_BASE_PATH"]:
-            base_path = urljoin(
-                base_path, re.sub(
-                    RE_STARTING_SLASH, "", current_app.config["CHORD_SERVICE_URL_BASE_PATH"]
-                )
-            )
+    if current_app.config["SERVICE_BASE_URL"]:
+        parsed_service_url = urlparse(current_app.config["get_drs_base_path"])
+        base_path = f"{parsed_service_url.netloc}{parsed_service_url.path}"
 
     return base_path
 
@@ -177,13 +170,15 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False, exp
 def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObjectDict:
     data_source = current_app.config["SERVICE_DATA_SOURCE"]
 
+    blob_url: str = urllib.parse.urljoin(
+        current_app.config["SERVICE_BASE_URL"] + "/",
+        url_for("drs_service.object_download", object_id=drs_blob.id).lstrip("/")
+    )
+
     default_access_method: DRSAccessMethodDict = {
         "access_url": {
             # url_for external was giving weird results - build the URL by hand instead using the internal url_for
-            "url": urllib.parse.urljoin(urllib.parse.urljoin(
-                str(current_app.config["CHORD_URL"]),  # str cast to shut up the IDE type-checker
-                current_app.config["CHORD_SERVICE_URL_BASE_PATH"].rstrip("/") + "/",
-            ), url_for("drs_service.object_download", object_id=drs_blob.id).lstrip("/"))
+            "url": blob_url,
             # No headers --> auth will have to be obtained via some
             # out-of-band method, or the object's contents are public. This
             # will depend on how the service is deployed.

@@ -49,7 +49,7 @@ application.cli.add_command(ingest)
 # Add callback to handle tearing down backend when a context is closed
 application.teardown_appcontext(close_backend)
 
-# Attach Prometheus metrics exporter (if we're not in a Bento context)
+# Attach Prometheus metrics exporter (if enabled)
 with application.app_context():
-    if not application.config["CHORD_URL"]:
+    if application.config["PROMETHEUS_ENABLED"]:
         metrics.init_app(application)

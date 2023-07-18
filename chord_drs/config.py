@@ -67,12 +67,13 @@ class Config:
     SQLALCHEMY_DATABASE_URI = "sqlite:///" + str(Path(os.path.join(BASEDIR, "db.sqlite3")).expanduser().resolve())
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    CHORD_URL: str = os.environ.get("BENTO_URL", os.environ.get("CHORD_URL", "http://127.0.0.1/"))
-    CHORD_SERVICE_URL_BASE_PATH: str = os.environ.get("SERVICE_URL_BASE_PATH", "")
+    PROMETHEUS_ENABLED: bool = os.environ.get("PROMETHEUS_ENABLED", "false").strip().lower() in TRUTH_VALUES
 
     SERVICE_ID: str = os.environ.get("SERVICE_ID", ":".join(list(SERVICE_TYPE.values())[:2]))
     SERVICE_DATA_SOURCE: str = DATA_SOURCE_MINIO if MINIO_URL else DATA_SOURCE_LOCAL
     SERVICE_DATA: str | None = None if MINIO_URL else SERVICE_DATA
+    SERVICE_BASE_URL: str = os.environ.get("SERVICE_BASE_URL", "http://127.0.0.1").strip().rstrip("/")
+
     MINIO_URL: str | None = MINIO_URL
     MINIO_USERNAME: str | None = MINIO_USERNAME
     MINIO_PASSWORD: str | None = MINIO_PASSWORD
