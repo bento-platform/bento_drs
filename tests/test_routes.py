@@ -301,6 +301,17 @@ def test_search_object(client, drs_bundle, url):
 
 
 @responses.activate
+def test_search_no_permissions(client, drs_bundle):
+    authz_everything_false(count=len(drs_bundle.objects))
+
+    res = client.get("/search?name=alembic.ini")
+    data = res.get_json()
+
+    assert res.status_code == 200
+    assert len(data) == 0
+
+
+@responses.activate
 def test_object_ingest_fail_1(client):
     authz_everything_true()
     res = client.post("/private/ingest", data={"wrong_arg": "some_path"})
