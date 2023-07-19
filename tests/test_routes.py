@@ -48,6 +48,10 @@ def authz_everything_true(count=1):
     responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [True] * count})
 
 
+def authz_everything_false_scalar():
+    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": False})
+
+
 @responses.activate
 def test_object_fail(client):
     authz_everything_true()
@@ -334,6 +338,12 @@ def test_object_ingest_no_deduplicate(client):
 @responses.activate
 def test_object_ingest_bad_req(client):
     authz_everything_true()
-
     res = client.post("/private/ingest", data={})
     assert res.status_code == 400
+
+
+@responses.activate
+def test_object_ingest_forbidden(client):
+    authz_everything_false_scalar()
+    res = client.post("/private/ingest", data={})  # invalid body shouldn't be caught until after
+    assert res.status_code == 403
