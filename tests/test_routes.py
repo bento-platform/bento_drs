@@ -56,6 +56,12 @@ def authz_everything_false(count=1):
     responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [False] * count})
 
 
+def authz_drs_specific_obj(iters=1):
+    for _ in range(iters):
+        authz_everything_false_scalar()
+        authz_everything_true()
+
+
 def authz_everything_false_scalar():
     responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": False})
 
@@ -165,16 +171,7 @@ def test_object_and_download_minio(client_minio, drs_object_minio):
 @responses.activate
 def test_object_and_download_minio_specific_perms(client_minio, drs_object_minio):
     # _test_object_and_download does 3 different accesses
-
-    authz_everything_false_scalar()
-    authz_everything_true()
-
-    authz_everything_false_scalar()
-    authz_everything_true()
-
-    authz_everything_false_scalar()
-    authz_everything_true()
-
+    authz_drs_specific_obj(iters=3)
     _test_object_and_download(client_minio, drs_object_minio)
 
 
@@ -187,16 +184,7 @@ def test_object_and_download(client, drs_object):
 @responses.activate
 def test_object_and_download_specific_perms(client, drs_object):
     # _test_object_and_download does 3 different accesses
-
-    authz_everything_false_scalar()
-    authz_everything_true()
-
-    authz_everything_false_scalar()
-    authz_everything_true()
-
-    authz_everything_false_scalar()
-    authz_everything_true()
-
+    authz_drs_specific_obj(iters=3)
     _test_object_and_download(client, drs_object)
 
 
