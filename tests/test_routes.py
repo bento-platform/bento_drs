@@ -299,7 +299,7 @@ def test_object_ingest(client):
 
 
 @responses.activate
-def test_object_ingest_x2(client):
+def test_object_ingest_dedup(client):
     authz_everything_true()
     data_1 = _ingest_one(client)
 
@@ -307,6 +307,13 @@ def test_object_ingest_x2(client):
     data_2 = _ingest_one(client, data_1["id"])
 
     assert json.dumps(data_1, sort_keys=True) == json.dumps(data_2, sort_keys=True)  # deduplicate is True by default
+
+    # ingest again, but with a different set of permissions
+    authz_everything_true()
+    data_3 = _ingest_one(client, params={"project_id": "project1"})
+
+    assert data_3["id"] != data_2["id"]
+    assert data_3["checksums"][0]["checksum"] == data_2["checksums"][0]["checksum"]
 
 
 @responses.activate
