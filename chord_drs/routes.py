@@ -116,13 +116,8 @@ def bad_request_log_mark(err: str) -> BadRequest:
 
 
 def get_drs_base_path() -> str:
-    base_path = request.host
-
-    if service_base_url := current_app.config["SERVICE_BASE_URL"]:
-        parsed_service_url = urlparse(service_base_url)
-        base_path = f"{parsed_service_url.netloc}{parsed_service_url.path}"
-
-    return base_path
+    parsed_service_url = urlparse(current_app.config["SERVICE_BASE_URL"])
+    return f"{parsed_service_url.netloc}{parsed_service_url.path}"
 
 
 def create_drs_uri(object_id: str) -> str:
@@ -332,6 +327,7 @@ def object_search():
         authz_middleware.mark_authz_done(request)
         raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
 
+    # TODO: map objects to resources to avoid duplicate calls to same resource in check_objects_permission
     for obj, p in zip(objects, check_objects_permission(list(objects), PERMISSION_VIEW_DATA)):
         if p:  # Only include the blob in the search results if we have permissions to view it.
             response.append(build_blob_json(obj, internal_path))
