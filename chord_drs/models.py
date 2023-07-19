@@ -86,7 +86,7 @@ class DrsBlob(db.Model, DrsMixin):
                 p = Path(location).resolve(strict=True)
             except FileNotFoundError:
                 # TODO: we will need to account for URLs at some point
-                raise Exception("Provided file path does not exists")
+                raise FileNotFoundError("Provided file path does not exists")
 
             self.name = p.name
             new_filename = f"{self.id[:12]}-{p.name}"  # TODO: use checksum for filename instead
