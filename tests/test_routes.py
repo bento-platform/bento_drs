@@ -318,3 +318,11 @@ def test_object_ingest_no_deduplicate(client):
     data_2 = _ingest_one(client, params={"deduplicate": False})
 
     assert json.dumps(data_1, sort_keys=True) != json.dumps(data_2, sort_keys=True)
+
+
+@responses.activate
+def test_object_ingest_bad_req(client):
+    authz_everything_true()
+
+    res = client.post("/private/ingest", data={})
+    assert res.status_code == 400
