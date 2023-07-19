@@ -47,10 +47,13 @@ def check_everything_permission(permission: str) -> bool:
     if not current_app.config["AUTHZ_ENABLED"]:
         return True
 
-    return authz_middleware.authz_post(request, "/policy/evaluate", body={
+    res = authz_middleware.authz_post(request, "/policy/evaluate", body={
         "requested_resource": {"everything": True},
         "required_permissions": [permission],
     })["result"]
+
+    assert isinstance(res, bool)  # otherwise, bad response - or bad test mock more likely
+    return res
 
 
 def get_requested_resource_from_params(project_id: str | None, dataset_id: str | None, data_type: str | None) -> dict:
