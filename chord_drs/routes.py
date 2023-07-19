@@ -129,13 +129,13 @@ def create_drs_uri(object_id: str) -> str:
     return f"drs://{get_drs_base_path()}/{object_id}"
 
 
-def build_contents(bundle: DrsBundle, inside_container: bool, expand: bool) -> list[DRSContentsDict]:
+def build_contents(bundle: DrsBundle, expand: bool) -> list[DRSContentsDict]:
     content: list[DRSContentsDict] = []
     bundles = DrsBundle.query.filter_by(parent_bundle=bundle).all()
 
     for b in bundles:
         content.append({
-            **({"contents": build_contents(b, inside_container, expand)} if expand else {}),
+            **({"contents": build_contents(b, expand)} if expand else {}),
             "drs_uri": create_drs_uri(b.id),
             "id": b.id,
             "name": b.name,  # TODO: Can overwrite... see spec
@@ -151,9 +151,9 @@ def build_contents(bundle: DrsBundle, inside_container: bool, expand: bool) -> l
     return content
 
 
-def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False, expand: bool = False) -> DRSObjectDict:
+def build_bundle_json(drs_bundle: DrsBundle, expand: bool = False) -> DRSObjectDict:
     return {
-        "contents": build_contents(drs_bundle, inside_container, expand),
+        "contents": build_contents(drs_bundle, expand),
         "checksums": [
             {
                 "checksum": drs_bundle.checksum,
@@ -286,11 +286,11 @@ def object_info(object_id: str):
 
     drs_object, is_bundle = fetch_and_check_object_permissions(object_id)
 
-    # The requester can specify object internal path to be added to the response
-    use_internal_path = strtobool(request.args.get("internal_path", ""))
-
     if is_bundle:
-        return jsonify(build_bundle_json(drs_object, inside_container=use_internal_path, expand=expand))
+        return jsonify(build_bundle_json(drs_object, expand=expand))
+
+    # The requester can specify object internal path to be added to the response
+    use_internal_path: bool = strtobool(request.args.get("internal_path", ""))
 
     return jsonify(build_blob_json(drs_object, inside_container=use_internal_path))
 
