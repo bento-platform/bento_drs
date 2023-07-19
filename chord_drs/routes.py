@@ -247,11 +247,9 @@ def service_info():
     try:
         if res_tag := subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"]):
             res_tag_str = res_tag.decode().rstrip()
-            info["git_tag"] = res_tag_str
             info["bento"]["gitTag"] = res_tag_str
         if res_branch := subprocess.check_output(["git", "branch", "--show-current"]):
             res_branch_str = res_branch.decode().strip()
-            info["git_branch"] = res_branch_str
             info["bento"]["gitBranch"] = res_branch_str
         if res_commit := subprocess.check_output(["git", "rev-parse", "HEAD"]):
             info["bento"]["gitCommit"] = res_commit.decode().strip()
