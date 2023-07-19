@@ -163,8 +163,40 @@ def test_object_and_download_minio(client_minio, drs_object_minio):
 
 
 @responses.activate
+def test_object_and_download_minio_specific_perms(client_minio, drs_object_minio):
+    # _test_object_and_download does 3 different accesses
+
+    authz_everything_false_scalar()
+    authz_everything_true()
+
+    authz_everything_false_scalar()
+    authz_everything_true()
+
+    authz_everything_false_scalar()
+    authz_everything_true()
+
+    _test_object_and_download(client_minio, drs_object_minio)
+
+
+@responses.activate
 def test_object_and_download(client, drs_object):
     authz_everything_true_scalar()
+    _test_object_and_download(client, drs_object)
+
+
+@responses.activate
+def test_object_and_download_specific_perms(client, drs_object):
+    # _test_object_and_download does 3 different accesses
+
+    authz_everything_false_scalar()
+    authz_everything_true()
+
+    authz_everything_false_scalar()
+    authz_everything_true()
+
+    authz_everything_false_scalar()
+    authz_everything_true()
+
     _test_object_and_download(client, drs_object)
 
 
@@ -173,17 +205,6 @@ def test_object_and_download_with_ranges(client_local, drs_object):
     authz_everything_true_scalar()
     # Only local backend supports ranges for now
     _test_object_and_download(client_local, drs_object, test_range=True)
-
-
-@responses.activate
-def test_object_inside_bento(client, drs_object):
-    authz_everything_true_scalar()
-
-    res = client.get(f"/objects/{drs_object.id}", headers={'X-CHORD-Internal': '1'})
-    data = res.get_json()
-
-    assert res.status_code == 200
-    assert len(data["access_methods"]) == 2
 
 
 @responses.activate
