@@ -34,7 +34,7 @@ CHUNK_SIZE = 1024 * 16  # Read 16 KB at a time
 drs_service = Blueprint("drs_service", __name__)
 
 
-def strtobool(val: str) -> bool:
+def str_to_bool(val: str) -> bool:
     return val.lower() in ("yes", "true", "t", "1", "on")
 
 
@@ -285,12 +285,11 @@ def object_info(object_id: str):
     drs_object, is_bundle = fetch_and_check_object_permissions(object_id)
 
     if is_bundle:
-        expand: bool = strtobool(request.args.get("expand"))
+        expand: bool = str_to_bool(request.args.get("expand"))
         return jsonify(build_bundle_json(drs_object, expand=expand))
 
     # The requester can specify object internal path to be added to the response
-    use_internal_path: bool = strtobool(request.args.get("internal_path", ""))
-
+    use_internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
     return jsonify(build_blob_json(drs_object, inside_container=use_internal_path))
 
 
@@ -316,7 +315,7 @@ def object_search():
     name: str | None = request.args.get("name")
     fuzzy_name: str | None = request.args.get("fuzzy_name")
     search_q: str | None = request.args.get("q")
-    internal_path: bool = strtobool(request.args.get("internal_path", ""))
+    internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
 
     if name:
         objects = DrsBlob.query.filter_by(name=name).all()
@@ -436,7 +435,7 @@ def object_ingest():
     logger = current_app.logger
     data = request.form or {}
 
-    deduplicate: bool = strtobool(data.get("deduplicate", "true"))  # Change for v0.9: default to True
+    deduplicate: bool = str_to_bool(data.get("deduplicate", "true"))  # Change for v0.9: default to True
     obj_path: str | None = data.get("path")
     project_id: str | None = data.get("project_id")
     dataset_id: str | None = data.get("dataset_id")
