@@ -38,9 +38,16 @@ def validate_object_fields(data, existing_id=None, with_internal_path=False):
 
 
 def test_service_info(client):
+    from chord_drs.app import application
+
     res = client.get("/service-info")
     data = res.get_json()
+    validate(data, bento_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
 
+    application.config["BENTO_DEBUG"] = True
+
+    res = client.get("/service-info")
+    data = res.get_json()
     validate(data, bento_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
 
 
