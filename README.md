@@ -109,7 +109,7 @@ partial match `/search?fuzzy_name=1001`
 
 ##### POST ingest
 
-`/private/ingest`
+`/ingest`
 
 e.g. POST body (multipart form-encoded)
 
