@@ -222,6 +222,10 @@ def test_bundle_and_download(client, drs_bundle):
     assert res.status_code == 200
     assert res.content_length == nested_obj["size"]
 
+    # Bundle download is currently unimplemented
+    res = client.get(f"/objects/{drs_bundle.id}/download")
+    assert res.status_code == 400
+
 
 @responses.activate
 def test_search_bad_query(client, drs_bundle):
