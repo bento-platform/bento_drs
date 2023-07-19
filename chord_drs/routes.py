@@ -282,7 +282,7 @@ def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])
 def object_info(object_id: str):
-    expand = request.args.get("expand") in ("true", "1", "yes")
+    expand = strtobool(request.args.get("expand"))
 
     drs_object, is_bundle = fetch_and_check_object_permissions(object_id)
 
