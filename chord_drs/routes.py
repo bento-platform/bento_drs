@@ -285,7 +285,7 @@ def object_info(object_id: str):
     drs_object, is_bundle = fetch_and_check_object_permissions(object_id)
 
     if is_bundle:
-        expand: bool = str_to_bool(request.args.get("expand"))
+        expand: bool = str_to_bool(request.args.get("expand", ""))
         return jsonify(build_bundle_json(drs_object, expand=expand))
 
     # The requester can specify object internal path to be added to the response
