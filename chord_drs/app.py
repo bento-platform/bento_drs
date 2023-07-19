@@ -50,6 +50,6 @@ application.cli.add_command(ingest)
 application.teardown_appcontext(close_backend)
 
 # Attach Prometheus metrics exporter (if enabled)
-with application.app_context():
+with application.app_context():  # pragma: no cover
     if application.config["PROMETHEUS_ENABLED"]:
         metrics.init_app(application)
