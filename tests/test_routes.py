@@ -48,27 +48,42 @@ def authz_everything_true(count=1):
     responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [True] * count})
 
 
+def authz_everything_true_scalar():
+    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": True})
+
+
+def authz_everything_false(count=1):
+    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [False] * count})
+
+
 def authz_everything_false_scalar():
     responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": False})
 
 
 @responses.activate
 def test_object_fail(client):
-    authz_everything_true()
+    authz_everything_true_scalar()
     res = client.get(f"/objects/{NON_EXISTENT_ID}")
     assert res.status_code == 404
 
 
 @responses.activate
+def test_object_fail_forbidden(client):
+    authz_everything_false_scalar()
+    res = client.get(f"/objects/{NON_EXISTENT_ID}")  # can't know if this exists since we don't have access
+    assert res.status_code == 403
+
+
+@responses.activate
 def test_object_download_fail(client):
-    authz_everything_true()
+    authz_everything_true_scalar()
     res = client.get(f"/objects/{NON_EXISTENT_ID}/download")
     assert res.status_code == 404
 
 
 @responses.activate
 def test_object_access_fail(client):
-    authz_everything_true()
+    authz_everything_true_scalar()
     res = client.get(f"/objects/{NON_EXISTENT_ID}/access/no_access")
     assert res.status_code == 404
 
@@ -143,26 +158,26 @@ def _test_object_and_download(client, obj, test_range=False):
 
 @responses.activate
 def test_object_and_download_minio(client_minio, drs_object_minio):
-    authz_everything_true()
+    authz_everything_true_scalar()
     _test_object_and_download(client_minio, drs_object_minio)
 
 
 @responses.activate
 def test_object_and_download(client, drs_object):
-    authz_everything_true()
+    authz_everything_true_scalar()
     _test_object_and_download(client, drs_object)
 
 
 @responses.activate
 def test_object_and_download_with_ranges(client_local, drs_object):
-    authz_everything_true()
+    authz_everything_true_scalar()
     # Only local backend supports ranges for now
     _test_object_and_download(client_local, drs_object, test_range=True)
 
 
 @responses.activate
 def test_object_inside_bento(client, drs_object):
-    authz_everything_true()
+    authz_everything_true_scalar()
 
     res = client.get(f"/objects/{drs_object.id}", headers={'X-CHORD-Internal': '1'})
     data = res.get_json()
@@ -173,7 +188,7 @@ def test_object_inside_bento(client, drs_object):
 
 @responses.activate
 def test_object_with_internal_path(client, drs_object):
-    authz_everything_true()
+    authz_everything_true_scalar()
 
     res = client.get(f"/objects/{drs_object.id}?internal_path=1")
     data = res.get_json()
@@ -184,7 +199,7 @@ def test_object_with_internal_path(client, drs_object):
 
 @responses.activate
 def test_object_with_disabled_internal_path(client, drs_object):
-    authz_everything_true()
+    authz_everything_true_scalar()
 
     res = client.get(f"/objects/{drs_object.id}?internal_path=0")
     data = res.get_json()
@@ -195,7 +210,7 @@ def test_object_with_disabled_internal_path(client, drs_object):
 
 @responses.activate
 def test_bundle_and_download(client, drs_bundle):
-    authz_everything_true()
+    authz_everything_true_scalar()
 
     res = client.get(f"/objects/{drs_bundle.id}")
     data = res.get_json()
