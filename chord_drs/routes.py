@@ -301,8 +301,7 @@ def object_info(object_id: str):
 @drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 def object_access(object_id: str, access_id: str):
-    if not fetch_and_check_object_permissions(object_id)[0]:
-        raise NotFound("No object found for this ID")
+    fetch_and_check_object_permissions(object_id)
 
     # We explicitly do not support access_id-based accesses; all of them will be 'not found'
     # since we don't provide access IDs
