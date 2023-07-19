@@ -423,7 +423,7 @@ def object_download(object_id: str):
     return response
 
 
-@drs_service.route("/private/ingest", methods=["POST"])
+@drs_service.route("/ingest", methods=["POST"])
 def object_ingest():
     # TODO: Enable specifying a parent bundle
     # TODO: If a parent is specified, make sure we have permissions to ingest into it? How to reconcile?
