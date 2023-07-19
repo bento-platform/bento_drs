@@ -71,6 +71,8 @@ class DrsBlob(db.Model, DrsMixin):
         # If set, we are deduplicating with an existing file object
         object_to_copy: DrsBlob | None = kwargs.get("object_to_copy")
 
+        self.id = str(uuid4())
+
         if object_to_copy:
             self.name = object_to_copy.name
             self.location = object_to_copy.location
@@ -86,7 +88,6 @@ class DrsBlob(db.Model, DrsMixin):
                 # TODO: we will need to account for URLs at some point
                 raise Exception("Provided file path does not exists")
 
-            self.id = str(uuid4())
             self.name = p.name
             new_filename = f"{self.id[:12]}-{p.name}"
 
