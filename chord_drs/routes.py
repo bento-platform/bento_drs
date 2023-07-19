@@ -286,19 +286,13 @@ def object_info(object_id: str):
 
     drs_object, is_bundle = fetch_and_check_object_permissions(object_id)
 
-    # Log X-CHORD-Internal header
-    current_app.logger.debug(f"object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}")
-
-    # Are we inside the bento singularity container? if so, provide local access method
-    inside_container = request.headers.get("X-CHORD-Internal", "0") == "1"
     # The requester can specify object internal path to be added to the response
     use_internal_path = strtobool(request.args.get("internal_path", ""))
-    include_internal_path = inside_container or use_internal_path
 
     if is_bundle:
-        return jsonify(build_bundle_json(drs_object, inside_container=include_internal_path, expand=expand))
+        return jsonify(build_bundle_json(drs_object, inside_container=use_internal_path, expand=expand))
 
-    return jsonify(build_blob_json(drs_object, inside_container=include_internal_path))
+    return jsonify(build_blob_json(drs_object, inside_container=use_internal_path))
 
 
 @drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
