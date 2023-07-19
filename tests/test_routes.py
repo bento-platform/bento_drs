@@ -321,19 +321,19 @@ def test_search_no_permissions(client, drs_bundle):
 @responses.activate
 def test_object_ingest_fail_1(client):
     authz_everything_true()
-    res = client.post("/private/ingest", data={"wrong_arg": "some_path"})
+    res = client.post("/ingest", data={"wrong_arg": "some_path"})
     assert res.status_code == 400
 
 
 @responses.activate
 def test_object_ingest_fail_2(client):
     authz_everything_true()
-    res = client.post("/private/ingest", data={"path": non_existant_dummy_file_path()})
+    res = client.post("/ingest", data={"path": non_existant_dummy_file_path()})
     assert res.status_code == 400
 
 
 def _ingest_one(client, existing_id=None, params=None):
-    res = client.post("/private/ingest", data={"path": dummy_file_path(), **(params or {})})
+    res = client.post("/ingest", data={"path": dummy_file_path(), **(params or {})})
     data = res.get_json()
 
     assert res.status_code == 201
@@ -380,12 +380,12 @@ def test_object_ingest_no_deduplicate(client):
 @responses.activate
 def test_object_ingest_bad_req(client):
     authz_everything_true()
-    res = client.post("/private/ingest", data={})
+    res = client.post("/ingest", data={})
     assert res.status_code == 400
 
 
 @responses.activate
 def test_object_ingest_forbidden(client):
     authz_everything_false_scalar()
-    res = client.post("/private/ingest", data={})  # invalid body shouldn't be caught until after
+    res = client.post("/ingest", data={})  # invalid body shouldn't be caught until after
     assert res.status_code == 403
