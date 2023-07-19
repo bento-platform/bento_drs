@@ -22,4 +22,4 @@ class LocalBackend(Backend):
     def save(self, current_location: str | Path, filename: str) -> str:
         new_location = self.base_location / filename
         copy(current_location, new_location)
-        return str(new_location.absolute())
+        return str(new_location.resolve())

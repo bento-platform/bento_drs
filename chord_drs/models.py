@@ -82,14 +82,14 @@ class DrsBlob(db.Model, DrsMixin):
         else:
             location = kwargs.get("location")
 
-            p = Path(location)
-
-            if not p.exists():
+            try:
+                p = Path(location).resolve(strict=True)
+            except FileNotFoundError:
                 # TODO: we will need to account for URLs at some point
                 raise Exception("Provided file path does not exists")
 
             self.name = p.name
-            new_filename = f"{self.id[:12]}-{p.name}"
+            new_filename = f"{self.id[:12]}-{p.name}"  # TODO: use checksum for filename instead
 
             backend = get_backend()
 
