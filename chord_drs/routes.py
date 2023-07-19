@@ -465,9 +465,7 @@ def object_ingest():
     if not has_permission:
         raise Forbidden("Forbidden")
 
-    if obj_path is not None and not isinstance(obj_path, str):
-        raise bad_request_log_mark(f"Invalid path parameter in ingest request: {obj_path}")
-    elif (obj_path is not None and file is not None) or (obj_path is None and file is None):
+    if (obj_path is not None and file is not None) or (obj_path is None and file is None):
         raise bad_request_log_mark("Must specify exactly one of path or file contents")
 
     drs_object: DrsBlob | None = None  # either the new object, or the object to fully reuse
