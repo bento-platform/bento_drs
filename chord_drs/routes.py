@@ -1,8 +1,9 @@
 import re
 import urllib.parse
+import os
 import subprocess
+import tempfile
 
-from bento_lib.responses import flask_errors
 from flask import (
     Blueprint,
     current_app,
@@ -13,18 +14,17 @@ from flask import (
     make_response
 )
 from sqlalchemy import or_
-from sqlalchemy.exc import NoResultFound
-from typing import List, Optional, Tuple, Union
-from urllib.parse import urljoin, urlparse
-from werkzeug.exceptions import BadRequest, NotFound, InternalServerError
+from urllib.parse import urlparse
+from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError
 
-from chord_drs import __version__
-from chord_drs.constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
-from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
-from chord_drs.db import db
-from chord_drs.models import DrsBlob, DrsBundle
-from chord_drs.types import DRSAccessMethodDict, DRSContentsDict, DRSObjectDict
-from chord_drs.utils import drs_file_checksum
+from . import __version__
+from .authz import authz_middleware, PERMISSION_VIEW_DATA, PERMISSION_INGEST_DATA
+from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
+from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
+from .db import db
+from .models import DrsBlob, DrsBundle
+from .types import DRSAccessMethodDict, DRSContentsDict, DRSObjectDict
+from .utils import drs_file_checksum
 
 
 RE_STARTING_SLASH = re.compile(r"^/")
@@ -34,43 +34,103 @@ CHUNK_SIZE = 1024 * 16  # Read 16 KB at a time
 drs_service = Blueprint("drs_service", __name__)
 
 
-def strtobool(val: str):
+def str_to_bool(val: str) -> bool:
     return val.lower() in ("yes", "true", "t", "1", "on")
 
 
-def bad_request_and_log(err: str) -> BadRequest:
+def forbidden() -> Forbidden:
+    authz_middleware.mark_authz_done(request)
+    return Forbidden()
+
+
+def check_everything_permission(permission: str) -> bool:
+    if not current_app.config["AUTHZ_ENABLED"]:
+        return True
+
+    res = authz_middleware.authz_post(request, "/policy/evaluate", body={
+        "requested_resource": {"everything": True},
+        "required_permissions": [permission],
+    })["result"]
+
+    assert isinstance(res, bool)  # otherwise, bad response - or bad test mock more likely
+    return res
+
+
+def get_requested_resource_from_params(project_id: str | None, dataset_id: str | None, data_type: str | None) -> dict:
+    if project_id is not None:
+        return {
+            "project": project_id,
+            **({"dataset": dataset_id} if dataset_id is not None else {}),
+            **({"data_type": data_type} if data_type is not None else {}),
+        }
+    else:  # Either truly some kind of global object or just bad fields, in either case resort to {everything}
+        return {"everything": True}
+
+
+def check_objects_permission(drs_objs: list[DrsBlob | DrsBundle], permission: str) -> tuple[bool, ...]:
+    if not current_app.config["AUTHZ_ENABLED"]:
+        return tuple([True] * len(drs_objs))  # Assume we have permission for everything if authz disabled
+
+    return authz_middleware.authz_post(request, "/policy/evaluate", body={
+        "requested_resource": [
+            get_requested_resource_from_params(
+                drs_obj.project_id,
+                drs_obj.dataset_id,
+                drs_obj.data_type,
+            )
+            for drs_obj in drs_objs
+        ],
+        "required_permissions": [permission],
+    })["result"]
+
+
+def fetch_and_check_object_permissions(object_id: str) -> tuple[DrsBlob | DrsBundle, bool]:
+    view_data_everything = check_everything_permission(PERMISSION_VIEW_DATA)
+
+    drs_object, is_bundle = get_drs_object(object_id)
+
+    if not drs_object:
+        authz_middleware.mark_authz_done(request)
+        if current_app.config["AUTHZ_ENABLED"] and not view_data_everything:  # Don't leak if this object exists
+            raise forbidden()
+        raise NotFound("No object found for this ID")
+
+    # Check permissions -------------------------------------------------
+    if view_data_everything:
+        # Good to go already!
+        authz_middleware.mark_authz_done(request)
+    else:
+        p = check_objects_permission([drs_object], PERMISSION_VIEW_DATA)
+        authz_middleware.mark_authz_done(request)
+        if not (p and p[0]):
+            raise forbidden()
+    # -------------------------------------------------------------------
+
+    return drs_object, is_bundle
+
+
+def bad_request_log_mark(err: str) -> BadRequest:
+    authz_middleware.mark_authz_done(request)
     current_app.logger.error(err)
     return BadRequest(err)
 
 
-def get_drs_base_path():
-    base_path = request.host
-
-    if current_app.config["CHORD_URL"]:
-        parsed_chord_url = urlparse(current_app.config["CHORD_URL"])
-        base_path = f"{parsed_chord_url.netloc}{parsed_chord_url.path}"
-
-        if current_app.config["CHORD_SERVICE_URL_BASE_PATH"]:
-            base_path = urljoin(
-                base_path, re.sub(
-                    RE_STARTING_SLASH, "", current_app.config["CHORD_SERVICE_URL_BASE_PATH"]
-                )
-            )
-
-    return base_path
+def get_drs_base_path() -> str:
+    parsed_service_url = urlparse(current_app.config["SERVICE_BASE_URL"])
+    return f"{parsed_service_url.netloc}{parsed_service_url.path}"
 
 
 def create_drs_uri(object_id: str) -> str:
     return f"drs://{get_drs_base_path()}/{object_id}"
 
 
-def build_contents(bundle: DrsBundle, inside_container: bool, expand: bool) -> List[DRSContentsDict]:
-    content: List[DRSContentsDict] = []
+def build_contents(bundle: DrsBundle, expand: bool) -> list[DRSContentsDict]:
+    content: list[DRSContentsDict] = []
     bundles = DrsBundle.query.filter_by(parent_bundle=bundle).all()
 
     for b in bundles:
         content.append({
-            **({"contents": build_contents(b, inside_container, expand)} if expand else {}),
+            **({"contents": build_contents(b, expand)} if expand else {}),
             "drs_uri": create_drs_uri(b.id),
             "id": b.id,
             "name": b.name,  # TODO: Can overwrite... see spec
@@ -86,9 +146,9 @@ def build_contents(bundle: DrsBundle, inside_container: bool, expand: bool) -> L
     return content
 
 
-def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False, expand: bool = False) -> DRSObjectDict:
+def build_bundle_json(drs_bundle: DrsBundle, expand: bool = False) -> DRSObjectDict:
     return {
-        "contents": build_contents(drs_bundle, inside_container, expand),
+        "contents": build_contents(drs_bundle, expand),
         "checksums": [
             {
                 "checksum": drs_bundle.checksum,
@@ -108,13 +168,15 @@ def build_bundle_json(drs_bundle: DrsBundle, inside_container: bool = False, exp
 def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObjectDict:
     data_source = current_app.config["SERVICE_DATA_SOURCE"]
 
+    blob_url: str = urllib.parse.urljoin(
+        current_app.config["SERVICE_BASE_URL"] + "/",
+        url_for("drs_service.object_download", object_id=drs_blob.id).lstrip("/")
+    )
+
     default_access_method: DRSAccessMethodDict = {
         "access_url": {
             # url_for external was giving weird results - build the URL by hand instead using the internal url_for
-            "url": urllib.parse.urljoin(urllib.parse.urljoin(
-                str(current_app.config["CHORD_URL"]),  # str cast to shut up the IDE type-checker
-                current_app.config["CHORD_SERVICE_URL_BASE_PATH"].rstrip("/") + "/",
-            ), url_for("drs_service.object_download", object_id=drs_blob.id).lstrip("/"))
+            "url": blob_url,
             # No headers --> auth will have to be obtained via some
             # out-of-band method, or the object's contents are public. This
             # will depend on how the service is deployed.
@@ -122,7 +184,7 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
         "type": "http",
     }
 
-    access_methods: List[DRSAccessMethodDict] = [default_access_method]
+    access_methods: list[DRSAccessMethodDict] = [default_access_method]
 
     if inside_container and data_source == DATA_SOURCE_LOCAL:
         access_methods.append({
@@ -158,6 +220,7 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
 
 
 @drs_service.route("/service-info", methods=["GET"])
+@authz_middleware.deco_public_endpoint
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
     info = {
@@ -200,7 +263,7 @@ def service_info():
     return jsonify(info)
 
 
-def get_drs_object(object_id: str) -> Tuple[Optional[Union[DrsBlob, DrsBundle]], bool]:
+def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
     if drs_bundle := DrsBundle.query.filter_by(id=object_id).first():
         return drs_bundle, True
 
@@ -214,35 +277,21 @@ def get_drs_object(object_id: str) -> Tuple[Optional[Union[DrsBlob, DrsBundle]],
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])
 def object_info(object_id: str):
-    expand = request.args.get("expand") in ("true", "1", "yes")
-
-    drs_object, is_bundle = get_drs_object(object_id)
-
-    if not drs_object:
-        raise NotFound("No object found for this ID")
-
-    # Log X-CHORD-Internal header
-    current_app.logger.debug(f"object_info X-CHORD-Internal: {request.headers.get('X-CHORD-Internal', 'not set')}")
-
-    # Are we inside the bento singularity container? if so, provide local access method
-    inside_container = request.headers.get("X-CHORD-Internal", "0") == "1"
-    # The requester can specify object internal path to be added to the response
-    use_internal_path = strtobool(request.args.get("internal_path", ""))
-    include_internal_path = inside_container or use_internal_path
+    drs_object, is_bundle = fetch_and_check_object_permissions(object_id)
 
     if is_bundle:
-        return jsonify(build_bundle_json(drs_object, inside_container=include_internal_path, expand=expand))
+        expand: bool = str_to_bool(request.args.get("expand", ""))
+        return jsonify(build_bundle_json(drs_object, expand=expand))
 
-    return jsonify(build_blob_json(drs_object, inside_container=include_internal_path))
+    # The requester can specify object internal path to be added to the response
+    use_internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
+    return jsonify(build_blob_json(drs_object, inside_container=use_internal_path))
 
 
 @drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 def object_access(object_id: str, access_id: str):
-    drs_object, is_bundle = get_drs_object(object_id)
-
-    if not drs_object:
-        raise NotFound("No object found for this ID")
+    fetch_and_check_object_permissions(object_id)
 
     # We explicitly do not support access_id-based accesses; all of them will be 'not found'
     # since we don't provide access IDs
@@ -258,10 +307,10 @@ def object_search():
 
     response = []
 
-    name = request.args.get("name")
-    fuzzy_name = request.args.get("fuzzy_name")
-    search_q = request.args.get("q")
-    internal_path = request.args.get("internal_path", "")
+    name: str | None = request.args.get("name")
+    fuzzy_name: str | None = request.args.get("fuzzy_name")
+    search_q: str | None = request.args.get("q")
+    internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
 
     if name:
         objects = DrsBlob.query.filter_by(name=name).all()
@@ -275,24 +324,28 @@ def object_search():
             DrsBlob.description.contains(search_q),
         ))
     else:
+        authz_middleware.mark_authz_done(request)
         raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
 
-    for obj in objects:
-        response.append(build_blob_json(obj, strtobool(internal_path)))
+    # TODO: map objects to resources to avoid duplicate calls to same resource in check_objects_permission
+    for obj, p in zip(objects, check_objects_permission(list(objects), PERMISSION_VIEW_DATA)):
+        if p:  # Only include the blob in the search results if we have permissions to view it.
+            response.append(build_blob_json(obj, internal_path))
 
+    authz_middleware.mark_authz_done(request)
     return jsonify(response)
 
 
 @drs_service.route("/objects/<string:object_id>/download", methods=["GET"])
-def object_download(object_id):
+def object_download(object_id: str):
     logger = current_app.logger
 
     # TODO: Bundle download
 
-    try:
-        drs_object = DrsBlob.query.filter_by(id=object_id).one()
-    except NoResultFound:
-        return flask_errors.flask_not_found_error("No object found for this ID")
+    drs_object, is_bundle = fetch_and_check_object_permissions(object_id)
+
+    if is_bundle:
+        raise BadRequest("Bundle download is currently unsupported")
 
     minio_obj = drs_object.return_minio_object()
 
@@ -313,7 +366,7 @@ def object_download(object_id):
 
         rh_split = range_header.split("=")
         if len(rh_split) != 2 or rh_split[0] != "bytes":
-            raise bad_request_and_log(range_err)
+            raise bad_request_log_mark(range_err)
 
         byte_range = rh_split[1].strip().split("-")
         logger.debug(f"Retrieving byte range {byte_range}")
@@ -322,10 +375,11 @@ def object_download(object_id):
             start = int(byte_range[0])
             end = int(byte_range[1]) if byte_range[1] else None
         except (IndexError, ValueError):
-            raise bad_request_and_log(range_err)
+            raise bad_request_log_mark(range_err)
 
         if end is not None and end < start:
-            raise bad_request_and_log(f"Invalid range header: end cannot be less than start (start={start}, end={end})")
+            raise bad_request_log_mark(
+                f"Invalid range header: end cannot be less than start (start={start}, end={end})")
 
         def generate_bytes():
             with open(drs_object.location, "rb") as fh2:
@@ -371,39 +425,92 @@ def object_download(object_id):
 
 @drs_service.route("/private/ingest", methods=["POST"])
 def object_ingest():
+    # TODO: Enable specifying a parent bundle
+    # TODO: If a parent is specified, make sure we have permissions to ingest into it? How to reconcile?
+
     logger = current_app.logger
-    data = request.json or {}
+    data = request.form or {}
 
-    obj_path: str = data.get("path")
+    deduplicate: bool = str_to_bool(data.get("deduplicate", "true"))  # Change for v0.9: default to True
+    obj_path: str | None = data.get("path")
+    project_id: str | None = data.get("project_id")
+    dataset_id: str | None = data.get("dataset_id")
+    data_type: str | None = data.get("data_type")
+    file = request.files.get("file")
 
-    if not obj_path or not isinstance(obj_path, str):
-        raise bad_request_and_log(f"Missing or invalid path parameter in JSON request: {obj_path}")
+    has_permission: bool
+    if current_app.config["AUTHZ_ENABLED"]:
+        has_permission = authz_middleware.authz_post(request, "/policy/evaluate", body={
+            "requested_resource": get_requested_resource_from_params(
+                project_id,
+                dataset_id,
+                data_type,
+            ),
+            "required_permissions": [PERMISSION_INGEST_DATA],
+        })["result"]
+    else:
+        has_permission = True
 
-    drs_object: Optional[DrsBlob] = None
-    deduplicate: bool = data.get("deduplicate", True)  # Change for v0.9: default to True
+    authz_middleware.mark_authz_done(request)
+    if not has_permission:
+        raise Forbidden("Forbidden")
 
-    if deduplicate:
-        # Get checksum of original file, and query database for objects that match
+    if (obj_path is not None and file is not None) or (obj_path is None and file is None):
+        raise bad_request_log_mark("Must specify exactly one of path or file contents")
 
-        try:
-            checksum = drs_file_checksum(obj_path)
-        except FileNotFoundError:
-            raise bad_request_and_log(f"File not found at path {obj_path}")
+    drs_object: DrsBlob | None = None  # either the new object, or the object to fully reuse
+    object_to_copy: DrsBlob | None = None
 
-        drs_object = DrsBlob.query.filter_by(checksum=checksum).first()
-        if drs_object:
-            logger.info(f"Found duplicate DRS object via checksum (will deduplicate): {drs_object}")
+    tfh, t_obj_path = tempfile.mkstemp()
+    try:
+        if file:
+            file.save(tfh)
+            obj_path = t_obj_path
 
-    if not drs_object:
-        try:
-            drs_object = DrsBlob(location=obj_path)
-            db.session.add(drs_object)
-            db.session.commit()
-            logger.info(f"Added DRS object: {drs_object}")
-        except Exception as e:  # TODO: More specific handling
-            logger.error(f"Encountered exception during ingest: {e}")
-            raise InternalServerError("Error while creating the object")
+        if deduplicate:
+            # Get checksum of original file, and query database for objects that match
 
-    response = build_blob_json(drs_object)
+            try:
+                checksum = drs_file_checksum(obj_path)
+            except FileNotFoundError:
+                raise bad_request_log_mark(f"File not found at path {obj_path}")
 
-    return response, 201
+            # Currently, we require exact permissions compatibility for deduplication of IDs.
+            # It might be possible to relax this a bit, but we can't fully relax this for two reasons:
+            #  - we would need to keep track of sets of permissions for each DRS object
+            #  - certain attacks may be performable by creating a second project/dataset in a semi-public instance
+            #    and seeing which files are DRS ID duplicates.
+            # However, we can actually deduplicate the files on the filesystem as these are more opaque.
+
+            candidate_drs_object: DrsBlob | None = DrsBlob.query.filter_by(checksum=checksum).first()
+
+            if candidate_drs_object is not None:
+                if candidate_drs_object.project_id == project_id and candidate_drs_object.dataset_id == dataset_id and \
+                        candidate_drs_object.data_type == data_type:
+                    logger.info(f"Found duplicate DRS object via checksum (will fully deduplicate): {drs_object}")
+                    drs_object = candidate_drs_object
+                else:
+                    logger.info(f"Found duplicate DRS object via checksum (will deduplicate JUST bytes): {drs_object}")
+                    object_to_copy = candidate_drs_object
+
+        if not drs_object:
+            try:
+                drs_object = DrsBlob(
+                    **(dict(object_to_copy=object_to_copy) if object_to_copy else dict(location=obj_path)),
+                    project_id=project_id,
+                    dataset_id=dataset_id,
+                    data_type=data_type,
+                )
+                db.session.add(drs_object)
+                db.session.commit()
+                logger.info(f"Added DRS object: {drs_object}")
+            except Exception as e:  # TODO: More specific handling
+                authz_middleware.mark_authz_done(request)
+                logger.error(f"Encountered exception during ingest: {e}")
+                raise InternalServerError("Error while creating the object")
+
+        return build_blob_json(drs_object), 201
+
+    finally:
+        os.close(tfh)
+        os.remove(t_obj_path)

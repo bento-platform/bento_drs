@@ -3,20 +3,25 @@ import os
 from bento_lib.responses import flask_errors
 from flask import Flask
 from flask_migrate import Migrate
-from werkzeug.exceptions import BadRequest, NotFound
+from werkzeug.exceptions import BadRequest, Forbidden, NotFound
 
-from chord_drs.backend import close_backend
-from chord_drs.commands import ingest
-from chord_drs.config import Config, APP_DIR
-from chord_drs.constants import SERVICE_NAME
-from chord_drs.db import db
-from chord_drs.metrics import metrics
-from chord_drs.routes import drs_service
+from .authz import authz_middleware
+from .backend import close_backend
+from .commands import ingest
+from .config import Config, APP_DIR
+from .constants import SERVICE_NAME
+from .db import db
+from .metrics import metrics
+from .routes import drs_service
+
 
 MIGRATION_DIR = os.path.join(APP_DIR, "migrations")
 
 application = Flask(__name__)
 application.config.from_object(Config)
+
+# Attach authz middleware to Flask instance
+authz_middleware.attach(application)
 
 # Register exception handlers, to return nice JSON responses
 # - Generic catch-all
@@ -26,6 +31,8 @@ application.register_error_handler(
                                                  drs_compat=True, logger=application.logger))
 application.register_error_handler(
     BadRequest, flask_errors.flask_error_wrap(flask_errors.flask_bad_request_error, drs_compat=True))
+application.register_error_handler(
+    Forbidden, flask_errors.flask_error_wrap(flask_errors.flask_forbidden_error, drs_compat=True))
 application.register_error_handler(
     NotFound, lambda e: flask_errors.flask_error_wrap(flask_errors.flask_not_found_error, str(e), drs_compat=True)(e))
 
@@ -42,7 +49,7 @@ application.cli.add_command(ingest)
 # Add callback to handle tearing down backend when a context is closed
 application.teardown_appcontext(close_backend)
 
-# Attach Prometheus metrics exporter (if we're not in a Bento context)
-with application.app_context():
-    if not application.config["CHORD_URL"]:
+# Attach Prometheus metrics exporter (if enabled)
+with application.app_context():  # pragma: no cover
+    if application.config["PROMETHEUS_ENABLED"]:
         metrics.init_app(application)

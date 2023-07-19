@@ -1,4 +1,4 @@
-FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.05.12
+FROM ghcr.io/bento-platform/bento_base_image:python-debian-2023.07.17
 
 RUN apt-get update -y && \
     apt-get install gcc libffi-dev -y && \
@@ -8,8 +8,8 @@ WORKDIR /drs
 RUN mkdir /wes
 
 # Install dependencies
-COPY pyproject.toml pyproject.toml
-COPY poetry.lock poetry.lock
+COPY pyproject.toml .
+COPY poetry.lock .
 RUN pip install --no-cache-dir gunicorn==20.1.0 && \
     poetry config virtualenvs.create false && \
     poetry install --without dev --no-root

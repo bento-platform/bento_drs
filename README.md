@@ -38,26 +38,26 @@ Development dependencies are described in `requirements.txt` and can be
 installed using the following command:
 
 ```bash
-pip install -r requirements.txt
+poetry install
 ```
 
-Afterwards we need to setup the DB:
+Afterward, we need to set up the DB:
 
 ```bash
-flask db upgrade
+poetry run flask db upgrade
 ```
 
 Most likely you will want to load some objects to serve through this service.
 This can be done with this command (ingestion is recursive for directories):
 
 ```bash
-flask ingest $A_FILE_OR_A_DIRECTORY
+poetry run flask ingest $A_FILE_OR_A_DIRECTORY
 ```
 
 The Flask development server can be run with the following command:
 
 ```bash
-FLASK_DEBUG=True flask run
+FLASK_DEBUG=True poetry run flask run
 ```
 
 
@@ -66,7 +66,7 @@ FLASK_DEBUG=True flask run
 To run all tests and calculate coverage, run the following command:
 
 ```bash
-tox
+poetry run tox
 ```
 
 Tox is configured to run both pytest and flake8, you may want to uncomment
@@ -111,24 +111,22 @@ partial match `/search?fuzzy_name=1001`
 
 `/private/ingest`
 
-e.g. POST body
+e.g. POST body (multipart form-encoded)
 
-```json
-{
-  "path": "examples/P-1001.hc.g.vcf.gz"
-}
+```
+path=examples/P-1001.hc.g.vcf.gz
 ```
 
 This will automatically deduplicate with existing DRS objects if the file matches.
 
 To ingest and force-create a duplicate record, provide the `deduplicate` parameter, set to `false`:
 
-```json
-{
-  "path": "examples/P-1001.hc.g.vcf.gz",
-  "deduplicate": false
-}
 ```
+path=examples/P-1001.hc.g.vcf.gz&deduplicate=false
+```
+
+If `path` is left out and instead a file is provided, the file will be uploaded instead
+of copied from the specified local filesystem path.
 
 
 ##### GET service info

@@ -1,4 +1,4 @@
-from typing import List, TypedDict
+from typing import TypedDict
 
 __all__ = [
     "DRSAccessURLDict",
@@ -8,7 +8,7 @@ __all__ = [
     "DRSObjectDict",
 ]
 
-# TODO: py3.10: new TypedDict required pattern
+# TODO: py3.11: new TypedDict required pattern
 
 
 class _DRSAccessURLDictBase(TypedDict):
@@ -16,7 +16,7 @@ class _DRSAccessURLDictBase(TypedDict):
 
 
 class DRSAccessURLDict(_DRSAccessURLDictBase, total=False):
-    headers: List[str]  # TODO: The schema is very unclear with this
+    headers: list[str]  # TODO: The schema is very unclear with this
 
 
 class _DRSAccessMethodDictBase(TypedDict):
@@ -36,7 +36,7 @@ class DRSChecksumDict(TypedDict):
 
 class _DRSObjectDictBase(TypedDict):
     id: str
-    checksums: List[DRSChecksumDict]
+    checksums: list[DRSChecksumDict]
     created_time: str
     size: int
     self_uri: str
@@ -49,15 +49,15 @@ class _DRSContentsDictBase(TypedDict):
 class DRSContentsDict(_DRSContentsDictBase, total=False):
     id: str
     drs_uri: str
-    contents: List["DRSContentsDict"]
+    contents: list["DRSContentsDict"]
 
 
 class DRSObjectDict(_DRSObjectDictBase, total=False):
-    access_methods: List[DRSAccessMethodDict]
+    access_methods: list[DRSAccessMethodDict]
     name: str
     description: str
     updated_time: str
     version: str
     mime_type: str
-    contents: List[DRSContentsDict]
-    aliases: List[str]
+    contents: list[DRSContentsDict]
+    aliases: list[str]
