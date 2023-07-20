@@ -4,7 +4,8 @@ from .config import Config
 __all__ = [
     "authz_middleware",
     "PERMISSION_INGEST_DATA",
-    "PERMISSION_VIEW_DATA",
+    "PERMISSION_QUERY_DATA",
+    "PERMISSION_DOWNLOAD_DATA",
 ]
 
 authz_middleware = FlaskAuthMiddleware(
@@ -14,4 +15,5 @@ authz_middleware = FlaskAuthMiddleware(
 )
 
 PERMISSION_INGEST_DATA = "ingest:data"
-PERMISSION_VIEW_DATA = "view:data"
+PERMISSION_QUERY_DATA = "query:data"
+PERMISSION_DOWNLOAD_DATA = "download:data"
