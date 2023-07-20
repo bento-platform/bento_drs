@@ -462,7 +462,7 @@ def object_ingest():
     tfh, t_obj_path = tempfile.mkstemp()
     try:
         if file:
-            file.save(tfh)
+            file.save(t_obj_path)
             obj_path = t_obj_path
 
         if deduplicate:
