@@ -389,3 +389,14 @@ def test_object_ingest_forbidden(client):
     authz_everything_false_scalar()
     res = client.post("/ingest", data={})  # invalid body shouldn't be caught until after
     assert res.status_code == 403
+
+
+@responses.activate
+def test_object_ingest_post_file(client):
+    # actual bytes of file in request
+    fp = dummy_file_path()
+    authz_everything_true()
+    with open(fp, "rb") as fh:
+        res = client.post("/ingest", data={"file": (fh, "dummy_file.txt")}, content_type="multipart/form-data")
+    assert res.status_code == 201
+    validate_object_fields(res.get_json())
