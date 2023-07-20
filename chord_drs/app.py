@@ -2,6 +2,7 @@ import os
 
 from bento_lib.responses import flask_errors
 from flask import Flask
+from flask_cors import CORS
 from flask_migrate import Migrate
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound
 
@@ -19,6 +20,9 @@ MIGRATION_DIR = os.path.join(APP_DIR, "migrations")
 
 application = Flask(__name__)
 application.config.from_object(Config)
+
+# Set up CORS
+CORS(application, origins=Config.CORS_ORIGINS)
 
 # Attach authz middleware to Flask instance
 authz_middleware.attach(application)
