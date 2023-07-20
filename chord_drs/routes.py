@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError
 
 from . import __version__
-from .authz import authz_middleware, PERMISSION_VIEW_DATA, PERMISSION_INGEST_DATA
+from .authz import authz_middleware, PERMISSION_INGEST_DATA, PERMISSION_QUERY_DATA, PERMISSION_DOWNLOAD_DATA
 from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from .db import db
@@ -84,8 +84,8 @@ def check_objects_permission(drs_objs: list[DrsBlob | DrsBundle], permission: st
     })["result"]
 
 
-def fetch_and_check_object_permissions(object_id: str) -> tuple[DrsBlob | DrsBundle, bool]:
-    view_data_everything = check_everything_permission(PERMISSION_VIEW_DATA)
+def fetch_and_check_object_permissions(object_id: str, permission: str) -> tuple[DrsBlob | DrsBundle, bool]:
+    view_data_everything = check_everything_permission(permission)
 
     drs_object, is_bundle = get_drs_object(object_id)
 
@@ -100,7 +100,7 @@ def fetch_and_check_object_permissions(object_id: str) -> tuple[DrsBlob | DrsBun
         # Good to go already!
         authz_middleware.mark_authz_done(request)
     else:
-        p = check_objects_permission([drs_object], PERMISSION_VIEW_DATA)
+        p = check_objects_permission([drs_object], permission)
         authz_middleware.mark_authz_done(request)
         if not (p and p[0]):
             raise forbidden()
@@ -275,7 +275,7 @@ def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])
 def object_info(object_id: str):
-    drs_object, is_bundle = fetch_and_check_object_permissions(object_id)
+    drs_object, is_bundle = fetch_and_check_object_permissions(object_id, PERMISSION_QUERY_DATA)
 
     if is_bundle:
         expand: bool = str_to_bool(request.args.get("expand", ""))
@@ -289,7 +289,7 @@ def object_info(object_id: str):
 @drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 def object_access(object_id: str, access_id: str):
-    fetch_and_check_object_permissions(object_id)
+    fetch_and_check_object_permissions(object_id, PERMISSION_QUERY_DATA)
 
     # We explicitly do not support access_id-based accesses; all of them will be 'not found'
     # since we don't provide access IDs
@@ -326,7 +326,7 @@ def object_search():
         raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
 
     # TODO: map objects to resources to avoid duplicate calls to same resource in check_objects_permission
-    for obj, p in zip(objects, check_objects_permission(list(objects), PERMISSION_VIEW_DATA)):
+    for obj, p in zip(objects, check_objects_permission(list(objects), PERMISSION_QUERY_DATA)):
         if p:  # Only include the blob in the search results if we have permissions to view it.
             response.append(build_blob_json(obj, internal_path))
 
@@ -340,7 +340,7 @@ def object_download(object_id: str):
 
     # TODO: Bundle download
 
-    drs_object, is_bundle = fetch_and_check_object_permissions(object_id)
+    drs_object, is_bundle = fetch_and_check_object_permissions(object_id, PERMISSION_DOWNLOAD_DATA)
 
     if is_bundle:
         raise BadRequest("Bundle download is currently unsupported")
