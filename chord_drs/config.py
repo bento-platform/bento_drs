@@ -80,6 +80,9 @@ class Config:
     MINIO_BUCKET: str | None = os.environ.get("MINIO_BUCKET") if MINIO_URL else None
     BENTO_DEBUG = os.environ.get("BENTO_DEBUG", os.environ.get("FLASK_DEBUG", "false")).strip().lower() in TRUTH_VALUES
 
+    # CORS
+    CORS_ORIGINS: list[str] | str = [x for x in os.environ.get("CORS_ORIGINS", "").split(";") if x] or "*"
+
     # Authn/z-related configuration
     AUTHZ_URL: str = AUTHZ_URL
     AUTHZ_ENABLED: bool = AUTHZ_ENABLED
