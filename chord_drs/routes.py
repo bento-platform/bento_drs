@@ -85,7 +85,7 @@ def check_objects_permission(drs_objs: list[DrsBlob | DrsBundle], permission: st
 
 
 def fetch_and_check_object_permissions(object_id: str, permission: str) -> tuple[DrsBlob | DrsBundle, bool]:
-    view_data_everything = check_everything_permission(PERMISSION_VIEW_DATA)
+    view_data_everything = check_everything_permission(permission)
 
     drs_object, is_bundle = get_drs_object(object_id)
 
@@ -100,7 +100,7 @@ def fetch_and_check_object_permissions(object_id: str, permission: str) -> tuple
         # Good to go already!
         authz_middleware.mark_authz_done(request)
     else:
-        p = check_objects_permission([drs_object], PERMISSION_VIEW_DATA)
+        p = check_objects_permission([drs_object], permission)
         authz_middleware.mark_authz_done(request)
         if not (p and p[0]):
             raise forbidden()
