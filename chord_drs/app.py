@@ -31,14 +31,35 @@ authz_middleware.attach(application)
 # - Generic catch-all
 application.register_error_handler(
     Exception,
-    flask_errors.flask_error_wrap_with_traceback(flask_errors.flask_internal_server_error, service_name=SERVICE_NAME,
-                                                 drs_compat=True, logger=application.logger))
+    flask_errors.flask_error_wrap_with_traceback(
+        flask_errors.flask_internal_server_error,
+        service_name=SERVICE_NAME,
+        drs_compat=True,
+        logger=application.logger,
+        authz=authz_middleware,
+    ))
 application.register_error_handler(
-    BadRequest, flask_errors.flask_error_wrap(flask_errors.flask_bad_request_error, drs_compat=True))
+    BadRequest,
+    flask_errors.flask_error_wrap(
+        flask_errors.flask_bad_request_error,
+        drs_compat=True,
+        authz=authz_middleware,
+    ))
 application.register_error_handler(
-    Forbidden, flask_errors.flask_error_wrap(flask_errors.flask_forbidden_error, drs_compat=True))
+    Forbidden,
+    flask_errors.flask_error_wrap(
+        flask_errors.flask_forbidden_error,
+        drs_compat=True,
+        authz=authz_middleware,
+    ))
 application.register_error_handler(
-    NotFound, lambda e: flask_errors.flask_error_wrap(flask_errors.flask_not_found_error, str(e), drs_compat=True)(e))
+    NotFound,
+    lambda e: flask_errors.flask_error_wrap(
+        flask_errors.flask_not_found_error,
+        str(e),
+        drs_compat=True,
+        authz=authz_middleware,
+    )(e))
 
 # Attach the database to the application and run migrations if needed
 db.init_app(application)
