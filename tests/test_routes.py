@@ -114,7 +114,12 @@ def _test_object_and_download(client, obj, test_range=False):
 
     # Download the object
     res = client.get(data["access_methods"][0]["access_url"]["url"])
+    assert res.status_code == 200
+    assert res.content_length == obj.size
+    assert len(res.get_data(as_text=False)) == obj.size
 
+    # Download the object (POST)
+    res = client.post(data["access_methods"][0]["access_url"]["url"])
     assert res.status_code == 200
     assert res.content_length == obj.size
     assert len(res.get_data(as_text=False)) == obj.size
@@ -178,7 +183,7 @@ def test_object_and_download_minio(client_minio, drs_object_minio):
 @responses.activate
 def test_object_and_download_minio_specific_perms(client_minio, drs_object_minio):
     # _test_object_and_download does 3 different accesses
-    authz_drs_specific_obj(iters=3)
+    authz_drs_specific_obj(iters=4)
     _test_object_and_download(client_minio, drs_object_minio)
 
 
@@ -191,7 +196,7 @@ def test_object_and_download(client, drs_object):
 @responses.activate
 def test_object_and_download_specific_perms(client, drs_object):
     # _test_object_and_download does 3 different accesses
-    authz_drs_specific_obj(iters=3)
+    authz_drs_specific_obj(iters=4)
     _test_object_and_download(client, drs_object)
 
 

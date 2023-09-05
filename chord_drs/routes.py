@@ -6,6 +6,7 @@ import tempfile
 
 from flask import (
     Blueprint,
+    Request,
     current_app,
     jsonify,
     url_for,
@@ -70,17 +71,28 @@ def check_objects_permission(drs_objs: list[DrsBlob | DrsBundle], permission: st
     if not current_app.config["AUTHZ_ENABLED"]:
         return tuple([True] * len(drs_objs))  # Assume we have permission for everything if authz disabled
 
-    return authz_middleware.authz_post(request, "/policy/evaluate", body={
-        "requested_resource": [
-            get_requested_resource_from_params(
-                drs_obj.project_id,
-                drs_obj.dataset_id,
-                drs_obj.data_type,
-            )
-            for drs_obj in drs_objs
-        ],
-        "required_permissions": [permission],
-    })["result"]
+    def _post_headers_getter(r: Request) -> dict[str, str]:
+        token = r.form.get("token")
+        return {"Authorization": f"Bearer {token}"} if token else {}
+
+    headers_getter = _post_headers_getter if request.method == "POST" else None
+
+    return authz_middleware.authz_post(
+        request,
+        "/policy/evaluate",
+        body={
+            "requested_resource": [
+                get_requested_resource_from_params(
+                    drs_obj.project_id,
+                    drs_obj.dataset_id,
+                    drs_obj.data_type,
+                )
+                for drs_obj in drs_objs
+            ],
+            "required_permissions": [permission],
+        },
+        headers_getter=headers_getter,
+    )["result"]
 
 
 def fetch_and_check_object_permissions(object_id: str, permission: str) -> tuple[DrsBlob | DrsBundle, bool]:
@@ -333,7 +345,7 @@ def object_search():
     return jsonify(response)
 
 
-@drs_service.route("/objects/<string:object_id>/download", methods=["GET"])
+@drs_service.route("/objects/<string:object_id>/download", methods=["GET", "POST"])
 def object_download(object_id: str):
     logger = current_app.logger
 
