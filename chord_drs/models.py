@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 from .backend import get_backend
-from .backends.minio import MinioBackend
 from .db import db
 from .utils import drs_file_checksum
 
@@ -93,8 +92,6 @@ class DrsBlob(db.Model, DrsMixin):
 
             backend = get_backend()
 
-            if not backend:
-                raise Exception("The backend for this instance is not properly configured.")
             try:
                 self.location = backend.save(location, new_filename)
                 self.size = os.path.getsize(p)
@@ -115,9 +112,4 @@ class DrsBlob(db.Model, DrsMixin):
         if parsed_url.scheme != "s3":
             return None
 
-        backend = get_backend()
-
-        if not backend or not isinstance(backend, MinioBackend):
-            raise Exception("The backend for this instance is not properly configured.")
-
-        return backend.get_minio_object(self.location)
+        return get_backend().get_minio_object(self.location)

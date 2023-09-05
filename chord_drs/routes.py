@@ -20,7 +20,6 @@ from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerE
 from . import __version__
 from .authz import authz_middleware, PERMISSION_INGEST_DATA, PERMISSION_QUERY_DATA, PERMISSION_DOWNLOAD_DATA
 from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
-from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from .db import db
 from .models import DrsBlob, DrsBundle
 from .types import DRSAccessMethodDict, DRSContentsDict, DRSObjectDict
