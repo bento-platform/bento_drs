@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "chord-drs"
-version = "0.12.5"
+version = "0.12.6"
 description = "An implementation of a data repository system (as per GA4GH's specs) for the Bento platform."
 authors = ["David Lougheed <david.lougheed@mail.mcgill.ca>"]
 license = "LGPL-3.0"
