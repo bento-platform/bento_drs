@@ -185,7 +185,7 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
         url_for("drs_service.object_download", object_id=drs_blob.id).lstrip("/")
     )
 
-    default_access_method: DRSAccessMethodDict = {
+    https_access_method: DRSAccessMethodDict = {
         "access_url": {
             # url_for external was giving weird results - build the URL by hand instead using the internal url_for
             "url": blob_url,
@@ -196,7 +196,7 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
         "type": "https",
     }
 
-    access_methods: list[DRSAccessMethodDict] = [default_access_method]
+    access_methods: list[DRSAccessMethodDict] = [https_access_method]
 
     if inside_container and data_source == DATA_SOURCE_LOCAL:
         access_methods.append({
