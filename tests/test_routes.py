@@ -26,8 +26,8 @@ def validate_object_fields(data, existing_id=None, with_internal_path=False):
     assert "size" in data
     assert "self_uri" in data
 
-    method_types = [method['type'] for method in data["access_methods"]]
-    assert "http" in method_types
+    method_types = [method["type"] for method in data["access_methods"]]
+    assert "https" in method_types
     if is_minio:
         assert "s3" in method_types
     elif is_local and with_internal_path:

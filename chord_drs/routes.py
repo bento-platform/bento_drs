@@ -193,7 +193,7 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
             # out-of-band method, or the object's contents are public. This
             # will depend on how the service is deployed.
         },
-        "type": "http",
+        "type": "https",
     }
 
     access_methods: list[DRSAccessMethodDict] = [default_access_method]
