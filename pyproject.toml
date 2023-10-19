@@ -14,7 +14,7 @@ include = [
 [tool.poetry.dependencies]
 python = "^3.10"
 boto3 = ">=1.18.34,<1.19"
-bento-lib = {version = "^7.0.0", extras = ["flask"]}
+bento-lib = {version = "9.0.0a1", extras = ["flask"]}
 flask = ">=2.2.3,<2.3"
 flask-sqlalchemy = ">=2.5.1,<2.6"
 flask-migrate = ">=3.1.0,<3.2"

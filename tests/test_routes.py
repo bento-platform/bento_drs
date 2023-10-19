@@ -52,51 +52,43 @@ def test_service_info(client):
 
 
 def authz_everything_true(count=1):
-    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [True] * count})
-
-
-def authz_everything_true_scalar():
-    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": True})
+    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [[True] for _ in range(count)]})
 
 
 def authz_everything_false(count=1):
-    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [False] * count})
+    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [[False] for _ in range(count)]})
 
 
 def authz_drs_specific_obj(iters=1):
     for _ in range(iters):
-        authz_everything_false_scalar()
+        authz_everything_false()
         authz_everything_true()
-
-
-def authz_everything_false_scalar():
-    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": False})
 
 
 @responses.activate
 def test_object_fail(client):
-    authz_everything_true_scalar()
+    authz_everything_true()
     res = client.get(f"/objects/{NON_EXISTENT_ID}")
     assert res.status_code == 404
 
 
 @responses.activate
 def test_object_fail_forbidden(client):
-    authz_everything_false_scalar()
+    authz_everything_false()
     res = client.get(f"/objects/{NON_EXISTENT_ID}")  # can't know if this exists since we don't have access
     assert res.status_code == 403
 
 
 @responses.activate
 def test_object_download_fail(client):
-    authz_everything_true_scalar()
+    authz_everything_true()
     res = client.get(f"/objects/{NON_EXISTENT_ID}/download")
     assert res.status_code == 404
 
 
 @responses.activate
 def test_object_access_fail(client):
-    authz_everything_true_scalar()
+    authz_everything_true()
     res = client.get(f"/objects/{NON_EXISTENT_ID}/access/no_access")
     assert res.status_code == 404
 
@@ -176,7 +168,7 @@ def _test_object_and_download(client, obj, test_range=False):
 
 @responses.activate
 def test_object_and_download_minio(client_minio, drs_object_minio):
-    authz_everything_true_scalar()
+    authz_everything_true()
     _test_object_and_download(client_minio, drs_object_minio)
 
 
@@ -189,7 +181,7 @@ def test_object_and_download_minio_specific_perms(client_minio, drs_object_minio
 
 @responses.activate
 def test_object_and_download(client, drs_object):
-    authz_everything_true_scalar()
+    authz_everything_true()
     _test_object_and_download(client, drs_object)
 
 
@@ -202,14 +194,14 @@ def test_object_and_download_specific_perms(client, drs_object):
 
 @responses.activate
 def test_object_and_download_with_ranges(client_local, drs_object):
-    authz_everything_true_scalar()
+    authz_everything_true()
     # Only local backend supports ranges for now
     _test_object_and_download(client_local, drs_object, test_range=True)
 
 
 @responses.activate
 def test_object_with_internal_path(client, drs_object):
-    authz_everything_true_scalar()
+    authz_everything_true()
 
     res = client.get(f"/objects/{drs_object.id}?internal_path=1")
     data = res.get_json()
@@ -220,7 +212,7 @@ def test_object_with_internal_path(client, drs_object):
 
 @responses.activate
 def test_object_with_disabled_internal_path(client, drs_object):
-    authz_everything_true_scalar()
+    authz_everything_true()
 
     res = client.get(f"/objects/{drs_object.id}?internal_path=0")
     data = res.get_json()
@@ -231,7 +223,7 @@ def test_object_with_disabled_internal_path(client, drs_object):
 
 @responses.activate
 def test_bundle_and_download(client, drs_bundle):
-    authz_everything_true_scalar()
+    authz_everything_true()
 
     res = client.get(f"/objects/{drs_bundle.id}")
     data = res.get_json()
@@ -391,7 +383,7 @@ def test_object_ingest_bad_req(client):
 
 @responses.activate
 def test_object_ingest_forbidden(client):
-    authz_everything_false_scalar()
+    authz_everything_false()
     res = client.post("/ingest", data={})  # invalid body shouldn't be caught until after
     assert res.status_code == 403
 
