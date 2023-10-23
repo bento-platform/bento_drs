@@ -183,13 +183,13 @@ tests-no-zope = ["cloudpickle", "hypothesis", "mypy (>=1.1.1)", "pympler", "pyte
 
 [[package]]
 name = "bento-lib"
-version = "9.0.0a1"
+version = "9.0.0a4"
 description = "A set of common utilities and helpers for Bento platform services."
 optional = false
 python-versions = ">=3.10.0"
 files = [
-    {file = "bento_lib-9.0.0a1-py3-none-any.whl", hash = "sha256:16eed662dafad50ca20f87ed560bc09944e3af6048f9ab86d7fbbf5cbe3b634c"},
-    {file = "bento_lib-9.0.0a1.tar.gz", hash = "sha256:9d6f23dc299163294cc5be96deab5c0789e8031a4b62f1e835a8abde5ec94e40"},
+    {file = "bento_lib-9.0.0a4-py3-none-any.whl", hash = "sha256:26b1ff7d868ec968a4746cb1aa4e2d0dd3d6b80985f99ecb2a7f73a127923087"},
+    {file = "bento_lib-9.0.0a4.tar.gz", hash = "sha256:299e24f9cddd5f41af27265febd37a344f382ec69e1cb343dd37f3cafc185cce"},
 ]
 
 [package.dependencies]
@@ -204,7 +204,7 @@ Werkzeug = ">=2.2.3,<3"
 
 [package.extras]
 django = ["Django (>=4.2.1,<5)", "djangorestframework (>=3.14.0,<3.15)"]
-fastapi = ["fastapi (>=0.100,<0.104)"]
+fastapi = ["fastapi (>=0.100,<0.105)"]
 flask = ["Flask (>=2.2.5,<3)"]
 
 [[package]]
@@ -2091,4 +2091,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "fe9290f606121b67774a2f741d8934334e0897e5758bcd8dd882d9138c5b5469"
+content-hash = "c46773f51d67e50b97caa498db203945a02aab09695ac934ae0482ec13e406e3"
