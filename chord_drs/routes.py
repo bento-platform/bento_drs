@@ -473,9 +473,11 @@ def object_ingest():
 
     tfh, t_obj_path = tempfile.mkstemp()
     try:
-        if file:
+        filename: str | None = None  # no override, use path filename if path is specified instead of a file upload
+        if file is not None:
             file.save(t_obj_path)
             obj_path = t_obj_path
+            filename = file.filename  # still may be none, in which case the temporary filename will be used
 
         if deduplicate:
             # Get checksum of original file, and query database for objects that match
@@ -507,6 +509,7 @@ def object_ingest():
             try:
                 drs_object = DrsBlob(
                     **(dict(object_to_copy=object_to_copy) if object_to_copy else dict(location=obj_path)),
+                    filename=filename,
                     project_id=project_id,
                     dataset_id=dataset_id,
                     data_type=data_type,
