@@ -69,6 +69,8 @@ class DrsBlob(db.Model, DrsMixin):
     location = db.Column(db.String(500), nullable=False)
 
     def __init__(self, *args, **kwargs):
+        logger = current_app.logger
+
         # If set, we are deduplicating with an existing file object
         object_to_copy: DrsBlob | None = kwargs.get("object_to_copy")
 
@@ -104,9 +106,11 @@ class DrsBlob(db.Model, DrsMixin):
                 self.size = os.path.getsize(p)
                 self.checksum = drs_file_checksum(location)
             except Exception as e:
-                current_app.logger.error(f"Encountered exception during DRS object creation: {e}")
+                logger.error(f"Encountered exception during DRS object creation: {e}")
                 # TODO: implement more specific exception handling
                 raise Exception("Well if the file is not saved... we can't do squat")
+
+            logger.info(f"Creating new DRS object: name={self.name}; size={self.size}; sha256={self.checksum}")
 
         for key_to_remove in ("location", "filename"):
             if key_to_remove in kwargs:
