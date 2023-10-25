@@ -4,6 +4,7 @@ from hashlib import sha256
 from pathlib import Path
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from werkzeug.utils import secure_filename
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -68,13 +69,18 @@ class DrsBlob(db.Model, DrsMixin):
     location = db.Column(db.String(500), nullable=False)
 
     def __init__(self, *args, **kwargs):
+        logger = current_app.logger
+
         # If set, we are deduplicating with an existing file object
         object_to_copy: DrsBlob | None = kwargs.get("object_to_copy")
+
+        # If set, we are overriding the filename to save the file to
+        filename: str | None = kwargs.get("filename")
 
         self.id = str(uuid4())
 
         if object_to_copy:
-            self.name = object_to_copy.name
+            self.name = secure_filename(filename) if filename else object_to_copy.name
             self.location = object_to_copy.location
             self.size = object_to_copy.size
             self.checksum = object_to_copy.checksum
@@ -88,8 +94,8 @@ class DrsBlob(db.Model, DrsMixin):
                 # TODO: we will need to account for URLs at some point
                 raise FileNotFoundError("Provided file path does not exists")
 
-            self.name = p.name
-            new_filename = f"{self.id[:12]}-{p.name}"  # TODO: use checksum for filename instead
+            self.name = secure_filename(filename or p.name)
+            new_filename = f"{self.id[:12]}-{self.name}"  # TODO: use checksum for filename instead
 
             backend = get_backend()
 
@@ -100,12 +106,15 @@ class DrsBlob(db.Model, DrsMixin):
                 self.size = os.path.getsize(p)
                 self.checksum = drs_file_checksum(location)
             except Exception as e:
-                current_app.logger.error(f"Encountered exception during DRS object creation: {e}")
+                logger.error(f"Encountered exception during DRS object creation: {e}")
                 # TODO: implement more specific exception handling
                 raise Exception("Well if the file is not saved... we can't do squat")
 
-        if "location" in kwargs:
-            del kwargs["location"]
+            logger.info(f"Creating new DRS object: name={self.name}; size={self.size}; sha256={self.checksum}")
+
+        for key_to_remove in ("location", "filename"):
+            if key_to_remove in kwargs:
+                del kwargs[key_to_remove]
 
         super().__init__(*args, **kwargs)
 

@@ -4,10 +4,12 @@ from .conftest import dummy_file_path
 
 
 def test_drs_blob_init_bad_file():
+    from chord_drs.app import application
     from chord_drs.models import DrsBlob
 
-    with pytest.raises(FileNotFoundError):
-        DrsBlob(location="path/to/dne")
+    with application.app_context():
+        with pytest.raises(FileNotFoundError):
+            DrsBlob(location="path/to/dne")
 
 
 def test_drs_blob_init():
