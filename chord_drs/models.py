@@ -80,7 +80,7 @@ class DrsBlob(db.Model, DrsMixin):
         self.id = str(uuid4())
 
         if object_to_copy:
-            self.name = object_to_copy.name
+            self.name = secure_filename(filename) if filename else object_to_copy.name
             self.location = object_to_copy.location
             self.size = object_to_copy.size
             self.checksum = object_to_copy.checksum
