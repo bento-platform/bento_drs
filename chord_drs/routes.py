@@ -4,6 +4,8 @@ import os
 import subprocess
 import tempfile
 
+from bento_lib.auth.permissions import Permission, P_INGEST_DATA, P_QUERY_DATA, P_DOWNLOAD_DATA
+from bento_lib.auth.resources import RESOURCE_EVERYTHING, build_resource
 from flask import (
     Blueprint,
     Request,
@@ -19,7 +21,7 @@ from urllib.parse import urlparse
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError
 
 from . import __version__
-from .authz import authz_middleware, PERMISSION_INGEST_DATA, PERMISSION_QUERY_DATA, PERMISSION_DOWNLOAD_DATA
+from .authz import authz_middleware
 from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from .db import db
@@ -44,66 +46,43 @@ def forbidden() -> Forbidden:
     return Forbidden()
 
 
-def check_everything_permission(permission: str) -> bool:
-    if not current_app.config["AUTHZ_ENABLED"]:
-        return True
-
-    res = authz_middleware.authz_post(request, "/policy/evaluate", body={
-        "requested_resource": {"everything": True},
-        "required_permissions": [permission],
-    })["result"]
-
-    assert isinstance(res, bool)  # otherwise, bad response - or bad test mock more likely
-    return res
+def authz_enabled() -> bool:
+    return current_app.config["AUTHZ_ENABLED"]
 
 
-def get_requested_resource_from_params(project_id: str | None, dataset_id: str | None, data_type: str | None) -> dict:
-    if project_id is not None:
-        return {
-            "project": project_id,
-            **({"dataset": dataset_id} if dataset_id is not None else {}),
-            **({"data_type": data_type} if data_type is not None else {}),
-        }
-    else:  # Either truly some kind of global object or just bad fields, in either case resort to {everything}
-        return {"everything": True}
+def check_everything_permission(permission: Permission) -> bool:
+    return authz_middleware.evaluate_one(request, RESOURCE_EVERYTHING, permission) if authz_enabled() else True
 
 
-def check_objects_permission(drs_objs: list[DrsBlob | DrsBundle], permission: str) -> tuple[bool, ...]:
-    if not current_app.config["AUTHZ_ENABLED"]:
+def check_objects_permission(
+    drs_objs: list[DrsBlob | DrsBundle], permission: Permission, mark_authz_done: bool = False
+) -> tuple[bool, ...]:
+    if not authz_enabled():
         return tuple([True] * len(drs_objs))  # Assume we have permission for everything if authz disabled
 
     def _post_headers_getter(r: Request) -> dict[str, str]:
         token = r.form.get("token")
         return {"Authorization": f"Bearer {token}"} if token else {}
 
-    headers_getter = _post_headers_getter if request.method == "POST" else None
-
-    return authz_middleware.authz_post(
-        request,
-        "/policy/evaluate",
-        body={
-            "requested_resource": [
-                get_requested_resource_from_params(
-                    drs_obj.project_id,
-                    drs_obj.dataset_id,
-                    drs_obj.data_type,
-                )
-                for drs_obj in drs_objs
-            ],
-            "required_permissions": [permission],
-        },
-        headers_getter=headers_getter,
-    )["result"]
+    return tuple(r[0] for r in (
+        authz_middleware.evaluate(
+            request,
+            [build_resource(drs_obj.project_id, drs_obj.dataset_id, drs_obj.data_type) for drs_obj in drs_objs],
+            [permission],
+            headers_getter=_post_headers_getter if request.method == "POST" else None,
+            mark_authz_done=mark_authz_done,
+        )  # gets us a matrix of len(drs_objs) rows, 1 column with the permission evaluation result
+    ))  # now a tuple of length len(drs_objs) of whether we have the permission for each object
 
 
-def fetch_and_check_object_permissions(object_id: str, permission: str) -> tuple[DrsBlob | DrsBundle, bool]:
+def fetch_and_check_object_permissions(object_id: str, permission: Permission) -> tuple[DrsBlob | DrsBundle, bool]:
     view_data_everything = check_everything_permission(permission)
 
     drs_object, is_bundle = get_drs_object(object_id)
 
     if not drs_object:
         authz_middleware.mark_authz_done(request)
-        if current_app.config["AUTHZ_ENABLED"] and not view_data_everything:  # Don't leak if this object exists
+        if authz_enabled() and not view_data_everything:  # Don't leak if this object exists
             raise forbidden()
         raise NotFound("No object found for this ID")
 
@@ -112,9 +91,8 @@ def fetch_and_check_object_permissions(object_id: str, permission: str) -> tuple
         # Good to go already!
         authz_middleware.mark_authz_done(request)
     else:
-        p = check_objects_permission([drs_object], permission)
-        authz_middleware.mark_authz_done(request)
-        if not (p and p[0]):
+        p = check_objects_permission([drs_object], permission, mark_authz_done=True)
+        if not p[0]:
             raise forbidden()
     # -------------------------------------------------------------------
 
@@ -287,7 +265,7 @@ def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
 @drs_service.route("/objects/<string:object_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])
 def object_info(object_id: str):
-    drs_object, is_bundle = fetch_and_check_object_permissions(object_id, PERMISSION_QUERY_DATA)
+    drs_object, is_bundle = fetch_and_check_object_permissions(object_id, P_QUERY_DATA)
 
     if is_bundle:
         expand: bool = str_to_bool(request.args.get("expand", ""))
@@ -301,7 +279,7 @@ def object_info(object_id: str):
 @drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 def object_access(object_id: str, access_id: str):
-    fetch_and_check_object_permissions(object_id, PERMISSION_QUERY_DATA)
+    fetch_and_check_object_permissions(object_id, P_QUERY_DATA)
 
     # We explicitly do not support access_id-based accesses; all of them will be 'not found'
     # since we don't provide access IDs
@@ -338,7 +316,7 @@ def object_search():
         raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
 
     # TODO: map objects to resources to avoid duplicate calls to same resource in check_objects_permission
-    for obj, p in zip(objects, check_objects_permission(list(objects), PERMISSION_QUERY_DATA)):
+    for obj, p in zip(objects, check_objects_permission(list(objects), P_QUERY_DATA)):
         if p:  # Only include the blob in the search results if we have permissions to view it.
             response.append(build_blob_json(obj, internal_path))
 
@@ -352,7 +330,7 @@ def object_download(object_id: str):
 
     # TODO: Bundle download
 
-    drs_object, is_bundle = fetch_and_check_object_permissions(object_id, PERMISSION_DOWNLOAD_DATA)
+    drs_object, is_bundle = fetch_and_check_object_permissions(object_id, P_DOWNLOAD_DATA)
 
     if is_bundle:
         raise BadRequest("Bundle download is currently unsupported")
@@ -365,11 +343,7 @@ def object_download(object_id: str):
 
         if range_header is None:
             # Early return, no range header so send the whole thing
-            return send_file(
-                drs_object.location,
-                mimetype=MIME_OCTET_STREAM,
-                download_name=drs_object.name,
-            )
+            return send_file(drs_object.location, mimetype=MIME_OCTET_STREAM, download_name=drs_object.name)
 
         logger.debug(f"Found Range header: {range_header}")
         range_err = f"Malformatted range header: expected bytes=X-Y or bytes=X-, got {range_header}"
@@ -448,20 +422,14 @@ def object_ingest():
     data_type: str | None = data.get("data_type")
     file = request.files.get("file")
 
-    has_permission: bool
-    if current_app.config["AUTHZ_ENABLED"]:
-        has_permission = authz_middleware.authz_post(request, "/policy/evaluate", body={
-            "requested_resource": get_requested_resource_from_params(
-                project_id,
-                dataset_id,
-                data_type,
-            ),
-            "required_permissions": [PERMISSION_INGEST_DATA],
-        })["result"]
-    else:
-        has_permission = True
+    # This authz call determines everything, so we can mark authz as done when the call completes:
+    has_permission: bool = authz_middleware.evaluate_one(
+        request,
+        build_resource(project_id, dataset_id, data_type),
+        P_INGEST_DATA,
+        mark_authz_done=True,
+    ) if authz_enabled() else True
 
-    authz_middleware.mark_authz_done(request)
     if not has_permission:
         raise Forbidden("Forbidden")
 
