@@ -447,7 +447,7 @@ def object_ingest():
     try:
         filename: str | None = None  # no override, use path filename if path is specified instead of a file upload
         if file is not None:
-            logger.debug(f"ingest - recieved file object: {file}")
+            logger.debug(f"ingest - received file object: {file}")
             file.save(t_obj_path)
             obj_path = t_obj_path
             filename = file.filename  # still may be none, in which case the temporary filename will be used
