@@ -61,6 +61,24 @@ FLASK_DEBUG=True poetry run flask run
 ```
 
 
+## Generating Migrations
+
+To generate migrations while in the shell of a development Docker container, 
+run the following command:
+
+```bash
+poetry run flask db migrate -m "describe what has changed here"
+```
+
+Migrations will be automatically applied in the Docker environment (dev/prod) 
+on container restart, but if you want to run them manually, use the following 
+command:
+
+```bash
+poetry run flask db upgrade
+```
+
+
 ## Running Tests
 
 To run all tests and calculate coverage, run the following command:
