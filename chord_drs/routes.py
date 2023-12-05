@@ -64,14 +64,17 @@ def check_objects_permission(
         token = r.form.get("token")
         return {"Authorization": f"Bearer {token}"} if token else {}
 
-    return tuple(r[0] for r in (
-        authz_middleware.evaluate(
-            request,
-            [build_resource(drs_obj.project_id, drs_obj.dataset_id, drs_obj.data_type) for drs_obj in drs_objs],
-            [permission],
-            headers_getter=_post_headers_getter if request.method == "POST" else None,
-            mark_authz_done=mark_authz_done,
-        )  # gets us a matrix of len(drs_objs) rows, 1 column with the permission evaluation result
+    return tuple(r[0] or drs_obj.public for r, drs_obj in (
+        zip(
+            authz_middleware.evaluate(
+                request,
+                [build_resource(drs_obj.project_id, drs_obj.dataset_id, drs_obj.data_type) for drs_obj in drs_objs],
+                [permission],
+                headers_getter=_post_headers_getter if request.method == "POST" else None,
+                mark_authz_done=mark_authz_done,
+            ),  # gets us a matrix of len(drs_objs) rows, 1 column with the permission evaluation result
+            drs_objs,
+        )
     ))  # now a tuple of length len(drs_objs) of whether we have the permission for each object
 
 
@@ -420,6 +423,7 @@ def object_ingest():
     project_id: str | None = data.get("project_id")
     dataset_id: str | None = data.get("dataset_id")
     data_type: str | None = data.get("data_type")
+    public: bool = data.get("public", "false").strip().lower() == "true"
     file = request.files.get("file")
 
     # This authz call determines everything, so we can mark authz as done when the call completes:
@@ -466,8 +470,12 @@ def object_ingest():
             candidate_drs_object: DrsBlob | None = DrsBlob.query.filter_by(checksum=checksum).first()
 
             if candidate_drs_object is not None:
-                if candidate_drs_object.project_id == project_id and candidate_drs_object.dataset_id == dataset_id and \
-                        candidate_drs_object.data_type == data_type:
+                if all((
+                    candidate_drs_object.project_id == project_id,
+                    candidate_drs_object.dataset_id == dataset_id,
+                    candidate_drs_object.data_type == data_type,
+                    candidate_drs_object.public == public,
+                )):
                     logger.info(f"Found duplicate DRS object via checksum (will fully deduplicate): {drs_object}")
                     drs_object = candidate_drs_object
                 else:
@@ -482,6 +490,7 @@ def object_ingest():
                     project_id=project_id,
                     dataset_id=dataset_id,
                     data_type=data_type,
+                    public=public,
                 )
                 db.session.add(drs_object)
                 db.session.commit()
