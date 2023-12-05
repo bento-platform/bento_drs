@@ -26,7 +26,7 @@ class DrsMixin:
     project_id = db.Column(db.String(64), nullable=True)  # Nullable for backwards-compatibility
     dataset_id = db.Column(db.String(64), nullable=True)  # Nullable for backwards-compatibility / project-only stuff?
     data_type = db.Column(db.String(24), nullable=True)  # NULL if multi-data type or something else
-    public = db.Column(db.Boolean, default=False)  # If true, the object is public - accessible by anyone
+    public = db.Column(db.Boolean, default=False, nullable=False)  # If true, the object is accessible by anyone
 
 
 class DrsBundle(db.Model, DrsMixin):
