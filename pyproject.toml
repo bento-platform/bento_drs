@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "chord-drs"
-version = "0.14.0"
+version = "0.14.1"
 description = "An implementation of a data repository system (as per GA4GH's specs) for the Bento platform."
 authors = ["David Lougheed <david.lougheed@mail.mcgill.ca>"]
 license = "LGPL-3.0"
@@ -13,8 +13,8 @@ include = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
-boto3 = ">=1.33.5,<1.34"
-bento-lib = {version = "^10.1.1", extras = ["flask"]}
+boto3 = ">=1.33.11,<1.34"
+bento-lib = {version = "^11.0.1", extras = ["flask"]}
 flask = ">=2.2.5,<2.3"
 flask-sqlalchemy = ">=3.0.5,<3.1"  # 3.1 drops SQLAlchemy 2 support
 flask-migrate = ">=4.0.5,<4.1"
@@ -23,6 +23,7 @@ python-dotenv = ">=1.0.0,<1.1"
 sqlalchemy = ">=1.4.50,<1.5"
 flask-cors = "^4.0.0"
 werkzeug = "~2.2.3"  # werkzeug 2.3.x breaks debugpy, so manually keep it at 2.2.x
+asgiref = "^3.7.2"
 
 [tool.poetry.group.dev.dependencies]
 coverage = "^7.2.1"

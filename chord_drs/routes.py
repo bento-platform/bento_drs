@@ -1,11 +1,13 @@
-import re
-import urllib.parse
 import os
-import subprocess
+import re
 import tempfile
+import urllib.parse
 
+from asgiref.sync import async_to_sync
 from bento_lib.auth.permissions import Permission, P_INGEST_DATA, P_QUERY_DATA, P_DOWNLOAD_DATA
 from bento_lib.auth.resources import RESOURCE_EVERYTHING, build_resource
+from bento_lib.service_info.constants import SERVICE_ORGANIZATION_C3G
+from bento_lib.service_info.helpers import build_service_info
 from flask import (
     Blueprint,
     Request,
@@ -216,42 +218,23 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
 @authz_middleware.deco_public_endpoint
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
-    info = {
-        "id": current_app.config["SERVICE_ID"],
-        "name": SERVICE_NAME,
-        "type": SERVICE_TYPE,
-        "description": "Data repository service (based on GA4GH's specs) for a Bento platform node.",
-        "organization": {
-            "name": "C3G",
-            "url": "https://www.computationalgenomics.ca"
+    return jsonify(async_to_sync(build_service_info)(
+        {
+            "id": current_app.config["SERVICE_ID"],
+            "name": SERVICE_NAME,
+            "type": SERVICE_TYPE,
+            "description": "Data repository service (based on GA4GH's specs) for a Bento platform node.",
+            "organization": SERVICE_ORGANIZATION_C3G,
+            "contactUrl": "mailto:info@c3g.ca",
+            "version": __version__,
+            "bento": {
+                "serviceKind": BENTO_SERVICE_KIND,
+            },
         },
-        "contactUrl": "mailto:info@c3g.ca",
-        "version": __version__,
-        "environment": "prod",
-        "bento": {
-            "serviceKind": BENTO_SERVICE_KIND,
-        },
-    }
-
-    if not current_app.config["BENTO_DEBUG"]:
-        return jsonify(info)
-
-    info["environment"] = "dev"
-    try:
-        if res_tag := subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"]):
-            res_tag_str = res_tag.decode().rstrip()
-            info["bento"]["gitTag"] = res_tag_str
-        if res_branch := subprocess.check_output(["git", "branch", "--show-current"]):
-            res_branch_str = res_branch.decode().strip()
-            info["bento"]["gitBranch"] = res_branch_str
-        if res_commit := subprocess.check_output(["git", "rev-parse", "HEAD"]):
-            info["bento"]["gitCommit"] = res_commit.decode().strip()
-
-    except Exception as e:
-        except_name = type(e).__name__
-        print("Error in dev-mode retrieving git information", except_name, e)
-
-    return jsonify(info)
+        debug=current_app.config["BENTO_DEBUG"],
+        local=current_app.config["BENTO_CONTAINER_LOCAL"],
+        logger=current_app.logger,
+    ))
 
 
 def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
