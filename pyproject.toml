@@ -22,7 +22,7 @@ prometheus-flask-exporter = ">=0.23.0,<0.24"
 python-dotenv = ">=1.0.0,<1.1"
 sqlalchemy = ">=1.4.50,<1.5"
 flask-cors = "^4.0.0"
-werkzeug = "~2.2.3"  # werkzeug 2.3.x breaks debugpy, so manually keep it at 2.2.x
+werkzeug = "~2.3.8"  # werkzeug 2.3.x breaks debugpy, so manually keep it at 2.2.x
 asgiref = "^3.7.2"
 
 [tool.poetry.group.dev.dependencies]
