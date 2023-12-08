@@ -14,7 +14,7 @@ from flask import (
     url_for,
     request,
     send_file,
-    make_response
+    make_response,
 )
 from sqlalchemy import or_
 from urllib.parse import urlparse
@@ -346,7 +346,9 @@ def object_download(object_id: str):
 
         if range_header is None:
             # Early return, no range header so send the whole thing
-            return send_file(drs_object.location, mimetype=MIME_OCTET_STREAM, download_name=drs_object.name)
+            res = make_response(
+                send_file(drs_object.location, mimetype=MIME_OCTET_STREAM, download_name=drs_object.name))
+            res.headers["Accept-Ranges"] = "bytes"
 
         logger.debug(f"Found Range header: {range_header}")
         range_err = f"Malformatted range header: expected bytes=X-Y or bytes=X-, got {range_header}"
@@ -390,7 +392,7 @@ def object_download(object_id: str):
 
         # Stream the bytes of the file or file segment from the generator function
         r = current_app.response_class(generate_bytes(), status=206, mimetype=MIME_OCTET_STREAM)
-        r.headers["Accept-Ranges"] = "bytes"
+        r.headers["Content-Range"] = f"bytes {start}-{end or (drs_object.size - 1)}/{drs_object.size}"
         r.headers["Content-Disposition"] = \
             f"attachment; filename*=UTF-8'{urllib.parse.quote(drs_object.name, encoding='utf-8')}'"
         return r
