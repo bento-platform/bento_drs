@@ -406,7 +406,7 @@ def object_download(object_id: str):
         )
     )
 
-    response.headers["Content-length"] = minio_obj["ContentLength"]
+    response.headers["Content-Length"] = minio_obj["ContentLength"]
     return response
 
 
@@ -476,10 +476,13 @@ def object_ingest():
                     candidate_drs_object.data_type == data_type,
                     candidate_drs_object.public == public,
                 )):
-                    logger.info(f"Found duplicate DRS object via checksum (will fully deduplicate): {drs_object}")
+                    logger.info(
+                        f"Found duplicate DRS object via checksum (will fully deduplicate): {candidate_drs_object}")
                     drs_object = candidate_drs_object
                 else:
-                    logger.info(f"Found duplicate DRS object via checksum (will deduplicate JUST bytes): {drs_object}")
+                    logger.info(
+                        f"Found duplicate DRS object via checksum (will deduplicate JUST bytes): "
+                        f"{candidate_drs_object}")
                     object_to_copy = candidate_drs_object
 
         if not drs_object:
