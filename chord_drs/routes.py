@@ -349,6 +349,7 @@ def object_download(object_id: str):
             res = make_response(
                 send_file(drs_object.location, mimetype=MIME_OCTET_STREAM, download_name=drs_object.name))
             res.headers["Accept-Ranges"] = "bytes"
+            return res
 
         logger.debug(f"Found Range header: {range_header}")
         range_err = f"Malformatted range header: expected bytes=X-Y or bytes=X-, got {range_header}"
