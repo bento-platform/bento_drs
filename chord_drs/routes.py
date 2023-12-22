@@ -215,6 +215,7 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
 
 
 @drs_service.route("/service-info", methods=["GET"])
+@drs_service.route("/ga4gh/drs/v1/service-info", methods=["GET"])
 @authz_middleware.deco_public_endpoint
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
