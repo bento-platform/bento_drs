@@ -44,6 +44,10 @@ def test_service_info(client):
     data = res.get_json()
     validate(data, bento_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
 
+    res = client.get("/ga4gh/drs/v1/service-info")
+    data = res.get_json()
+    validate(data, bento_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
+
     application.config["BENTO_DEBUG"] = True
 
     res = client.get("/service-info")
