@@ -129,7 +129,7 @@ def _test_object_and_download(client, obj, test_range=False):
         body = res.get_data(as_text=False)
         assert len(body) == 5
 
-        #  - bytes 100-19999
+        #  - bytes 100-1999
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=100-1999"),))
         assert res.status_code == 206
         body = res.get_data(as_text=False)
@@ -137,10 +137,6 @@ def _test_object_and_download(client, obj, test_range=False):
 
         # Size is 2455, so these'll run off the end and return the whole thing after 100
 
-        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=100-19999"),))
-        assert res.status_code == 206
-        body = res.get_data(as_text=False)
-        assert len(body) == 2355
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=100-"),))
         assert res.status_code == 206
         body = res.get_data(as_text=False)
@@ -165,9 +161,13 @@ def _test_object_and_download(client, obj, test_range=False):
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bites=0-4"),))
         assert res.status_code == 400
 
+        #  - cannot request more than what is available
+        res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=100-19999"),))
+        assert res.status_code == 416
+
         # - reversed interval
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=4-0"),))
-        assert res.status_code == 400
+        assert res.status_code == 416
 
 
 @responses.activate
