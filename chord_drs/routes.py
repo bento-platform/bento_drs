@@ -20,7 +20,7 @@ from flask import (
 )
 from sqlalchemy import or_
 from urllib.parse import urlparse
-from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError
+from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError, RequestedRangeNotSatisfiable
 
 from . import __version__
 from .authz import authz_middleware
@@ -108,6 +108,12 @@ def bad_request_log_mark(err: str) -> BadRequest:
     authz_middleware.mark_authz_done(request)
     current_app.logger.error(err)
     return BadRequest(err)
+
+
+def range_not_satisfiable_log_mark(description: str, length: int) -> RequestedRangeNotSatisfiable:
+    authz_middleware.mark_authz_done(request)
+    current_app.logger.error(f"Requested range not satisfiable: {description}; true length: {length}")
+    return RequestedRangeNotSatisfiable(description=description, length=length)
 
 
 def get_drs_base_path() -> str:
@@ -335,6 +341,8 @@ def object_download(object_id: str):
             res.headers["Accept-Ranges"] = "bytes"
             return res
 
+        drs_end_byte = drs_object.size - 1
+
         logger.debug(f"Found Range header: {range_header}")
         range_err = f"Malformatted range header: expected bytes=X-Y or bytes=X-, got {range_header}"
 
@@ -346,14 +354,20 @@ def object_download(object_id: str):
         logger.debug(f"Retrieving byte range {byte_range}")
 
         try:
-            start = int(byte_range[0])
-            end = int(byte_range[1]) if byte_range[1] else None
+            start: int = int(byte_range[0])
+            end: int = int(byte_range[1]) if byte_range[1] else drs_end_byte
         except (IndexError, ValueError):
             raise bad_request_log_mark(range_err)
 
-        if end is not None and end < start:
-            raise bad_request_log_mark(
-                f"Invalid range header: end cannot be less than start (start={start}, end={end})")
+        if end > drs_end_byte:
+            raise range_not_satisfiable_log_mark(
+                f"End cannot be past last byte ({end} > {drs_end_byte})",
+                drs_object.size)
+
+        if end < start:
+            raise range_not_satisfiable_log_mark(
+                f"Invalid range header: end cannot be less than start (start={start}, end={end})",
+                drs_object.size)
 
         def generate_bytes():
             with open(drs_object.location, "rb") as fh2:
@@ -372,12 +386,13 @@ def object_download(object_id: str):
                     # If we've hit the end of the file and are reading empty byte strings, or we've reached the
                     # end of our range (inclusive), then escape the loop.
                     # This is guaranteed to terminate with a finite-sized file.
-                    if len(data) == 0 or (end is not None and byte_offset > end):
+                    if len(data) == 0 or byte_offset > end:
                         break
 
         # Stream the bytes of the file or file segment from the generator function
         r = current_app.response_class(generate_bytes(), status=206, mimetype=MIME_OCTET_STREAM)
-        r.headers["Content-Range"] = f"bytes {start}-{end or (drs_object.size - 1)}/{drs_object.size}"
+        r.headers["Content-Length"] = (end + 1 - start)  # byte range is inclusive, so need to add one
+        r.headers["Content-Range"] = f"bytes {start}-{end}/{drs_object.size}"
         r.headers["Content-Disposition"] = \
             f"attachment; filename*=UTF-8'{urllib.parse.quote(drs_object.name, encoding='utf-8')}'"
         return r

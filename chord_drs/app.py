@@ -4,7 +4,7 @@ from bento_lib.responses import flask_errors
 from flask import Flask
 from flask_cors import CORS
 from flask_migrate import Migrate
-from werkzeug.exceptions import BadRequest, Forbidden, NotFound
+from werkzeug.exceptions import BadRequest, Forbidden, NotFound, RequestedRangeNotSatisfiable
 
 from .authz import authz_middleware
 from .backend import close_backend
@@ -64,6 +64,13 @@ application.register_error_handler(
         drs_compat=True,
         authz=authz_middleware,
     )(e))
+application.register_error_handler(
+    RequestedRangeNotSatisfiable,
+    flask_errors.flask_error_wrap(
+        flask_errors.flask_range_not_satisfiable_error,
+        drs_compat=True,
+        authz=authz_middleware,
+    ))
 
 # Attach the database to the application and run migrations if needed
 db.init_app(application)
