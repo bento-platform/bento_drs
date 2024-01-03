@@ -22,7 +22,11 @@ application = Flask(__name__)
 application.config.from_object(Config)
 
 # Set up CORS
-CORS(application, origins=Config.CORS_ORIGINS)
+CORS(
+    application,
+    origins=Config.CORS_ORIGINS,
+    supports_credentials=True,
+)
 
 # Attach authz middleware to Flask instance
 authz_middleware.attach(application)
