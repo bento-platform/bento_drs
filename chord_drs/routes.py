@@ -445,7 +445,7 @@ def object_ingest():
     drs_object: DrsBlob | None = None  # either the new object, or the object to fully reuse
     object_to_copy: DrsBlob | None = None
 
-    tfh, t_obj_path = tempfile.mkstemp(dir=current_app.config.DRS_INGEST_TMP_DIR)
+    tfh, t_obj_path = tempfile.mkstemp(dir=current_app.config["DRS_INGEST_TMP_DIR"])
     try:
         filename: str | None = None  # no override, use path filename if path is specified instead of a file upload
         if file is not None:
