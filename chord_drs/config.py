@@ -81,6 +81,11 @@ class Config:
     BENTO_DEBUG = os.environ.get("BENTO_DEBUG", os.environ.get("FLASK_DEBUG", "false")).strip().lower() in TRUTH_VALUES
     BENTO_CONTAINER_LOCAL = os.environ.get("BENTO_CONTAINER_LOCAL", "false").strip().lower() in TRUTH_VALUES
 
+    # Temporary directory to write files to while they're being ingested - useful in containerized contexts, so we can
+    # choose to write temporary files to a volume bound to a host directory with sufficient space for ingesting large
+    # files such as reference genomes.
+    DRS_INGEST_TMP_DIR: str | None = os.environ.get("DRS_INGEST_TMP_DIR", "").strip() or None
+
     # CORS
     CORS_ORIGINS: list[str] | str = [x for x in os.environ.get("CORS_ORIGINS", "").split(";") if x] or "*"
 
