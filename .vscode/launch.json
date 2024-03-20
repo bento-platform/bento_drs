@@ -3,10 +3,12 @@
     "configurations": [
         {
             "name": "Python: Attach Debugger (Bento)",
-            "type": "python",
+            "type": "debugpy",
             "request": "attach",
-            "port": 5682,
-            "host": "0.0.0.0"
+            "connect": {
+                "host": "0.0.0.0",
+                "port": 5682
+            }
         }
     ]
 }
