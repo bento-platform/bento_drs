@@ -13,6 +13,7 @@ from .config import Config, APP_DIR
 from .constants import SERVICE_NAME
 from .db import db
 from .metrics import metrics
+from .request import DrsRequest
 from .routes import drs_service
 
 
@@ -20,6 +21,7 @@ MIGRATION_DIR = os.path.join(APP_DIR, "migrations")
 
 application = Flask(__name__)
 application.config.from_object(Config)
+application.request_class = DrsRequest
 
 # Set up CORS
 CORS(
