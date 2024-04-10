@@ -116,13 +116,12 @@ def range_not_satisfiable_log_mark(description: str, length: int) -> RequestedRa
     return RequestedRangeNotSatisfiable(description=description, length=length)
 
 
-def get_drs_base_path() -> str:
-    parsed_service_url = urlparse(current_app.config["SERVICE_BASE_URL"])
-    return f"{parsed_service_url.netloc}{parsed_service_url.path}"
+def get_drs_host() -> str:
+    return urlparse(current_app.config["SERVICE_BASE_URL"]).netloc
 
 
 def create_drs_uri(object_id: str) -> str:
-    return f"drs://{get_drs_base_path()}/{object_id}"
+    return f"drs://{get_drs_host()}/{object_id}"
 
 
 def build_contents(bundle: DrsBundle, expand: bool) -> list[DRSContentsDict]:
