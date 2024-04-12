@@ -32,10 +32,8 @@ APP_DIR = Path(__file__).resolve().parent.absolute()
 # when deployed inside chord_singularity, DATABASE will be set
 BASEDIR = os.environ.get("DATABASE", APP_DIR.parent)
 SERVICE_DATA: str = str(
-    Path(os.environ.get("DATA", os.path.join(Path.home(), "chord_drs_data")))
-    .expanduser()
-    .absolute()
-    .resolve())
+    Path(os.environ.get("DATA", os.path.join(Path.home(), "chord_drs_data"))).expanduser().absolute().resolve()
+)
 
 # Authorization variables
 AUTHZ_ENABLED = os.environ.get("AUTHZ_ENABLED", "true").strip().lower() in TRUTH_VALUES

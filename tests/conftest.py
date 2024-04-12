@@ -24,21 +24,25 @@ DATA_TYPE_PHENOPACKET = "phenopacket"
 
 def non_existant_dummy_file_path() -> str:  # Function rather than constant so we can set environ first
     from chord_drs.config import APP_DIR
+
     return str(APP_DIR.parent / "potato")
 
 
 def dummy_file_path() -> str:  # Function rather than constant so we can set environ first
     from chord_drs.config import APP_DIR
+
     return str(APP_DIR.parent / "tests" / "dummy_file.txt")
 
 
 def dummy_directory_path() -> str:  # Function rather than constant so we can set environ first
     from chord_drs.config import APP_DIR
+
     return str(APP_DIR / "migrations")
 
 
 def empty_file_path():  # Function rather than constant so we can set environ first
     from chord_drs.config import APP_DIR
+
     return str(APP_DIR.parent / "tests" / "empty_file.txt")
 
 
@@ -88,10 +92,7 @@ def client_local():
         db.drop_all()
 
 
-@pytest.fixture(params=[
-    lazy_fixture("client_minio"),
-    lazy_fixture("client_local")
-])
+@pytest.fixture(params=[lazy_fixture("client_minio"), lazy_fixture("client_local")])
 def client(request):
     return request.param
 

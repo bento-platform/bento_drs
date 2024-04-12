@@ -12,10 +12,10 @@ __all__ = ["MinioBackend"]
 class MinioBackend(Backend):
     def __init__(self, resource=None):
         self.minio = resource or boto3.resource(
-            's3',
+            "s3",
             endpoint_url=current_app.config["MINIO_URL"],
             aws_access_key_id=current_app.config["MINIO_USERNAME"],
-            aws_secret_access_key=current_app.config["MINIO_PASSWORD"]
+            aws_secret_access_key=current_app.config["MINIO_PASSWORD"],
         )
 
         self.bucket = self.minio.Bucket(current_app.config["MINIO_BUCKET"])

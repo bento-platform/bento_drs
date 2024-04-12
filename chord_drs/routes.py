@@ -66,18 +66,21 @@ def check_objects_permission(
         token = r.form.get("token")
         return {"Authorization": f"Bearer {token}"} if token else {}
 
-    return tuple(r[0] or drs_obj.public for r, drs_obj in (
-        zip(
-            authz_middleware.evaluate(
-                request,
-                [build_resource(drs_obj.project_id, drs_obj.dataset_id, drs_obj.data_type) for drs_obj in drs_objs],
-                [permission],
-                headers_getter=_post_headers_getter if request.method == "POST" else None,
-                mark_authz_done=mark_authz_done,
-            ),  # gets us a matrix of len(drs_objs) rows, 1 column with the permission evaluation result
-            drs_objs,
+    return tuple(
+        r[0] or drs_obj.public
+        for r, drs_obj in (
+            zip(
+                authz_middleware.evaluate(
+                    request,
+                    [build_resource(drs_obj.project_id, drs_obj.dataset_id, drs_obj.data_type) for drs_obj in drs_objs],
+                    [permission],
+                    headers_getter=_post_headers_getter if request.method == "POST" else None,
+                    mark_authz_done=mark_authz_done,
+                ),  # gets us a matrix of len(drs_objs) rows, 1 column with the permission evaluation result
+                drs_objs,
+            )
         )
-    ))  # now a tuple of length len(drs_objs) of whether we have the permission for each object
+    )  # now a tuple of length len(drs_objs) of whether we have the permission for each object
 
 
 def fetch_and_check_object_permissions(object_id: str, permission: Permission) -> tuple[DrsBlob | DrsBundle, bool]:
@@ -129,19 +132,23 @@ def build_contents(bundle: DrsBundle, expand: bool) -> list[DRSContentsDict]:
     bundles = DrsBundle.query.filter_by(parent_bundle=bundle).all()
 
     for b in bundles:
-        content.append({
-            **({"contents": build_contents(b, expand)} if expand else {}),
-            "drs_uri": create_drs_uri(b.id),
-            "id": b.id,
-            "name": b.name,  # TODO: Can overwrite... see spec
-        })
+        content.append(
+            {
+                **({"contents": build_contents(b, expand)} if expand else {}),
+                "drs_uri": create_drs_uri(b.id),
+                "id": b.id,
+                "name": b.name,  # TODO: Can overwrite... see spec
+            }
+        )
 
     for c in bundle.objects:
-        content.append({
-            "drs_uri": create_drs_uri(c.id),
-            "id": c.id,
-            "name": c.name,  # TODO: Can overwrite... see spec
-        })
+        content.append(
+            {
+                "drs_uri": create_drs_uri(c.id),
+                "id": c.id,
+                "name": c.name,  # TODO: Can overwrite... see spec
+            }
+        )
 
     return content
 
@@ -161,7 +168,7 @@ def build_bundle_json(drs_bundle: DrsBundle, expand: bool = False) -> DRSObjectD
         # Description should be excluded if null in the database
         **({"description": drs_bundle.description} if drs_bundle.description is not None else {}),
         "id": drs_bundle.id,
-        "self_uri": create_drs_uri(drs_bundle.id)
+        "self_uri": create_drs_uri(drs_bundle.id),
     }
 
 
@@ -170,7 +177,7 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
 
     blob_url: str = urllib.parse.urljoin(
         current_app.config["SERVICE_BASE_URL"] + "/",
-        url_for("drs_service.object_download", object_id=drs_blob.id).lstrip("/")
+        url_for("drs_service.object_download", object_id=drs_blob.id).lstrip("/"),
     )
 
     https_access_method: DRSAccessMethodDict = {
@@ -187,19 +194,23 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
     access_methods: list[DRSAccessMethodDict] = [https_access_method]
 
     if inside_container and data_source == DATA_SOURCE_LOCAL:
-        access_methods.append({
-            "access_url": {
-                "url": f"file://{drs_blob.location}",
-            },
-            "type": "file",
-        })
+        access_methods.append(
+            {
+                "access_url": {
+                    "url": f"file://{drs_blob.location}",
+                },
+                "type": "file",
+            }
+        )
     elif data_source == DATA_SOURCE_MINIO:
-        access_methods.append({
-            "access_url": {
-                "url": drs_blob.location,
-            },
-            "type": "s3",
-        })
+        access_methods.append(
+            {
+                "access_url": {
+                    "url": drs_blob.location,
+                },
+                "type": "s3",
+            }
+        )
 
     return {
         "access_methods": access_methods,
@@ -215,7 +226,7 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
         # Description should be excluded if null in the database
         **({"description": drs_blob.description} if drs_blob.description is not None else {}),
         "id": drs_blob.id,
-        "self_uri": create_drs_uri(drs_blob.id)
+        "self_uri": create_drs_uri(drs_blob.id),
     }
 
 
@@ -224,23 +235,25 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
 @authz_middleware.deco_public_endpoint
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
-    return jsonify(async_to_sync(build_service_info)(
-        {
-            "id": current_app.config["SERVICE_ID"],
-            "name": SERVICE_NAME,
-            "type": SERVICE_TYPE,
-            "description": "Data repository service (based on GA4GH's specs) for a Bento platform node.",
-            "organization": SERVICE_ORGANIZATION_C3G,
-            "contactUrl": "mailto:info@c3g.ca",
-            "version": __version__,
-            "bento": {
-                "serviceKind": BENTO_SERVICE_KIND,
+    return jsonify(
+        async_to_sync(build_service_info)(
+            {
+                "id": current_app.config["SERVICE_ID"],
+                "name": SERVICE_NAME,
+                "type": SERVICE_TYPE,
+                "description": "Data repository service (based on GA4GH's specs) for a Bento platform node.",
+                "organization": SERVICE_ORGANIZATION_C3G,
+                "contactUrl": "mailto:info@c3g.ca",
+                "version": __version__,
+                "bento": {
+                    "serviceKind": BENTO_SERVICE_KIND,
+                },
             },
-        },
-        debug=current_app.config["BENTO_DEBUG"],
-        local=current_app.config["BENTO_CONTAINER_LOCAL"],
-        logger=current_app.logger,
-    ))
+            debug=current_app.config["BENTO_DEBUG"],
+            local=current_app.config["BENTO_CONTAINER_LOCAL"],
+            logger=current_app.logger,
+        )
+    )
 
 
 def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
@@ -297,12 +310,14 @@ def object_search():
     elif fuzzy_name:
         objects = DrsBlob.query.filter(DrsBlob.name.contains(fuzzy_name)).all()
     elif search_q:
-        objects = DrsBlob.query.filter(or_(
-            DrsBlob.id.contains(search_q),
-            DrsBlob.name.contains(search_q),
-            DrsBlob.checksum.contains(search_q),
-            DrsBlob.description.contains(search_q),
-        ))
+        objects = DrsBlob.query.filter(
+            or_(
+                DrsBlob.id.contains(search_q),
+                DrsBlob.name.contains(search_q),
+                DrsBlob.checksum.contains(search_q),
+                DrsBlob.description.contains(search_q),
+            )
+        )
     else:
         authz_middleware.mark_authz_done(request)
         raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
@@ -336,7 +351,8 @@ def object_download(object_id: str):
         if range_header is None:
             # Early return, no range header so send the whole thing
             res = make_response(
-                send_file(drs_object.location, mimetype=MIME_OCTET_STREAM, download_name=drs_object.name))
+                send_file(drs_object.location, mimetype=MIME_OCTET_STREAM, download_name=drs_object.name)
+            )
             res.headers["Accept-Ranges"] = "bytes"
             return res
 
@@ -360,13 +376,13 @@ def object_download(object_id: str):
 
         if end > drs_end_byte:
             raise range_not_satisfiable_log_mark(
-                f"End cannot be past last byte ({end} > {drs_end_byte})",
-                drs_object.size)
+                f"End cannot be past last byte ({end} > {drs_end_byte})", drs_object.size
+            )
 
         if end < start:
             raise range_not_satisfiable_log_mark(
-                f"Invalid range header: end cannot be less than start (start={start}, end={end})",
-                drs_object.size)
+                f"Invalid range header: end cannot be less than start (start={start}, end={end})", drs_object.size
+            )
 
         def generate_bytes():
             with open(drs_object.location, "rb") as fh2:
@@ -390,20 +406,18 @@ def object_download(object_id: str):
 
         # Stream the bytes of the file or file segment from the generator function
         r = current_app.response_class(generate_bytes(), status=206, mimetype=MIME_OCTET_STREAM)
-        r.headers["Content-Length"] = (end + 1 - start)  # byte range is inclusive, so need to add one
+        r.headers["Content-Length"] = end + 1 - start  # byte range is inclusive, so need to add one
         r.headers["Content-Range"] = f"bytes {start}-{end}/{drs_object.size}"
-        r.headers["Content-Disposition"] = \
+        r.headers["Content-Disposition"] = (
             f"attachment; filename*=UTF-8'{urllib.parse.quote(drs_object.name, encoding='utf-8')}'"
+        )
         return r
 
     # TODO: Support range headers for MinIO objects - only the local backend supports it for now
     # TODO: kinda greasy, not really sure we want to support such a feature later on
     response = make_response(
         send_file(
-            minio_obj["Body"],
-            mimetype="application/octet-stream",
-            as_attachment=True,
-            download_name=drs_object.name
+            minio_obj["Body"], mimetype="application/octet-stream", as_attachment=True, download_name=drs_object.name
         )
     )
 
@@ -428,12 +442,16 @@ def object_ingest():
     file = request.files.get("file")
 
     # This authz call determines everything, so we can mark authz as done when the call completes:
-    has_permission: bool = authz_middleware.evaluate_one(
-        request,
-        build_resource(project_id, dataset_id, data_type),
-        P_INGEST_DATA,
-        mark_authz_done=True,
-    ) if authz_enabled() else True
+    has_permission: bool = (
+        authz_middleware.evaluate_one(
+            request,
+            build_resource(project_id, dataset_id, data_type),
+            P_INGEST_DATA,
+            mark_authz_done=True,
+        )
+        if authz_enabled()
+        else True
+    )
 
     if not has_permission:
         raise Forbidden("Forbidden")
@@ -472,19 +490,23 @@ def object_ingest():
             candidate_drs_object: DrsBlob | None = DrsBlob.query.filter_by(checksum=checksum).first()
 
             if candidate_drs_object is not None:
-                if all((
-                    candidate_drs_object.project_id == project_id,
-                    candidate_drs_object.dataset_id == dataset_id,
-                    candidate_drs_object.data_type == data_type,
-                    candidate_drs_object.public == public,
-                )):
+                if all(
+                    (
+                        candidate_drs_object.project_id == project_id,
+                        candidate_drs_object.dataset_id == dataset_id,
+                        candidate_drs_object.data_type == data_type,
+                        candidate_drs_object.public == public,
+                    )
+                ):
                     logger.info(
-                        f"Found duplicate DRS object via checksum (will fully deduplicate): {candidate_drs_object}")
+                        f"Found duplicate DRS object via checksum (will fully deduplicate): {candidate_drs_object}"
+                    )
                     drs_object = candidate_drs_object
                 else:
                     logger.info(
                         f"Found duplicate DRS object via checksum (will deduplicate JUST bytes): "
-                        f"{candidate_drs_object}")
+                        f"{candidate_drs_object}"
+                    )
                     object_to_copy = candidate_drs_object
 
         if not drs_object:

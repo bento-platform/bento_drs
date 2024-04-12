@@ -14,6 +14,7 @@ class LocalBackend(Backend):
     by this service. Lives on the current filesystem, in a directory
     specified by the DATA var env, the default being in ~/chord_drs_data
     """
+
     def __init__(self):
         self.base_location = Path(current_app.config["SERVICE_DATA"])
         # We can use mkdir, since resolve has been called in config.py

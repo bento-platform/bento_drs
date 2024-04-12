@@ -272,10 +272,13 @@ def test_search_bad_query(client, drs_bundle):
 
 
 @responses.activate
-@pytest.mark.parametrize("url", (
-    "/search?name=asd",
-    "/search?fuzzy_name=asd",
-))
+@pytest.mark.parametrize(
+    "url",
+    (
+        "/search?name=asd",
+        "/search?fuzzy_name=asd",
+    ),
+)
 def test_search_object_empty(client, drs_bundle, url):
     authz_everything_true(count=len(drs_bundle.objects))
 
@@ -287,14 +290,17 @@ def test_search_object_empty(client, drs_bundle, url):
 
 
 @responses.activate
-@pytest.mark.parametrize("url", (
-    "/search?name=alembic.ini",
-    "/search?fuzzy_name=mbic",
-    "/search?name=alembic.ini&internal_path=1",
-    "/search?q=alembic.ini",
-    "/search?q=mbic.i",
-    "/search?q=alembic.ini&internal_path=1",
-))
+@pytest.mark.parametrize(
+    "url",
+    (
+        "/search?name=alembic.ini",
+        "/search?fuzzy_name=mbic",
+        "/search?name=alembic.ini&internal_path=1",
+        "/search?q=alembic.ini",
+        "/search?q=mbic.i",
+        "/search?q=alembic.ini&internal_path=1",
+    ),
+)
 def test_search_object(client, drs_bundle, url):
     authz_everything_true(count=len(drs_bundle.objects))  # TODO: + 1 once we can search bundles
 
