@@ -39,7 +39,12 @@ sqlalchemy-stubs = "^0.4"
 mypy = "^1.7.1"
 types-flask-cors = "^4.0.0.2"
 types-flask-migrate = "^4.0.0.7"
+black = "^24.4.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120
+exclude = "migrations"

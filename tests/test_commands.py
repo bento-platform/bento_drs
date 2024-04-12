@@ -23,7 +23,7 @@ def test_ingest(client_local):
     runner = CliRunner()
     result = runner.invoke(ingest, [dummy_file])
 
-    filename = dummy_file.split('/')[-1]
+    filename = dummy_file.split("/")[-1]
     obj = DrsBlob.query.filter_by(name=filename).first()
 
     assert result.exit_code == 0
@@ -32,7 +32,7 @@ def test_ingest(client_local):
 
     result = runner.invoke(ingest, [dummy_dir])
 
-    filename = dummy_dir.split('/')[-1]
+    filename = dummy_dir.split("/")[-1]
     bundle = DrsBundle.query.filter_by(name=filename).first()
 
     assert result.exit_code == 0
