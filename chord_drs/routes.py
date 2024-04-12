@@ -28,7 +28,7 @@ from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from .db import db
 from .models import DrsBlob, DrsBundle
-from .types import DRSAccessMethodDict, DRSContentsDict, DRSObjectDict
+from .types import DRSAccessMethodDict, DRSContentsDict, DRSObjectBentoDict, DRSObjectDict
 from .utils import drs_file_checksum
 
 
@@ -153,7 +153,20 @@ def build_contents(bundle: DrsBundle, expand: bool) -> list[DRSContentsDict]:
     return content
 
 
-def build_bundle_json(drs_bundle: DrsBundle, expand: bool = False) -> DRSObjectDict:
+def build_bento_object_json(drs_object: DrsMixin) -> DRSObjectBentoDict:
+    return {
+        "project_id": drs_object.project_id,
+        "dataset_id": drs_object.dataset_id,
+        "data_type": drs_object.data_type,
+        "public": drs_object.public,
+    }
+
+
+def build_bundle_json(
+    drs_bundle: DrsBundle,
+    expand: bool = False,
+    with_bento_properties: bool = False,
+) -> DRSObjectDict:
     return {
         "contents": build_contents(drs_bundle, expand),
         "checksums": [
@@ -169,10 +182,15 @@ def build_bundle_json(drs_bundle: DrsBundle, expand: bool = False) -> DRSObjectD
         **({"description": drs_bundle.description} if drs_bundle.description is not None else {}),
         "id": drs_bundle.id,
         "self_uri": create_drs_uri(drs_bundle.id),
+        **(build_bento_object_json(drs_bundle) if with_bento_properties else {}),
     }
 
 
-def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObjectDict:
+def build_blob_json(
+    drs_blob: DrsBlob,
+    inside_container: bool = False,
+    with_bento_properties: bool = False,
+) -> DRSObjectDict:
     data_source = current_app.config["SERVICE_DATA_SOURCE"]
 
     blob_url: str = urllib.parse.urljoin(
@@ -227,6 +245,7 @@ def build_blob_json(drs_blob: DrsBlob, inside_container: bool = False) -> DRSObj
         **({"description": drs_blob.description} if drs_blob.description is not None else {}),
         "id": drs_blob.id,
         "self_uri": create_drs_uri(drs_blob.id),
+        **(build_bento_object_json(drs_bundle) if with_bento_properties else {}),
     }
 
 
@@ -278,7 +297,13 @@ def object_info(object_id: str):
 
     # The requester can specify object internal path to be added to the response
     use_internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
-    return jsonify(build_blob_json(drs_object, inside_container=use_internal_path))
+
+    # The requester can ask for additional, non-spec-compliant Bento properties to be included in the response
+    with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
+
+    return jsonify(
+        build_blob_json(drs_object, inside_container=use_internal_path, with_bento_properties=with_bento_properties)
+    )
 
 
 @drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
@@ -304,6 +329,7 @@ def object_search():
     fuzzy_name: str | None = request.args.get("fuzzy_name")
     search_q: str | None = request.args.get("q")
     internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
+    with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
 
     if name:
         objects = DrsBlob.query.filter_by(name=name).all()
@@ -325,7 +351,7 @@ def object_search():
     # TODO: map objects to resources to avoid duplicate calls to same resource in check_objects_permission
     for obj, p in zip(objects, check_objects_permission(list(objects), P_QUERY_DATA)):
         if p:  # Only include the blob in the search results if we have permissions to view it.
-            response.append(build_blob_json(obj, internal_path))
+            response.append(build_blob_json(obj, internal_path, with_bento_properties=with_bento_properties))
 
     authz_middleware.mark_authz_done(request)
     return jsonify(response)

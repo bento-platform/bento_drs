@@ -5,6 +5,7 @@ __all__ = [
     "DRSAccessMethodDict",
     "DRSChecksumDict",
     "DRSContentsDict",
+    "DRSObjectBentoDict",
     "DRSObjectDict",
 ]
 
@@ -52,6 +53,13 @@ class DRSContentsDict(_DRSContentsDictBase, total=False):
     contents: list["DRSContentsDict"]
 
 
+class DRSObjectBentoDict(TypedDict):
+    project_id: str | None
+    dataset_id: str | None
+    data_type: str | None
+    public: bool
+
+
 class DRSObjectDict(_DRSObjectDictBase, total=False):
     access_methods: list[DRSAccessMethodDict]
     name: str
@@ -61,3 +69,4 @@ class DRSObjectDict(_DRSObjectDictBase, total=False):
     mime_type: str
     contents: list[DRSContentsDict]
     aliases: list[str]
+    bento: DRSObjectBentoDict
