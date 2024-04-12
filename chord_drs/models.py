@@ -2,38 +2,47 @@ import os
 from flask import current_app
 from hashlib import sha256
 from pathlib import Path
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import declarative_base, relationship
 from werkzeug.utils import secure_filename
 from urllib.parse import urlparse
 from uuid import uuid4
 
 from .backend import get_backend
 from .backends.minio import MinioBackend
-from .db import db
 from .utils import drs_file_checksum
+
+__all__ = [
+    "Base",
+    "DrsMixin",
+    "DrsBlob",
+    "DrsBundle",
+]
+
+Base = declarative_base()
 
 
 class DrsMixin:
     # IDs (PKs) must remain outside the mixin!
-    created = db.Column(db.DateTime, server_default=func.now())
-    checksum = db.Column(db.String(64), nullable=False)
-    size = db.Column(db.Integer, default=0)
-    name = db.Column(db.String(250), nullable=True)
-    description = db.Column(db.String(1000), nullable=True)
+    created = Column(DateTime, server_default=func.now())
+    checksum = Column(String(64), nullable=False)
+    size = Column(Integer, default=0)
+    name = Column(String(250), nullable=True)
+    description = Column(String(1000), nullable=True)
     # Permissions/Bento-specific project & dataset tagging for DRS items
     # TODO: Make some of these not nullable in the future:
-    project_id = db.Column(db.String(64), nullable=True)  # Nullable for backwards-compatibility
-    dataset_id = db.Column(db.String(64), nullable=True)  # Nullable for backwards-compatibility / project-only stuff?
-    data_type = db.Column(db.String(24), nullable=True)  # NULL if multi-data type or something else
-    public = db.Column(db.Boolean, default=False, nullable=False)  # If true, the object is accessible by anyone
+    project_id = Column(String(64), nullable=True)  # Nullable for backwards-compatibility
+    dataset_id = Column(String(64), nullable=True)  # Nullable for backwards-compatibility / project-only stuff?
+    data_type = Column(String(24), nullable=True)  # NULL if multi-data type or something else
+    public = Column(Boolean, default=False, nullable=False)  # If true, the object is accessible by anyone
 
 
-class DrsBundle(db.Model, DrsMixin):
+class DrsBundle(Base, DrsMixin):
     __tablename__ = "drs_bundle"
 
-    id = db.Column(db.String, primary_key=True)
-    parent_bundle_id = db.Column(db.Integer, db.ForeignKey("drs_bundle.id"))
+    id = Column(String, primary_key=True)
+    parent_bundle_id = Column(Integer, ForeignKey("drs_bundle.id"))
     parent_bundle = relationship("DrsBundle", remote_side=[id])
     objects = relationship("DrsBlob", cascade="all, delete-orphan", backref="bundle")
 
@@ -62,12 +71,12 @@ class DrsBundle(db.Model, DrsMixin):
         self.size = total_size
 
 
-class DrsBlob(db.Model, DrsMixin):
+class DrsBlob(Base, DrsMixin):
     __tablename__ = "drs_object"
 
-    id = db.Column(db.String, primary_key=True)
-    bundle_id = db.Column(db.Integer, db.ForeignKey(DrsBundle.id), nullable=True)
-    location = db.Column(db.String(500), nullable=False)
+    id = Column(String, primary_key=True)
+    bundle_id = Column(Integer, ForeignKey(DrsBundle.id), nullable=True)
+    location = Column(String(500), nullable=False)
 
     def __init__(self, *args, **kwargs):
         logger = current_app.logger
