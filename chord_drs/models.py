@@ -2,7 +2,7 @@ import os
 from flask import current_app
 from hashlib import sha256
 from pathlib import Path
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.sql import func
 from sqlalchemy.orm import declarative_base, relationship
 from werkzeug.utils import secure_filename
