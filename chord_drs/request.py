@@ -1,6 +1,6 @@
 from flask import Request, current_app
 from tempfile import SpooledTemporaryFile
-from typing import Optional
+from typing import IO, Optional
 
 __all__ = ["DrsRequest"]
 
@@ -14,5 +14,5 @@ class DrsRequest(Request):
         content_type: Optional[str],
         filename: Optional[str] = None,
         content_length: Optional[int] = None,
-    ):
+    ) -> IO[bytes]:
         return SpooledTemporaryFile(max_size=MAX_IN_MEMORY_SIZE, dir=current_app.config["DRS_INGEST_TMP_DIR"])
