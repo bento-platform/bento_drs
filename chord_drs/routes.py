@@ -155,10 +155,12 @@ def build_contents(bundle: DrsBundle, expand: bool) -> list[DRSContentsDict]:
 
 def build_bento_object_json(drs_object: DrsMixin) -> DRSObjectBentoDict:
     return {
-        "project_id": drs_object.project_id,
-        "dataset_id": drs_object.dataset_id,
-        "data_type": drs_object.data_type,
-        "public": drs_object.public,
+        "bento": {
+            "project_id": drs_object.project_id,
+            "dataset_id": drs_object.dataset_id,
+            "data_type": drs_object.data_type,
+            "public": drs_object.public,
+        }
     }
 
 
@@ -291,15 +293,15 @@ def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
 def object_info(object_id: str):
     drs_object, is_bundle = fetch_and_check_object_permissions(object_id, P_QUERY_DATA)
 
+    # The requester can ask for additional, non-spec-compliant Bento properties to be included in the response
+    with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
+
     if is_bundle:
         expand: bool = str_to_bool(request.args.get("expand", ""))
-        return jsonify(build_bundle_json(drs_object, expand=expand))
+        return jsonify(build_bundle_json(drs_object, expand=expand, with_bento_properties=with_bento_properties))
 
     # The requester can specify object internal path to be added to the response
     use_internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
-
-    # The requester can ask for additional, non-spec-compliant Bento properties to be included in the response
-    with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
 
     return jsonify(
         build_blob_json(drs_object, inside_container=use_internal_path, with_bento_properties=with_bento_properties)
