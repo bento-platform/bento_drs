@@ -364,7 +364,7 @@ def _ingest_one(client, existing_id=None, params=None):
     data = res.get_json()
 
     assert res.status_code == 201
-    validate_object_fields(data, existing_id=existing_id)
+    validate_object_fields(data, existing_id=existing_id, with_bento_properties=True)
 
     return data
 
@@ -387,10 +387,17 @@ def test_object_ingest_dedup(client):
 
     # ingest again, but with a different set of permissions
     authz_everything_true()
-    data_3 = _ingest_one(client, params={"project_id": "project1"})
+    data_3 = _ingest_one(client, params={"project_id": "project1", "dataset_id": ""})  # dataset_id: "" -> None
 
     assert data_3["id"] != data_2["id"]
     assert data_3["checksums"][0]["checksum"] == data_2["checksums"][0]["checksum"]
+
+    # bento properties should exist in the ingest response:
+    assert data_3["bento"]
+    assert data_3["bento"]["project_id"] == "project1"
+    assert data_3["bento"]["dataset_id"] is None
+    assert data_3["bento"]["data_type"] is None
+    assert not data_3["bento"]["public"]
 
 
 @responses.activate
@@ -426,4 +433,4 @@ def test_object_ingest_post_file(client):
     with open(fp, "rb") as fh:
         res = client.post("/ingest", data={"file": (fh, "dummy_file.txt")}, content_type="multipart/form-data")
     assert res.status_code == 201
-    validate_object_fields(res.get_json())
+    validate_object_fields(res.get_json(), with_bento_properties=True)

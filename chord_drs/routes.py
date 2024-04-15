@@ -555,7 +555,7 @@ def object_ingest():
                 logger.error(f"Encountered exception during ingest: {e}")
                 raise InternalServerError("Error while creating the object")
 
-        return build_blob_json(drs_object), 201
+        return build_blob_json(drs_object, with_bento_properties=True), 201
 
     finally:
         os.close(tfh)
