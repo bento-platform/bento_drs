@@ -27,7 +27,7 @@ from .authz import authz_middleware
 from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from .db import db
-from .models import DrsBlob, DrsBundle
+from .models import DrsMixin, DrsBlob, DrsBundle
 from .types import DRSAccessMethodDict, DRSContentsDict, DRSObjectBentoDict, DRSObjectDict
 from .utils import drs_file_checksum
 
@@ -245,7 +245,7 @@ def build_blob_json(
         **({"description": drs_blob.description} if drs_blob.description is not None else {}),
         "id": drs_blob.id,
         "self_uri": create_drs_uri(drs_blob.id),
-        **(build_bento_object_json(drs_bundle) if with_bento_properties else {}),
+        **(build_bento_object_json(drs_blob) if with_bento_properties else {}),
     }
 
 
