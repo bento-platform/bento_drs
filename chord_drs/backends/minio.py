@@ -33,3 +33,7 @@ class MinioBackend(Backend):
         with open(current_location, "rb") as f:
             obj = self.bucket.put_object(Key=filename, Body=f)
             return MinioBackend.build_minio_location(obj)
+
+    def delete(self, location: str) -> None:
+        obj = self.get_minio_object(location)
+        obj.delete()

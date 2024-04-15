@@ -9,6 +9,10 @@ class Backend(ABC):
     def save(self, current_location: str, filename: str) -> str:  # pragma: no cover
         pass
 
+    @abstractmethod
+    def delete(self, location: str) -> None:  # pragma: no cover
+        pass
+
 
 class FakeBackend(Backend):
     """
@@ -17,3 +21,6 @@ class FakeBackend(Backend):
 
     def save(self, current_location: str, filename: str) -> str:
         return current_location
+
+    def delete(self, location: str):
+        return None

@@ -24,3 +24,10 @@ class LocalBackend(Backend):
         new_location = self.base_location / filename
         copy(current_location, new_location)
         return str(new_location.resolve())
+
+    def delete(self, location: str | Path) -> None:
+        loc = location if isinstance(location, Path) else Path(location)
+        if self.base_location in loc.parents:
+            loc.unlink()
+            return
+        raise ValueError(f"Location {loc} is not a subpath of backend base location {self.base_location}")

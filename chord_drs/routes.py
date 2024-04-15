@@ -4,7 +4,7 @@ import tempfile
 import urllib.parse
 
 from asgiref.sync import async_to_sync
-from bento_lib.auth.permissions import Permission, P_INGEST_DATA, P_QUERY_DATA, P_DOWNLOAD_DATA
+from bento_lib.auth.permissions import Permission, P_INGEST_DATA, P_QUERY_DATA, P_DELETE_DATA, P_DOWNLOAD_DATA
 from bento_lib.auth.resources import RESOURCE_EVERYTHING, build_resource
 from bento_lib.service_info.constants import SERVICE_ORGANIZATION_C3G
 from bento_lib.service_info.helpers import build_service_info
@@ -22,6 +22,7 @@ from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerE
 
 from . import __version__
 from .authz import authz_middleware
+from .backend import get_backend
 from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from .db import db
 from .models import DrsBlob, DrsBundle
@@ -81,18 +82,18 @@ def check_objects_permission(
 
 
 def fetch_and_check_object_permissions(object_id: str, permission: Permission) -> tuple[DrsBlob | DrsBundle, bool]:
-    view_data_everything = check_everything_permission(permission)
+    has_permission_on_everything = check_everything_permission(permission)
 
     drs_object, is_bundle = get_drs_object(object_id)
 
     if not drs_object:
         authz_middleware.mark_authz_done(request)
-        if authz_enabled() and not view_data_everything:  # Don't leak if this object exists
+        if authz_enabled() and not has_permission_on_everything:  # Don't leak if this object exists
             raise forbidden()
         raise NotFound("No object found for this ID")
 
     # Check permissions -------------------------------------------------
-    if view_data_everything:
+    if has_permission_on_everything:
         # Good to go already!
         authz_middleware.mark_authz_done(request)
     else:
@@ -153,9 +154,34 @@ def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
     return None, False
 
 
-@drs_service.route("/objects/<string:object_id>", methods=["GET"])
-@drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET"])
+@drs_service.route("/objects/<string:object_id>", methods=["GET", "DELETE"])
+@drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET", "DELETE"])
 def object_info(object_id: str):
+    logger = current_app.logger
+
+    if request.method == "DELETE":
+        drs_object, is_bundle = fetch_and_check_object_permissions(object_id, P_DELETE_DATA)
+
+        logger.info(f"Deleting object {drs_object.id}")
+
+        if not is_bundle:
+            q = DrsBundle.query.filter_by(location=drs_object.location).count()
+            n_using_file = q.count()
+            if n_using_file == 1 and q.first().id == drs_object.id:
+                # If this object is the only one using the file, delete the file too
+                logger.info(
+                    f"Deleting file at {drs_object.location}, since {drs_object.id} is the only object referring to it."
+                )
+                backend = get_backend()
+                backend.delete(drs_object.location)
+
+        # Don't bother with additional bundle deleting logic, they'll be removed soon anyway. TODO
+
+        drs_object.delete()
+        db.session.commit()
+
+        return current_app.response_class(status=204)
+
     drs_object, is_bundle = fetch_and_check_object_permissions(object_id, P_QUERY_DATA)
 
     # The requester can ask for additional, non-spec-compliant Bento properties to be included in the response
