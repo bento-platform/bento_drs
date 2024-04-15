@@ -4,7 +4,7 @@ from bento_lib.responses import flask_errors
 from flask import Flask
 from flask_cors import CORS
 from flask_migrate import Migrate
-from werkzeug.exceptions import BadRequest, Forbidden, NotFound, RequestedRangeNotSatisfiable
+from werkzeug.exceptions import BadRequest, Forbidden, NotFound, MethodNotAllowed, RequestedRangeNotSatisfiable
 
 from .authz import authz_middleware
 from .backend import close_backend
@@ -47,19 +47,11 @@ application.register_error_handler(
 )
 application.register_error_handler(
     BadRequest,
-    flask_errors.flask_error_wrap(
-        flask_errors.flask_bad_request_error,
-        drs_compat=True,
-        authz=authz_middleware,
-    ),
+    flask_errors.flask_error_wrap(flask_errors.flask_bad_request_error, drs_compat=True, authz=authz_middleware),
 )
 application.register_error_handler(
     Forbidden,
-    flask_errors.flask_error_wrap(
-        flask_errors.flask_forbidden_error,
-        drs_compat=True,
-        authz=authz_middleware,
-    ),
+    flask_errors.flask_error_wrap(flask_errors.flask_forbidden_error, drs_compat=True, authz=authz_middleware),
 )
 application.register_error_handler(
     NotFound,
@@ -69,6 +61,10 @@ application.register_error_handler(
         drs_compat=True,
         authz=authz_middleware,
     )(e),
+)
+application.register_error_handler(
+    MethodNotAllowed,
+    flask_errors.flask_error_wrap(flask_errors.flask_method_not_allowed_error, drs_compat=True, authz=authz_middleware),
 )
 application.register_error_handler(
     RequestedRangeNotSatisfiable,

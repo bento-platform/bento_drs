@@ -70,6 +70,11 @@ def test_service_info(client):
     validate(data, bento_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
 
 
+def test_method_not_allowed(client):
+    res = client.post("/service-info")
+    assert res.status_code == 405
+
+
 def authz_everything_true(count=1):
     responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [[True] for _ in range(count)]})
 
