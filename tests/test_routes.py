@@ -12,7 +12,12 @@ from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 NON_EXISTENT_ID = "123"
 
 
-def validate_object_fields(data, existing_id=None, with_internal_path=False):
+def validate_object_fields(
+    data,
+    existing_id: bool = None,
+    with_internal_path: bool = False,
+    with_bento_properties: bool = False,
+):
     is_local = current_app.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_LOCAL
     is_minio = current_app.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_MINIO
 
@@ -35,6 +40,16 @@ def validate_object_fields(data, existing_id=None, with_internal_path=False):
 
     if existing_id:
         assert "id" in data and data["id"] == existing_id
+
+    if with_bento_properties:
+        assert "bento" in data
+        bento_data = data["bento"]
+        assert "project_id" in bento_data
+        assert "dataset_id" in bento_data
+        assert "data_type" in bento_data
+        assert "public" in bento_data
+    else:
+        assert "bento" not in data
 
 
 def test_service_info(client):
@@ -100,9 +115,14 @@ def test_object_access_fail(client):
 def _test_object_and_download(client, obj, test_range=False):
     res = client.get(f"/objects/{obj.id}")
     data = res.get_json()
-
     assert res.status_code == 200
     validate_object_fields(data, existing_id=obj.id)
+
+    # Check that we can get extra Bento data
+    res = client.get(f"/objects/{obj.id}?with_bento_properties=true")
+    data = res.get_json()
+    assert res.status_code == 200
+    validate_object_fields(data, existing_id=obj.id, with_bento_properties=True)
 
     # Check that we don't have access via an access ID (since we don't generate them)
     res = client.get(f"/objects/{obj.id}/access/no_access")
@@ -178,8 +198,8 @@ def test_object_and_download_minio(client_minio, drs_object_minio):
 
 @responses.activate
 def test_object_and_download_minio_specific_perms(client_minio, drs_object_minio):
-    # _test_object_and_download does 3 different accesses
-    authz_drs_specific_obj(iters=4)
+    # _test_object_and_download does 5 different accesses
+    authz_drs_specific_obj(iters=5)
     _test_object_and_download(client_minio, drs_object_minio)
 
 
@@ -191,8 +211,8 @@ def test_object_and_download(client, drs_object):
 
 @responses.activate
 def test_object_and_download_specific_perms(client, drs_object):
-    # _test_object_and_download does 3 different accesses
-    authz_drs_specific_obj(iters=4)
+    # _test_object_and_download does 5 different accesses
+    authz_drs_specific_obj(iters=5)
     _test_object_and_download(client, drs_object)
 
 
