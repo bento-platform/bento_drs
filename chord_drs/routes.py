@@ -463,9 +463,9 @@ def object_ingest():
 
     deduplicate: bool = str_to_bool(data.get("deduplicate", "true"))  # Change for v0.9: default to True
     obj_path: str | None = data.get("path")
-    project_id: str | None = data.get("project_id")
-    dataset_id: str | None = data.get("dataset_id")
-    data_type: str | None = data.get("data_type")
+    project_id: str | None = data.get("project_id") or None  # replace blank strings with None
+    dataset_id: str | None = data.get("dataset_id") or None  # "
+    data_type: str | None = data.get("data_type") or None  # "
     public: bool = data.get("public", "false").strip().lower() == "true"
     file = request.files.get("file")
 
