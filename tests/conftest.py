@@ -73,12 +73,20 @@ def client_minio() -> FlaskClient:
 
 
 @pytest.fixture
-def client_local() -> FlaskClient:
+def local_volume():
     local_test_volume = (pathlib.Path(__file__).parent / "data").absolute()
     local_test_volume.mkdir(parents=True, exist_ok=True)
 
+    yield local_test_volume
+
+    # clear test volume
+    shutil.rmtree(local_test_volume)
+
+
+@pytest.fixture
+def client_local(local_volume: pathlib.Path) -> FlaskClient:
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
-    os.environ["DATA"] = str(local_test_volume)
+    os.environ["DATA"] = str(local_volume)
 
     from chord_drs.app import application, db
 
@@ -92,9 +100,6 @@ def client_local() -> FlaskClient:
 
         db.session.remove()
         db.drop_all()
-
-        # clear test volume
-        shutil.rmtree(local_test_volume)
 
 
 @pytest.fixture(params=[lazy_fixture("client_minio"), lazy_fixture("client_local")])
