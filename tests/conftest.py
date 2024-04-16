@@ -60,7 +60,7 @@ def client_minio() -> FlaskClient:
 
     with application.app_context(), mock_s3():
         s3 = boto3.resource("s3")
-        minio_backend = MinioBackend(resource=s3)
+        minio_backend = MinioBackend(application.config, resource=s3)
         g.backend = minio_backend
 
         s3.create_bucket(Bucket=bucket_name)
