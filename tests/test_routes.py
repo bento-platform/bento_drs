@@ -1,7 +1,10 @@
 import bento_lib
 import json
+import os.path
 import pytest
 import responses
+import tempfile
+import uuid
 
 from flask import current_app
 from jsonschema import validate
@@ -92,14 +95,22 @@ def authz_drs_specific_obj(iters=1):
 @responses.activate
 def test_object_fail(client):
     authz_everything_true()
+
     res = client.get(f"/objects/{NON_EXISTENT_ID}")
+    assert res.status_code == 404
+
+    res = client.delete(f"/objects/{NON_EXISTENT_ID}")
     assert res.status_code == 404
 
 
 @responses.activate
 def test_object_fail_forbidden(client):
     authz_everything_false()
+
     res = client.get(f"/objects/{NON_EXISTENT_ID}")  # can't know if this exists since we don't have access
+    assert res.status_code == 403
+
+    res = client.delete(f"/objects/{NON_EXISTENT_ID}")
     assert res.status_code == 403
 
 
@@ -248,6 +259,29 @@ def test_object_with_disabled_internal_path(client, drs_object):
 
     assert res.status_code == 200
     validate_object_fields(data, with_internal_path=False)
+
+
+@responses.activate
+def test_object_delete(client):
+    authz_everything_true()
+
+    contents = str(uuid.uuid4())
+
+    # first, ingest a new object for us to test deleting with
+    with tempfile.NamedTemporaryFile(mode="w") as tf:
+        tf.write(contents)  # random content, so checksum is unique
+        tf.flush()
+        res = client.post("/ingest", data={"path": tf.name})
+
+    ingested_obj = res.get_json()
+
+    res = client.delete(f"/objects/{ingested_obj['id']}")
+    assert res.status_code == 204
+
+    # deleted, so if we try again it should be a 404
+
+    res = client.delete(f"/objects/{ingested_obj['id']}")
+    assert res.status_code == 404
 
 
 @responses.activate
