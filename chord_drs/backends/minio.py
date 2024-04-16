@@ -26,8 +26,10 @@ class MinioBackend(Backend):
         return f"s3://{host}/{obj.bucket_name}/{obj.key}"
 
     def get_minio_object(self, location: str):
-        obj = self.bucket.Object(location.split("/")[-1])
-        return obj.get()
+        return self.bucket.Object(location.split("/")[-1])
+
+    def get_minio_object_dict(self, location: str) -> dict:
+        return self.get_minio_object(location).get()
 
     def save(self, current_location: str, filename: str) -> str:
         with open(current_location, "rb") as f:

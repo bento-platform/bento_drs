@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import tempfile
@@ -154,32 +155,33 @@ def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
     return None, False
 
 
+def delete_drs_object(object_id: str, logger: logging.Logger):
+    drs_object, is_bundle = fetch_and_check_object_permissions(object_id, P_DELETE_DATA)
+
+    logger.info(f"Deleting object {drs_object.id}")
+
+    if not is_bundle:
+        q = DrsBlob.query.filter_by(location=drs_object.location)
+        n_using_file = q.count()
+        if n_using_file == 1 and q.first().id == drs_object.id:
+            # If this object is the only one using the file, delete the file too
+            logger.info(
+                f"Deleting file at {drs_object.location}, since {drs_object.id} is the only object referring to it."
+            )
+            backend = get_backend()
+            backend.delete(drs_object.location)
+
+    # Don't bother with additional bundle deleting logic, they'll be removed soon anyway. TODO
+
+    db.session.delete(drs_object)
+    db.session.commit()
+
+
 @drs_service.route("/objects/<string:object_id>", methods=["GET", "DELETE"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET", "DELETE"])
 def object_info(object_id: str):
-    logger = current_app.logger
-
     if request.method == "DELETE":
-        drs_object, is_bundle = fetch_and_check_object_permissions(object_id, P_DELETE_DATA)
-
-        logger.info(f"Deleting object {drs_object.id}")
-
-        if not is_bundle:
-            q = DrsBundle.query.filter_by(location=drs_object.location).count()
-            n_using_file = q.count()
-            if n_using_file == 1 and q.first().id == drs_object.id:
-                # If this object is the only one using the file, delete the file too
-                logger.info(
-                    f"Deleting file at {drs_object.location}, since {drs_object.id} is the only object referring to it."
-                )
-                backend = get_backend()
-                backend.delete(drs_object.location)
-
-        # Don't bother with additional bundle deleting logic, they'll be removed soon anyway. TODO
-
-        drs_object.delete()
-        db.session.commit()
-
+        delete_drs_object(object_id, current_app.logger)
         return current_app.response_class(status=204)
 
     drs_object, is_bundle = fetch_and_check_object_permissions(object_id, P_QUERY_DATA)
