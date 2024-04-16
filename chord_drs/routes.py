@@ -165,6 +165,7 @@ def delete_drs_object(object_id: str, logger: logging.Logger):
         n_using_file = q.count()
         if n_using_file == 1 and q.first().id == drs_object.id:
             # If this object is the only one using the file, delete the file too
+            # TODO: this can create a race condition and leave files undeleted... should we have a cleanup on start?
             logger.info(
                 f"Deleting file at {drs_object.location}, since {drs_object.id} is the only object referring to it."
             )
