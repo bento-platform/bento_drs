@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-__all__ = ["Backend", "FakeBackend"]
+__all__ = ["Backend"]
 
 
 class Backend(ABC):
@@ -12,15 +12,3 @@ class Backend(ABC):
     @abstractmethod
     def delete(self, location: str) -> None:  # pragma: no cover
         pass
-
-
-class FakeBackend(Backend):
-    """
-    For the tests
-    """
-
-    def save(self, current_location: str, filename: str) -> str:
-        return current_location
-
-    def delete(self, location: str):
-        return None

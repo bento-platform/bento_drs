@@ -285,6 +285,58 @@ def test_object_delete(client):
 
 
 @responses.activate
+def test_object_multi_delete(client):
+    from chord_drs.models import DrsBlob
+
+    authz_everything_true()
+
+    contents = str(uuid.uuid4())
+
+    # first, ingest two new objects with the same contents
+    with tempfile.NamedTemporaryFile(mode="w") as tf:
+        tf.write(contents)  # random content, so checksum is unique
+        tf.flush()
+
+        # two different projects to ensure we have two objects pointing to the same resource:
+        res1 = client.post("/ingest", data={"path": tf.name, "project_id": "project1"})
+        assert res1.status_code == 201
+        res2 = client.post("/ingest", data={"path": tf.name, "project_id": "project2"})
+        assert res2.status_code == 201
+
+    i1 = res1.get_json()
+    i2 = res2.get_json()
+
+    assert i1["id"] != i2["id"]
+
+    b1 = DrsBlob.query.filter_by(id=i1["id"]).first()
+    b2 = DrsBlob.query.filter_by(id=i2["id"]).first()
+
+    assert b1.location == b2.location
+
+    # make sure we can get the bytes of i2
+    assert client.get(f"/objects/{i2['id']}/download").status_code == 200
+
+    # delete i2
+    rd2 = client.delete(f"/objects/{i2['id']}")
+    assert rd2.status_code == 204
+
+    # make sure we can still get the bytes of i1
+    assert client.get(f"/objects/{i1['id']}/download").status_code == 200
+
+    # check file exists if local
+    if b1.location.startswith("/"):
+        assert os.path.exists(b1.location)
+
+    # delete i1
+    rd1 = client.delete(f"/objects/{i1['id']}")
+    assert rd1.status_code == 204
+
+    # check file doesn't exist if local
+    if b1.location.startswith("/"):
+        assert not os.path.exists(b1.location)
+
+
+@responses.activate
 def test_bundle_and_download(client, drs_bundle):
     authz_everything_true()
 
