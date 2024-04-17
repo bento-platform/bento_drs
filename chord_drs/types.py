@@ -6,7 +6,6 @@ __all__ = [
     "DRSChecksumDict",
     "DRSContentsDict",
     "DRSObjectBentoDict",
-    "DRSObjectBentoMetaDict",
     "DRSObjectDict",
 ]
 
@@ -59,10 +58,6 @@ class DRSObjectBentoDict(TypedDict):
     dataset_id: str | None
     data_type: str | None
     public: bool
-
-
-class DRSObjectBentoMetaDict(TypedDict):
-    bento: DRSObjectBentoDict
 
 
 class DRSObjectDict(_DRSObjectDictBase, total=False):

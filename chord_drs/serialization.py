@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 from .models import DrsMixin, DrsBlob, DrsBundle
-from .types import DRSAccessMethodDict, DRSContentsDict, DRSObjectBentoMetaDict, DRSObjectDict
+from .types import DRSAccessMethodDict, DRSContentsDict, DRSObjectBentoDict, DRSObjectDict
 
 
 __all__ = [
@@ -51,14 +51,12 @@ def build_contents(bundle: DrsBundle, expand: bool) -> list[DRSContentsDict]:
     return content
 
 
-def build_bento_object_json(drs_object: DrsMixin) -> DRSObjectBentoMetaDict:
+def build_bento_object_json(drs_object: DrsMixin) -> DRSObjectBentoDict:
     return {
-        "bento": {
-            "project_id": drs_object.project_id,
-            "dataset_id": drs_object.dataset_id,
-            "data_type": drs_object.data_type,
-            "public": drs_object.public,
-        }
+        "project_id": drs_object.project_id,
+        "dataset_id": drs_object.dataset_id,
+        "data_type": drs_object.data_type,
+        "public": drs_object.public,
     }
 
 
@@ -82,7 +80,7 @@ def build_bundle_json(
         **({"description": drs_bundle.description} if drs_bundle.description is not None else {}),
         "id": drs_bundle.id,
         "self_uri": create_drs_uri(drs_bundle.id),
-        **(build_bento_object_json(drs_bundle) if with_bento_properties else {}),
+        **({"bento": build_bento_object_json(drs_bundle)} if with_bento_properties else {}),
     }
 
 
@@ -145,5 +143,5 @@ def build_blob_json(
         **({"description": drs_blob.description} if drs_blob.description is not None else {}),
         "id": drs_blob.id,
         "self_uri": create_drs_uri(drs_blob.id),
-        **(build_bento_object_json(drs_blob) if with_bento_properties else {}),
+        **({"bento": build_bento_object_json(drs_blob)} if with_bento_properties else {}),
     }
