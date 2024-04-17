@@ -2,13 +2,14 @@ import boto3
 import os
 import pathlib
 import pytest
+import shutil
 
 from flask import g
+from flask.testing import FlaskClient
 from moto import mock_s3
 from pytest_lazyfixture import lazy_fixture
 
 # Must only be imports that don't import authz/app/config/db
-from chord_drs.backends.base import FakeBackend
 from chord_drs.backends.minio import MinioBackend
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
 
@@ -47,7 +48,7 @@ def empty_file_path():  # Function rather than constant so we can set environ fi
 
 
 @pytest.fixture
-def client_minio():
+def client_minio() -> FlaskClient:
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import application, db
@@ -59,7 +60,7 @@ def client_minio():
 
     with application.app_context(), mock_s3():
         s3 = boto3.resource("s3")
-        minio_backend = MinioBackend(resource=s3)
+        minio_backend = MinioBackend(application.config, resource=s3)
         g.backend = minio_backend
 
         s3.create_bucket(Bucket=bucket_name)
@@ -72,9 +73,20 @@ def client_minio():
 
 
 @pytest.fixture
-def client_local():
+def local_volume():
+    local_test_volume = (pathlib.Path(__file__).parent / "data").absolute()
+    local_test_volume.mkdir(parents=True, exist_ok=True)
+
+    yield local_test_volume
+
+    # clear test volume
+    shutil.rmtree(local_test_volume)
+
+
+@pytest.fixture
+def client_local(local_volume: pathlib.Path) -> FlaskClient:
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
-    os.environ["DATA"] = str((pathlib.Path(__file__).parent / "data").absolute())
+    os.environ["DATA"] = str(local_volume)
 
     from chord_drs.app import application, db
 
@@ -82,8 +94,6 @@ def client_local():
     application.config["SERVICE_DATA_SOURCE"] = DATA_SOURCE_LOCAL
 
     with application.app_context():
-        g.backend = FakeBackend()
-
         db.create_all()
 
         yield application.test_client()
@@ -93,7 +103,7 @@ def client_local():
 
 
 @pytest.fixture(params=[lazy_fixture("client_minio"), lazy_fixture("client_local")])
-def client(request):
+def client(request) -> FlaskClient:
     return request.param
 
 

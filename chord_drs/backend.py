@@ -13,7 +13,7 @@ __all__ = [
 def _get_backend() -> Backend | None:
     # Instantiate backend if needed
     backend_class = DATA_SOURCE_BACKENDS.get(current_app.config["SERVICE_DATA_SOURCE"])
-    return backend_class() if backend_class else None
+    return backend_class(current_app.config) if backend_class else None
 
 
 def get_backend() -> Backend | None:

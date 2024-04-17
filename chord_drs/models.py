@@ -128,7 +128,7 @@ class DrsBlob(Base, DrsMixin):
 
         super().__init__(*args, **kwargs)
 
-    def return_minio_object(self):
+    def return_minio_object(self) -> dict:
         parsed_url = urlparse(self.location)
 
         if parsed_url.scheme != "s3":
@@ -139,4 +139,4 @@ class DrsBlob(Base, DrsMixin):
         if not backend or not isinstance(backend, MinioBackend):
             raise Exception("The backend for this instance is not properly configured.")
 
-        return backend.get_minio_object(self.location)
+        return backend.get_minio_object_dict(self.location)
