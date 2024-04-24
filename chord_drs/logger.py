@@ -8,3 +8,6 @@ logging.basicConfig(level=logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+# Remove `DEBUG:asyncio:Using selector: EpollSelector` spam
+logging.getLogger("asyncio").setLevel(logging.INFO)

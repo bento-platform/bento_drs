@@ -37,6 +37,8 @@ CHUNK_SIZE = 1024 * 16  # Read 16 KB at a time
 
 drs_service = Blueprint("drs_service", __name__)
 
+build_service_info_sync = async_to_sync(build_service_info)
+
 
 def str_to_bool(val: str) -> bool:
     return val.lower() in ("yes", "true", "t", "1", "on")
@@ -55,15 +57,16 @@ def check_everything_permission(permission: Permission) -> bool:
     return authz_middleware.evaluate_one(request, RESOURCE_EVERYTHING, permission) if authz_enabled() else True
 
 
+def _post_headers_getter(r: Request) -> dict[str, str]:
+    token = r.form.get("token")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
 def check_objects_permission(
     drs_objs: list[DrsBlob | DrsBundle], permission: Permission, mark_authz_done: bool = False
 ) -> tuple[bool, ...]:
     if not authz_enabled():
         return tuple([True] * len(drs_objs))  # Assume we have permission for everything if authz disabled
-
-    def _post_headers_getter(r: Request) -> dict[str, str]:
-        token = r.form.get("token")
-        return {"Authorization": f"Bearer {token}"} if token else {}
 
     return tuple(
         r[0] or drs_obj.public
@@ -124,7 +127,7 @@ def range_not_satisfiable_log_mark(description: str, length: int) -> RequestedRa
 def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
     return jsonify(
-        async_to_sync(build_service_info)(
+        build_service_info_sync(
             {
                 "id": current_app.config["SERVICE_ID"],
                 "name": SERVICE_NAME,
@@ -412,13 +415,11 @@ def object_ingest():
             candidate_drs_object: DrsBlob | None = DrsBlob.query.filter_by(checksum=checksum).first()
 
             if candidate_drs_object is not None:
-                if all(
-                    (
-                        candidate_drs_object.project_id == project_id,
-                        candidate_drs_object.dataset_id == dataset_id,
-                        candidate_drs_object.data_type == data_type,
-                        candidate_drs_object.public == public,
-                    )
+                if (
+                    candidate_drs_object.project_id == project_id
+                    and candidate_drs_object.dataset_id == dataset_id
+                    and candidate_drs_object.data_type == data_type
+                    and candidate_drs_object.public == public
                 ):
                     logger.info(
                         f"Found duplicate DRS object via checksum (will fully deduplicate): {candidate_drs_object}"
