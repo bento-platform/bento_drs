@@ -33,7 +33,7 @@ from .utils import drs_file_checksum
 
 RE_STARTING_SLASH = re.compile(r"^/")
 MIME_OCTET_STREAM = "application/octet-stream"
-CHUNK_SIZE = 1024 * 16  # Read 16 KB at a time
+CHUNK_SIZE = 1024 * 128  # Read 128 KB at a time
 
 drs_service = Blueprint("drs_service", __name__)
 
