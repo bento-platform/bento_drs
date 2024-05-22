@@ -366,6 +366,8 @@ def object_ingest():
     public: bool = data.get("public", "false").strip().lower() == "true"
     file = request.files.get("file")
 
+    logger.info(f"Received ingest request metadata: {data}")
+
     # This authz call determines everything, so we can mark authz as done when the call completes:
     has_permission: bool = (
         authz_middleware.evaluate_one(
@@ -415,11 +417,16 @@ def object_ingest():
             candidate_drs_object: DrsBlob | None = DrsBlob.query.filter_by(checksum=checksum).first()
 
             if candidate_drs_object is not None:
+                c_project_id = candidate_drs_object.project_id
+                c_dataset_id = candidate_drs_object.dataset_id
+                c_data_type = candidate_drs_object.data_type
+                c_public = candidate_drs_object.public
+
                 if (
-                    candidate_drs_object.project_id == project_id
-                    and candidate_drs_object.dataset_id == dataset_id
-                    and candidate_drs_object.data_type == data_type
-                    and candidate_drs_object.public == public
+                    c_project_id == project_id
+                    and c_dataset_id == dataset_id
+                    and c_data_type == data_type
+                    and c_public == public
                 ):
                     logger.info(
                         f"Found duplicate DRS object via checksum (will fully deduplicate): {candidate_drs_object}"
@@ -427,7 +434,9 @@ def object_ingest():
                     drs_object = candidate_drs_object
                 else:
                     logger.info(
-                        f"Found duplicate DRS object via checksum (will deduplicate JUST bytes): "
+                        f"Found duplicate DRS object via checksum (will deduplicate JUST bytes; req resource: "
+                        f"({project_id}, {dataset_id}, {data_type}, {public}) vs existing resource: "
+                        f"({c_project_id}, {c_dataset_id}, {c_data_type}, {c_public})): "
                         f"{candidate_drs_object}"
                     )
                     object_to_copy = candidate_drs_object
