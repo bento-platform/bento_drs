@@ -4,7 +4,7 @@ from typing import IO, Optional
 
 __all__ = ["DrsRequest"]
 
-MAX_IN_MEMORY_SIZE = 1024 * 1024  # 1 MB
+MAX_IN_MEMORY_SIZE = 1024 * 1024 * 10  # 10 MB
 
 
 class DrsRequest(Request):
