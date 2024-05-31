@@ -9,6 +9,8 @@ from bento_lib.auth.permissions import Permission, P_INGEST_DATA, P_QUERY_DATA, 
 from bento_lib.auth.resources import RESOURCE_EVERYTHING, build_resource
 from bento_lib.service_info.constants import SERVICE_ORGANIZATION_C3G
 from bento_lib.service_info.helpers import build_service_info
+from bento_lib.streaming.exceptions import StreamingBadRange, StreamingRangeNotSatisfiable
+from bento_lib.streaming.range import parse_range_header
 from flask import (
     Blueprint,
     Request,
@@ -267,6 +269,7 @@ def object_download(object_id: str):
     if is_bundle:
         raise BadRequest("Bundle download is currently unsupported")
 
+    obj_name = drs_object.name
     minio_obj = drs_object.return_minio_object()
 
     if not minio_obj:
@@ -275,39 +278,22 @@ def object_download(object_id: str):
 
         if range_header is None:
             # Early return, no range header so send the whole thing
-            res = make_response(
-                send_file(drs_object.location, mimetype=MIME_OCTET_STREAM, download_name=drs_object.name)
-            )
+            res = make_response(send_file(drs_object.location, mimetype=MIME_OCTET_STREAM, download_name=obj_name))
             res.headers["Accept-Ranges"] = "bytes"
             return res
 
-        drs_end_byte = drs_object.size - 1
-
-        logger.debug(f"Found Range header: {range_header}")
-        range_err = f"Malformatted range header: expected bytes=X-Y or bytes=X-, got {range_header}"
-
-        rh_split = range_header.split("=")
-        if len(rh_split) != 2 or rh_split[0] != "bytes":
-            raise bad_request_log_mark(range_err)
-
-        byte_range = rh_split[1].strip().split("-")
-        logger.debug(f"Retrieving byte range {byte_range}")
+        obj_size = drs_object.size
 
         try:
-            start: int = int(byte_range[0])
-            end: int = int(byte_range[1]) if byte_range[1] else drs_end_byte
-        except (IndexError, ValueError):
-            raise bad_request_log_mark(range_err)
+            range_intervals = parse_range_header(range_header, obj_size)
+        except StreamingBadRange as e:
+            raise bad_request_log_mark(str(e))
+        except StreamingRangeNotSatisfiable as e:
+            raise range_not_satisfiable_log_mark(str(e), obj_size)
 
-        if end > drs_end_byte:
-            raise range_not_satisfiable_log_mark(
-                f"End cannot be past last byte ({end} > {drs_end_byte})", drs_object.size
-            )
+        logger.debug(f"Found valid Range header: {range_header}")
 
-        if end < start:
-            raise range_not_satisfiable_log_mark(
-                f"Invalid range header: end cannot be less than start (start={start}, end={end})", drs_object.size
-            )
+        start, end = range_intervals[0]
 
         def generate_bytes():
             with open(drs_object.location, "rb") as fh2:
@@ -319,7 +305,7 @@ def object_download(object_id: str):
                 byte_offset: int = start
                 while True:
                     # Add a 1 to the amount to read if it's below chunk size, because the last coordinate is inclusive.
-                    data = fh2.read(min(CHUNK_SIZE, (end + 1 - byte_offset) if end is not None else CHUNK_SIZE))
+                    data = fh2.read(min(CHUNK_SIZE, end + 1 - byte_offset))
                     byte_offset += len(data)
                     yield data
 
@@ -332,18 +318,16 @@ def object_download(object_id: str):
         # Stream the bytes of the file or file segment from the generator function
         r = current_app.response_class(generate_bytes(), status=206, mimetype=MIME_OCTET_STREAM)
         r.headers["Content-Length"] = end + 1 - start  # byte range is inclusive, so need to add one
-        r.headers["Content-Range"] = f"bytes {start}-{end}/{drs_object.size}"
+        r.headers["Content-Range"] = f"bytes {start}-{end}/{obj_size}"
         r.headers["Content-Disposition"] = (
-            f"attachment; filename*=UTF-8'{urllib.parse.quote(drs_object.name, encoding='utf-8')}'"
+            f"attachment; filename*=UTF-8'{urllib.parse.quote(obj_name, encoding='utf-8')}'"
         )
         return r
 
     # TODO: Support range headers for MinIO objects - only the local backend supports it for now
     # TODO: kinda greasy, not really sure we want to support such a feature later on
     response = make_response(
-        send_file(
-            minio_obj["Body"], mimetype="application/octet-stream", as_attachment=True, download_name=drs_object.name
-        )
+        send_file(minio_obj["Body"], mimetype="application/octet-stream", as_attachment=True, download_name=obj_name)
     )
 
     response.headers["Content-Length"] = minio_obj["ContentLength"]
