@@ -3,14 +3,26 @@ from chord_drs.commands import ingest
 from chord_drs.models import DrsBlob
 from tests.conftest import (
     non_existant_dummy_file_path,
+    dummy_directory_path,
     dummy_file_path,
 )
 
 
 # TODO: Issue with app context and backends. On hold for now
 def test_ingest_fail(client_local):
+    # cannot ingest non-existant file
+
     runner = CliRunner()
     result = runner.invoke(ingest, [non_existant_dummy_file_path()])
+
+    assert result.exit_code == 1
+
+
+def test_ingest_fail_dir(client_local):
+    # cannot ingest directory
+
+    runner = CliRunner()
+    result = runner.invoke(ingest, [str(dummy_directory_path())])
 
     assert result.exit_code == 1
 
