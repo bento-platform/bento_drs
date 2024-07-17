@@ -15,8 +15,7 @@ or inside a MinIO instance (which is a s3-like software).
 ## TODO / Future considerations
 
  - Ingesting is either through the command line or by the endpoint of the same name
- (which will create a single object). There is currently no way to ingest an archive
- or to package objects into bundles.
+ (which will create a single object).
  - Consider how to be aware of http vs https depending on the deployment setup
  (in singularity, docker, as is).
 

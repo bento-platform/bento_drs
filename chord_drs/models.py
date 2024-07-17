@@ -17,66 +17,29 @@ __all__ = [
     "Base",
     "DrsMixin",
     "DrsBlob",
-    "DrsBundle",
 ]
 
 Base = declarative_base()
 
 
-class DrsMixin:
-    # IDs (PKs) must remain outside the mixin!
+class DrsBlob(Base):
+    __tablename__ = "drs_object"
+
+    id = Column(String, primary_key=True)
+    location = Column(String(500), nullable=False)
+
     created = Column(DateTime, server_default=func.now())
     checksum = Column(String(64), nullable=False)
     size = Column(Integer, default=0)
     name = Column(String(250), nullable=True)
     description = Column(String(1000), nullable=True)
+
     # Permissions/Bento-specific project & dataset tagging for DRS items
     # TODO: Make some of these not nullable in the future:
     project_id = Column(String(64), nullable=True)  # Nullable for backwards-compatibility
     dataset_id = Column(String(64), nullable=True)  # Nullable for backwards-compatibility / project-only stuff?
     data_type = Column(String(24), nullable=True)  # NULL if multi-data type or something else
     public = Column(Boolean, default=False, nullable=False)  # If true, the object is accessible by anyone
-
-
-class DrsBundle(Base, DrsMixin):
-    __tablename__ = "drs_bundle"
-
-    id = Column(String, primary_key=True)
-    parent_bundle_id = Column(Integer, ForeignKey("drs_bundle.id"))
-    parent_bundle = relationship("DrsBundle", remote_side=[id])
-    objects = relationship("DrsBlob", cascade="all, delete-orphan", backref="bundle")
-
-    def __init__(self, *args, **kwargs):
-        self.id = str(uuid4())
-        super().__init__(*args, **kwargs)
-
-    def update_checksum_and_size(self):
-        # For bundle checksumming logic, see the `checksums` field in
-        # https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-1.3.0/docs/#tag/DrsObjectModel
-
-        checksums = []
-        total_size = 0
-
-        for obj in self.objects:
-            total_size += obj.size
-            checksums.append(obj.checksum)
-
-        checksums.sort()
-        concat_checksums = "".join(checksums)
-
-        hash_obj = sha256()
-        hash_obj.update(concat_checksums.encode())
-
-        self.checksum = hash_obj.hexdigest()
-        self.size = total_size
-
-
-class DrsBlob(Base, DrsMixin):
-    __tablename__ = "drs_object"
-
-    id = Column(String, primary_key=True)
-    bundle_id = Column(Integer, ForeignKey(DrsBundle.id), nullable=True)
-    location = Column(String(500), nullable=False)
 
     def __init__(self, *args, **kwargs):
         logger = current_app.logger

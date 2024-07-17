@@ -35,10 +35,10 @@ def dummy_file_path() -> str:  # Function rather than constant so we can set env
     return str(APP_DIR.parent / "tests" / "dummy_file.txt")
 
 
-def dummy_directory_path() -> str:  # Function rather than constant so we can set environ first
+def dummy_directory_path() -> pathlib.Path:  # Function rather than constant so we can set environ first
     from chord_drs.config import APP_DIR
 
-    return str(APP_DIR / "migrations")
+    return APP_DIR / "migrations"
 
 
 def empty_file_path():  # Function rather than constant so we can set environ first
@@ -128,22 +128,29 @@ def drs_object():
 
 
 @pytest.fixture
-def drs_bundle():
+def drs_multi_object():
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import db
-    from chord_drs.commands import create_drs_bundle
+    from chord_drs.models import DrsBlob
 
-    bundle = create_drs_bundle(
-        dummy_directory_path(),
-        project_id=DUMMY_PROJECT_ID,
-        dataset_id=DUMMY_DATASET_ID,
-        data_type=DATA_TYPE_PHENOPACKET,
-    )
+    objs = []
+
+    for f in dummy_directory_path().glob("*"):
+        if f.is_file():
+            obj = DrsBlob(
+                location=str(f),
+                project_id=DUMMY_PROJECT_ID,
+                dataset_id=DUMMY_DATASET_ID,
+                data_type=DATA_TYPE_PHENOPACKET,
+            )
+
+            db.session.add(obj)
+            objs.append(obj)
 
     db.session.commit()
 
-    yield bundle
+    return objs
 
 
 @pytest.fixture
@@ -164,24 +171,3 @@ def drs_object_minio():
     db.session.commit()
 
     yield drs_object
-
-
-@pytest.fixture
-def drs_bundle_minio():
-    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
-
-    from chord_drs.app import db
-    from chord_drs.commands import create_drs_bundle
-
-    with mock_s3():
-        bundle = create_drs_bundle(
-            dummy_directory_path(),
-            project_id=DUMMY_PROJECT_ID,
-            dataset_id=DUMMY_DATASET_ID,
-            data_type=DATA_TYPE_PHENOPACKET,
-            exclude=frozenset({"versions", "__pycache__"}),
-        )
-
-        db.session.commit()
-
-        yield bundle
