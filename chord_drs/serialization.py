@@ -7,12 +7,11 @@ from flask import (
 from urllib.parse import urlparse
 
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
-from .models import DrsMixin, DrsBlob, DrsBundle
-from .types import DRSAccessMethodDict, DRSContentsDict, DRSObjectBentoDict, DRSObjectDict
+from .models import DrsMixin, DrsBlob
+from .types import DRSAccessMethodDict, DRSObjectBentoDict, DRSObjectDict
 
 
 __all__ = [
-    "build_bundle_json",
     "build_blob_json",
 ]
 
@@ -25,62 +24,12 @@ def create_drs_uri(object_id: str) -> str:
     return f"drs://{get_drs_host()}/{object_id}"
 
 
-def build_contents(bundle: DrsBundle, expand: bool) -> list[DRSContentsDict]:
-    content: list[DRSContentsDict] = []
-    bundles = DrsBundle.query.filter_by(parent_bundle=bundle).all()
-
-    for b in bundles:
-        content.append(
-            {
-                **({"contents": build_contents(b, expand)} if expand else {}),
-                "drs_uri": create_drs_uri(b.id),
-                "id": b.id,
-                "name": b.name,  # TODO: Can overwrite... see spec
-            }
-        )
-
-    for c in bundle.objects:
-        content.append(
-            {
-                "drs_uri": create_drs_uri(c.id),
-                "id": c.id,
-                "name": c.name,  # TODO: Can overwrite... see spec
-            }
-        )
-
-    return content
-
-
 def build_bento_object_json(drs_object: DrsMixin) -> DRSObjectBentoDict:
     return {
         "project_id": drs_object.project_id,
         "dataset_id": drs_object.dataset_id,
         "data_type": drs_object.data_type,
         "public": drs_object.public,
-    }
-
-
-def build_bundle_json(
-    drs_bundle: DrsBundle,
-    expand: bool = False,
-    with_bento_properties: bool = False,
-) -> DRSObjectDict:
-    return {
-        "contents": build_contents(drs_bundle, expand),
-        "checksums": [
-            {
-                "checksum": drs_bundle.checksum,
-                "type": "sha-256",
-            },
-        ],
-        "created_time": f"{drs_bundle.created.isoformat('T')}Z",
-        "size": drs_bundle.size,
-        "name": drs_bundle.name,
-        # Description should be excluded if null in the database
-        **({"description": drs_bundle.description} if drs_bundle.description is not None else {}),
-        "id": drs_bundle.id,
-        "self_uri": create_drs_uri(drs_bundle.id),
-        **({"bento": build_bento_object_json(drs_bundle)} if with_bento_properties else {}),
     }
 
 

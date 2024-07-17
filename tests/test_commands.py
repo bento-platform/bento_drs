@@ -1,10 +1,9 @@
 from click.testing import CliRunner
 from chord_drs.commands import ingest
-from chord_drs.models import DrsBlob, DrsBundle
+from chord_drs.models import DrsBlob
 from tests.conftest import (
     non_existant_dummy_file_path,
     dummy_file_path,
-    dummy_directory_path,
 )
 
 
@@ -18,7 +17,6 @@ def test_ingest_fail(client_local):
 
 def test_ingest(client_local):
     dummy_file = dummy_file_path()
-    dummy_dir = dummy_directory_path()
 
     runner = CliRunner()
     result = runner.invoke(ingest, [dummy_file])
@@ -29,11 +27,3 @@ def test_ingest(client_local):
     assert result.exit_code == 0
     assert obj.name == filename
     assert obj.location
-
-    result = runner.invoke(ingest, [dummy_dir])
-
-    filename = dummy_dir.split("/")[-1]
-    bundle = DrsBundle.query.filter_by(name=filename).first()
-
-    assert result.exit_code == 0
-    assert len(bundle.objects) > 0

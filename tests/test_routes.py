@@ -337,45 +337,7 @@ def test_object_multi_delete(client):
 
 
 @responses.activate
-def test_bundle_and_download(client, drs_bundle):
-    authz_everything_true()
-
-    res = client.get(f"/objects/{drs_bundle.id}")
-    data = res.get_json()
-
-    assert res.status_code == 200
-    assert "access_methods" not in data  # TODO: there should be access_methods for bundles... although it is spec-opt.
-    # issue again with the number of files ingested when ran locally vs travis-ci
-    assert "contents" in data and len(data["contents"]) > 0
-    assert "name" in data and data["name"] == drs_bundle.name
-
-    assert "checksums" in data and len("checksums") > 0
-
-    assert "created_time" in data
-    assert "size" in data
-    assert "id" in data and data["id"] == drs_bundle.id
-
-    # jsonify sort alphabetically - makes it that the last element will be
-    # an object and not a bundle
-    obj = data["contents"][-1]
-
-    # Fetch nested object record by ID
-    res = client.get(f"/objects/{obj['id']}")
-    assert res.status_code == 200
-    nested_obj = res.get_json()
-
-    # Fetch nested object bytes
-    res = client.get(nested_obj["access_methods"][0]["access_url"]["url"])
-    assert res.status_code == 200
-    assert res.content_length == nested_obj["size"]
-
-    # Bundle download is currently unimplemented
-    res = client.get(f"/objects/{drs_bundle.id}/download")
-    assert res.status_code == 400
-
-
-@responses.activate
-def test_search_bad_query(client, drs_bundle):
+def test_search_bad_query(client, drs_multi_object):
     authz_everything_true()
 
     res = client.get("/search")
@@ -390,8 +352,8 @@ def test_search_bad_query(client, drs_bundle):
         "/search?fuzzy_name=asd",
     ),
 )
-def test_search_object_empty(client, drs_bundle, url):
-    authz_everything_true(count=len(drs_bundle.objects))
+def test_search_object_empty(client, drs_multi_object, url):
+    authz_everything_true(count=len(drs_multi_object))
 
     res = client.get(url)
     data = res.get_json()
@@ -412,8 +374,8 @@ def test_search_object_empty(client, drs_bundle, url):
         "/search?q=alembic.ini&internal_path=1",
     ),
 )
-def test_search_object(client, drs_bundle, url):
-    authz_everything_true(count=len(drs_bundle.objects))  # TODO: + 1 once we can search bundles
+def test_search_object(client, drs_multi_object, url):
+    authz_everything_true(count=len(drs_multi_object))
 
     res = client.get(url)
     data = res.get_json()
@@ -426,8 +388,8 @@ def test_search_object(client, drs_bundle, url):
 
 
 @responses.activate
-def test_search_no_permissions(client, drs_bundle):
-    authz_everything_false(count=len(drs_bundle.objects))
+def test_search_no_permissions(client, drs_multi_object):
+    authz_everything_false(count=len(drs_multi_object))
 
     res = client.get("/search?name=alembic.ini")
     data = res.get_json()
