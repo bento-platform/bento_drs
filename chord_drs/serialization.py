@@ -7,7 +7,7 @@ from flask import (
 from urllib.parse import urlparse
 
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
-from .models import DrsMixin, DrsBlob
+from .models import DrsBlob
 from .types import DRSAccessMethodDict, DRSObjectBentoDict, DRSObjectDict
 
 
@@ -24,7 +24,7 @@ def create_drs_uri(object_id: str) -> str:
     return f"drs://{get_drs_host()}/{object_id}"
 
 
-def build_bento_object_json(drs_object: DrsMixin) -> DRSObjectBentoDict:
+def build_bento_object_json(drs_object: DrsBlob) -> DRSObjectBentoDict:
     return {
         "project_id": drs_object.project_id,
         "dataset_id": drs_object.dataset_id,

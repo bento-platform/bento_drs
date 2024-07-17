@@ -22,26 +22,24 @@ __all__ = [
 Base = declarative_base()
 
 
-class DrsMixin:
-    # IDs (PKs) must remain outside the mixin!
+class DrsBlob(Base):
+    __tablename__ = "drs_object"
+
+    id = Column(String, primary_key=True)
+    location = Column(String(500), nullable=False)
+
     created = Column(DateTime, server_default=func.now())
     checksum = Column(String(64), nullable=False)
     size = Column(Integer, default=0)
     name = Column(String(250), nullable=True)
     description = Column(String(1000), nullable=True)
+
     # Permissions/Bento-specific project & dataset tagging for DRS items
     # TODO: Make some of these not nullable in the future:
     project_id = Column(String(64), nullable=True)  # Nullable for backwards-compatibility
     dataset_id = Column(String(64), nullable=True)  # Nullable for backwards-compatibility / project-only stuff?
     data_type = Column(String(24), nullable=True)  # NULL if multi-data type or something else
     public = Column(Boolean, default=False, nullable=False)  # If true, the object is accessible by anyone
-
-
-class DrsBlob(Base, DrsMixin):
-    __tablename__ = "drs_object"
-
-    id = Column(String, primary_key=True)
-    location = Column(String(500), nullable=False)
 
     def __init__(self, *args, **kwargs):
         logger = current_app.logger
