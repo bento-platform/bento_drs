@@ -4,7 +4,6 @@ __all__ = [
     "DRSAccessURLDict",
     "DRSAccessMethodDict",
     "DRSChecksumDict",
-    "DRSContentsDict",
     "DRSObjectBentoDict",
     "DRSObjectDict",
 ]
@@ -47,12 +46,6 @@ class _DRSContentsDictBase(TypedDict):
     name: str
 
 
-class DRSContentsDict(_DRSContentsDictBase, total=False):
-    id: str
-    drs_uri: str
-    contents: list["DRSContentsDict"]
-
-
 class DRSObjectBentoDict(TypedDict):
     project_id: str | None
     dataset_id: str | None
@@ -67,6 +60,5 @@ class DRSObjectDict(_DRSObjectDictBase, total=False):
     updated_time: str
     version: str
     mime_type: str
-    contents: list[DRSContentsDict]
     aliases: list[str]
     bento: DRSObjectBentoDict

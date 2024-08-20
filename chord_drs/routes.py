@@ -28,8 +28,8 @@ from .authz import authz_middleware
 from .backend import get_backend
 from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
 from .db import db
-from .models import DrsBlob, DrsBundle
-from .serialization import build_bundle_json, build_blob_json
+from .models import DrsBlob
+from .serialization import build_blob_json
 from .utils import drs_file_checksum
 
 
@@ -65,7 +65,7 @@ def _post_headers_getter(r: Request) -> dict[str, str]:
 
 
 def check_objects_permission(
-    drs_objs: list[DrsBlob | DrsBundle], permission: Permission, mark_authz_done: bool = False
+    drs_objs: list[DrsBlob], permission: Permission, mark_authz_done: bool = False
 ) -> tuple[bool, ...]:
     if not authz_enabled():
         return tuple([True] * len(drs_objs))  # Assume we have permission for everything if authz disabled
@@ -87,10 +87,10 @@ def check_objects_permission(
     )  # now a tuple of length len(drs_objs) of whether we have the permission for each object
 
 
-def fetch_and_check_object_permissions(object_id: str, permission: Permission) -> tuple[DrsBlob | DrsBundle, bool]:
+def fetch_and_check_object_permissions(object_id: str, permission: Permission) -> DrsBlob:
     has_permission_on_everything = check_everything_permission(permission)
 
-    drs_object, is_bundle = get_drs_object(object_id)
+    drs_object = get_drs_object(object_id)
 
     if not drs_object:
         authz_middleware.mark_authz_done(request)
@@ -108,7 +108,7 @@ def fetch_and_check_object_permissions(object_id: str, permission: Permission) -
             raise forbidden()
     # -------------------------------------------------------------------
 
-    return drs_object, is_bundle
+    return drs_object
 
 
 def bad_request_log_mark(err: str) -> BadRequest:
@@ -149,35 +149,25 @@ def service_info():
     )
 
 
-def get_drs_object(object_id: str) -> tuple[DrsBlob | DrsBundle | None, bool]:
-    if drs_bundle := DrsBundle.query.filter_by(id=object_id).first():
-        return drs_bundle, True
-
-    # Only try hitting the database for an object if no bundle was found
-    if drs_blob := DrsBlob.query.filter_by(id=object_id).first():
-        return drs_blob, False
-
-    return None, False
+def get_drs_object(object_id: str) -> DrsBlob | None:
+    return DrsBlob.query.filter_by(id=object_id).first()
 
 
 def delete_drs_object(object_id: str, logger: logging.Logger):
-    drs_object, is_bundle = fetch_and_check_object_permissions(object_id, P_DELETE_DATA)
+    drs_object = fetch_and_check_object_permissions(object_id, P_DELETE_DATA)
 
     logger.info(f"Deleting object {drs_object.id}")
 
-    if not is_bundle:
-        q = DrsBlob.query.filter_by(location=drs_object.location)
-        n_using_file = q.count()
-        if n_using_file == 1 and q.first().id == drs_object.id:
-            # If this object is the only one using the file, delete the file too
-            # TODO: this can create a race condition and leave files undeleted... should we have a cleanup on start?
-            logger.info(
-                f"Deleting file at {drs_object.location}, since {drs_object.id} is the only object referring to it."
-            )
-            backend = get_backend()
-            backend.delete(drs_object.location)
-
-    # Don't bother with additional bundle deleting logic, they'll be removed soon anyway. TODO
+    q = DrsBlob.query.filter_by(location=drs_object.location)
+    n_using_file = q.count()
+    if n_using_file == 1 and q.first().id == drs_object.id:
+        # If this object is the only one using the file, delete the file too
+        # TODO: this can create a race condition and leave files undeleted... should we have a cleanup on start?
+        logger.info(
+            f"Deleting file at {drs_object.location}, since {drs_object.id} is the only object referring to it."
+        )
+        backend = get_backend()
+        backend.delete(drs_object.location)
 
     db.session.delete(drs_object)
     db.session.commit()
@@ -190,14 +180,10 @@ def object_info(object_id: str):
         delete_drs_object(object_id, current_app.logger)
         return current_app.response_class(status=204)
 
-    drs_object, is_bundle = fetch_and_check_object_permissions(object_id, P_QUERY_DATA)
+    drs_object = fetch_and_check_object_permissions(object_id, P_QUERY_DATA)
 
     # The requester can ask for additional, non-spec-compliant Bento properties to be included in the response
     with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
-
-    if is_bundle:
-        expand: bool = str_to_bool(request.args.get("expand", ""))
-        return jsonify(build_bundle_json(drs_object, expand=expand, with_bento_properties=with_bento_properties))
 
     # The requester can specify object internal path to be added to the response
     use_internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
@@ -222,8 +208,6 @@ def object_access(object_id: str, access_id: str):
 
 @drs_service.route("/search", methods=["GET"])
 def object_search():
-    # TODO: Enable search for bundles too
-
     response = []
 
     name: str | None = request.args.get("name")
@@ -262,12 +246,7 @@ def object_search():
 def object_download(object_id: str):
     logger = current_app.logger
 
-    # TODO: Bundle download
-
-    drs_object, is_bundle = fetch_and_check_object_permissions(object_id, P_DOWNLOAD_DATA)
-
-    if is_bundle:
-        raise BadRequest("Bundle download is currently unsupported")
+    drs_object = fetch_and_check_object_permissions(object_id, P_DOWNLOAD_DATA)
 
     obj_name = drs_object.name
     minio_obj = drs_object.return_minio_object()
@@ -336,9 +315,6 @@ def object_download(object_id: str):
 
 @drs_service.route("/ingest", methods=["POST"])
 def object_ingest():
-    # TODO: Enable specifying a parent bundle
-    # TODO: If a parent is specified, make sure we have permissions to ingest into it? How to reconcile?
-
     logger = current_app.logger
     data = request.form or {}
 
