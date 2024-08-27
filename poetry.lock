@@ -227,31 +227,31 @@ tests-mypy = ["mypy (>=1.11.1)", "pytest-mypy-plugins"]
 
 [[package]]
 name = "bento-lib"
-version = "11.12.0"
+version = "12.1.0"
 description = "A set of common utilities and helpers for Bento platform services."
 optional = false
 python-versions = "<4.0,>=3.10"
 files = [
-    {file = "bento_lib-11.12.0-py3-none-any.whl", hash = "sha256:6623110d4eb784f5bb1039cca79aeed4b7663c635e37b699c18832d705178e14"},
-    {file = "bento_lib-11.12.0.tar.gz", hash = "sha256:fc44433625f94057cd08a9bbf4e8b4adc6a9ce6ad9d504811b84e6e9fe73e5ed"},
+    {file = "bento_lib-12.1.0-py3-none-any.whl", hash = "sha256:ddf47517639a819939f1cb024c155d5c3ef307092691dbae78171c122ab24c50"},
+    {file = "bento_lib-12.1.0.tar.gz", hash = "sha256:ed2a56fb8e029e8f433abcf6370b1c8752f5f5d7043813c132bbf511f358ba35"},
 ]
 
 [package.dependencies]
-aiofiles = ">=23.2.1,<25"
-aiohttp = ">=3.9.4,<4"
+aiofiles = ">=24.1.0,<25"
+aiohttp = ">=3.10.5,<4"
 flask = {version = ">=2.2.5,<4", optional = true, markers = "extra == \"flask\""}
-jsonschema = ">=4.20.0,<5"
+jsonschema = ">=4.23.0,<5"
 psycopg2-binary = ">=2.9.9,<3.0"
-pydantic = ">=2.5.2,<3"
-pydantic-settings = ">=2.1.0,<3"
-redis = ">=5.0.1,<6"
-requests = ">=2.31.0,<3"
+pydantic = ">=2.8.2,<3"
+pydantic-settings = ">=2.4.0,<3"
+redis = ">=5.0.8,<6"
+requests = ">=2.32.3,<3"
 werkzeug = ">=2.2.3,<4"
 
 [package.extras]
 asyncpg = ["asyncpg (>=0.29.0,<0.30.0)"]
-django = ["django (>=4.2.7,<5.1)", "djangorestframework (>=3.14.0,<3.16)"]
-fastapi = ["fastapi (>=0.104,<0.113)"]
+django = ["django (>=5.0.8,<5.2)", "djangorestframework (>=3.14.0,<3.16)"]
+fastapi = ["fastapi (>=0.112.1,<0.113)"]
 flask = ["flask (>=2.2.5,<4)"]
 
 [[package]]
@@ -1007,13 +1007,13 @@ test = ["objgraph", "psutil"]
 
 [[package]]
 name = "idna"
-version = "3.7"
+version = "3.8"
 description = "Internationalized Domain Names in Applications (IDNA)"
 optional = false
-python-versions = ">=3.5"
+python-versions = ">=3.6"
 files = [
-    {file = "idna-3.7-py3-none-any.whl", hash = "sha256:82fee1fc78add43492d3a1898bfa6d8a904cc97d8427f683ed8e798d07761aa0"},
-    {file = "idna-3.7.tar.gz", hash = "sha256:028ff3aadf0609c1fd278d8ea3089299412a7a8b9bd005dd08b9f8285bcb5cfc"},
+    {file = "idna-3.8-py3-none-any.whl", hash = "sha256:050b4e5baadcd44d760cedbd2b8e639f2ff89bbc7a5730fcc662954303377aac"},
+    {file = "idna-3.8.tar.gz", hash = "sha256:d838c2c0ed6fced7693d5e8ab8e734d5f8fda53a039c0164afb0b82e771e3603"},
 ]
 
 [[package]]
@@ -2240,13 +2240,13 @@ testing = ["build[virtualenv] (>=1.2.1)", "covdefaults (>=2.3)", "detect-test-po
 
 [[package]]
 name = "types-flask-cors"
-version = "4.0.0.20240806"
+version = "4.0.0.20240825"
 description = "Typing stubs for Flask-Cors"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "types-Flask-Cors-4.0.0.20240806.tar.gz", hash = "sha256:f2909056ff2e42f6a966735129d02a4c6a1379e1aee3dfbb3180ea31107699a1"},
-    {file = "types_Flask_Cors-4.0.0.20240806-py3-none-any.whl", hash = "sha256:536c41a7cd7094ef3a8a5626d2610a3d443fd1336d03d758fe898db6f362adfc"},
+    {file = "types-Flask-Cors-4.0.0.20240825.tar.gz", hash = "sha256:db273733259bad810aec5bea79541431b3bae316b4766a12ca002f2b5e36cde9"},
+    {file = "types_Flask_Cors-4.0.0.20240825-py3-none-any.whl", hash = "sha256:32c9959af4bd7fb38034b3839fa497f84c3dbdc7a92979036566f30c1fe1b093"},
 ]
 
 [package.dependencies]
@@ -2449,4 +2449,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "68fed1452eae68d9f534bd8637bb2e0d78f0250f32c77be3c59997eace1d5385"
+content-hash = "37eaeb55016ba11a8cbfcd81464246f9a9a89df72c7975e9b92b1598221ceda2"

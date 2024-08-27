@@ -10,7 +10,6 @@ from .authz import authz_middleware
 from .backend import close_backend
 from .commands import ingest
 from .config import Config, APP_DIR
-from .constants import SERVICE_NAME
 from .db import db
 from .metrics import metrics
 from .request import DrsRequest
@@ -39,7 +38,6 @@ application.register_error_handler(
     Exception,
     flask_errors.flask_error_wrap_with_traceback(
         flask_errors.flask_internal_server_error,
-        service_name=SERVICE_NAME,
         drs_compat=True,
         logger=application.logger,
         authz=authz_middleware,
