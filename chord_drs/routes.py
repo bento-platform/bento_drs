@@ -87,7 +87,7 @@ def check_objects_permission(
     )  # now a tuple of length len(drs_objs) of whether we have the permission for each object
 
 
-def fetch_and_check_object_permissions(object_id: str, permission: Permission) -> DrsBlob:
+def fetch_and_check_object_permissions(object_id: str, permission: Permission, logger: logging.Logger) -> DrsBlob:
     has_permission_on_everything = check_everything_permission(permission)
 
     drs_object = get_drs_object(object_id)
@@ -95,6 +95,7 @@ def fetch_and_check_object_permissions(object_id: str, permission: Permission) -
     if not drs_object:
         authz_middleware.mark_authz_done(request)
         if authz_enabled() and not has_permission_on_everything:  # Don't leak if this object exists
+            logger.error("No object found for the requested ID; masking with 403 to prevent ID discovery")
             raise forbidden()
         raise NotFound("No object found for this ID")
 
@@ -154,7 +155,7 @@ def get_drs_object(object_id: str) -> DrsBlob | None:
 
 
 def delete_drs_object(object_id: str, logger: logging.Logger):
-    drs_object = fetch_and_check_object_permissions(object_id, P_DELETE_DATA)
+    drs_object = fetch_and_check_object_permissions(object_id, P_DELETE_DATA, logger)
 
     logger.info(f"Deleting object {drs_object.id}")
 
@@ -176,11 +177,13 @@ def delete_drs_object(object_id: str, logger: logging.Logger):
 @drs_service.route("/objects/<string:object_id>", methods=["GET", "DELETE"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET", "DELETE"])
 def object_info(object_id: str):
+    logger = current_app.logger
+
     if request.method == "DELETE":
-        delete_drs_object(object_id, current_app.logger)
+        delete_drs_object(object_id, logger)
         return current_app.response_class(status=204)
 
-    drs_object = fetch_and_check_object_permissions(object_id, P_QUERY_DATA)
+    drs_object = fetch_and_check_object_permissions(object_id, P_QUERY_DATA, logger)
 
     # The requester can ask for additional, non-spec-compliant Bento properties to be included in the response
     with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
@@ -196,7 +199,7 @@ def object_info(object_id: str):
 @drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 def object_access(object_id: str, access_id: str):
-    fetch_and_check_object_permissions(object_id, P_QUERY_DATA)
+    fetch_and_check_object_permissions(object_id, P_QUERY_DATA, current_app.logger)
 
     # We explicitly do not support access_id-based accesses; all of them will be 'not found'
     # since we don't provide access IDs
@@ -246,7 +249,7 @@ def object_search():
 def object_download(object_id: str):
     logger = current_app.logger
 
-    drs_object = fetch_and_check_object_permissions(object_id, P_DOWNLOAD_DATA)
+    drs_object = fetch_and_check_object_permissions(object_id, P_DOWNLOAD_DATA, logger)
 
     obj_name = drs_object.name
     minio_obj = drs_object.return_minio_object()
