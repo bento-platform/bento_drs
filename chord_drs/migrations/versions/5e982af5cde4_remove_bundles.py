@@ -53,6 +53,5 @@ def downgrade():
 
     with op.batch_alter_table("drs_object", schema=None) as batch_op:
         batch_op.add_column(sa.Column("bundle_id", sa.INTEGER(), nullable=True))
-        batch_op.create_foreign_key(None, "drs_bundle", ["bundle_id"], ["id"])
 
     # ### end Alembic commands ###
