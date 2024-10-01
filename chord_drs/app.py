@@ -75,7 +75,7 @@ application.register_error_handler(
 
 # Attach the database to the application and run migrations if needed
 db.init_app(application)
-migrate = Migrate(application, db, directory=MIGRATION_DIR)
+migrate = Migrate(application, db, directory=MIGRATION_DIR, render_as_batch=True)
 
 # Register routes
 application.register_blueprint(drs_service)
