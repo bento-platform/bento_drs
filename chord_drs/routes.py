@@ -26,7 +26,7 @@ from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerE
 from . import __version__
 from .authz import authz_middleware
 from .backend import get_backend
-from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE
+from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE, MIME_OCTET_STREAM
 from .db import db
 from .models import DrsBlob
 from .serialization import build_blob_json
@@ -34,7 +34,6 @@ from .utils import drs_file_checksum
 
 
 RE_STARTING_SLASH = re.compile(r"^/")
-MIME_OCTET_STREAM = "application/octet-stream"
 CHUNK_SIZE = 1024 * 128  # Read 128 KB at a time
 
 drs_service = Blueprint("drs_service", __name__)
@@ -253,6 +252,7 @@ def object_download(object_id: str):
 
     obj_name = drs_object.name
     minio_obj = drs_object.return_minio_object()
+    mime_type = drs_object.mime_type or MIME_OCTET_STREAM
 
     if not minio_obj:
         # Check for "Range" HTTP header
@@ -260,7 +260,7 @@ def object_download(object_id: str):
 
         if range_header is None:
             # Early return, no range header so send the whole thing
-            res = make_response(send_file(drs_object.location, mimetype=MIME_OCTET_STREAM, download_name=obj_name))
+            res = make_response(send_file(drs_object.location, mimetype=mime_type, download_name=obj_name))
             res.headers["Accept-Ranges"] = "bytes"
             return res
 
@@ -298,8 +298,8 @@ def object_download(object_id: str):
                         break
 
         # Stream the bytes of the file or file segment from the generator function
-        r = current_app.response_class(generate_bytes(), status=206, mimetype=MIME_OCTET_STREAM)
-        r.headers["Content-Length"] = end + 1 - start  # byte range is inclusive, so need to add one
+        r = current_app.response_class(generate_bytes(), status=206, mimetype=mime_type)
+        r.headers["Content-Length"] = str(end + 1 - start)  # byte range is inclusive, so need to add one
         r.headers["Content-Range"] = f"bytes {start}-{end}/{obj_size}"
         r.headers["Content-Disposition"] = (
             f"attachment; filename*=UTF-8'{urllib.parse.quote(obj_name, encoding='utf-8')}'"
@@ -309,7 +309,7 @@ def object_download(object_id: str):
     # TODO: Support range headers for MinIO objects - only the local backend supports it for now
     # TODO: kinda greasy, not really sure we want to support such a feature later on
     response = make_response(
-        send_file(minio_obj["Body"], mimetype="application/octet-stream", as_attachment=True, download_name=obj_name)
+        send_file(minio_obj["Body"], mimetype=mime_type, as_attachment=True, download_name=obj_name)
     )
 
     response.headers["Content-Length"] = minio_obj["ContentLength"]
@@ -327,7 +327,9 @@ def object_ingest():
     dataset_id: str | None = data.get("dataset_id") or None  # "
     data_type: str | None = data.get("data_type") or None  # "
     public: bool = data.get("public", "false").strip().lower() == "true"
+
     file = request.files.get("file")
+    mime_type: str | None = data.get("mime_type") or None  # replace blank strings with None
 
     logger.info(f"Received ingest request metadata: {data}")
 
@@ -409,6 +411,7 @@ def object_ingest():
                 drs_object = DrsBlob(
                     **(dict(object_to_copy=object_to_copy) if object_to_copy else dict(location=obj_path)),
                     filename=filename,
+                    mime_type=mime_type,
                     project_id=project_id,
                     dataset_id=dataset_id,
                     data_type=data_type,
@@ -417,6 +420,8 @@ def object_ingest():
                 db.session.add(drs_object)
                 db.session.commit()
                 logger.info(f"Added DRS object: {drs_object}")
+            except ValueError as e:
+                raise bad_request_log_mark(str(e))
             except Exception as e:  # TODO: More specific handling
                 authz_middleware.mark_authz_done(request)
                 logger.error(f"Encountered exception during ingest: {e}")
