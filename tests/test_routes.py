@@ -436,7 +436,10 @@ def _ingest_one(client, existing_id=None, params=None):
 @responses.activate
 def test_object_ingest(client):
     authz_everything_true()
-    _ingest_one(client)
+    data = _ingest_one(client)
+    # check we don't have fields we didn't specify
+    assert "description" not in data
+    assert "mime_type" not in data
 
 
 @responses.activate
