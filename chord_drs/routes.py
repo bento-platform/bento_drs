@@ -252,7 +252,10 @@ def object_download(object_id: str):
 
     obj_name = drs_object.name
     minio_obj = drs_object.return_minio_object()
-    mime_type = drs_object.mime_type or MIME_OCTET_STREAM
+
+    # DRS objects have a nullable mime_type in the database. If mime_type is None, serve the object as a generic
+    # application/octet-stream.
+    mime_type: str = drs_object.mime_type or MIME_OCTET_STREAM
 
     if not minio_obj:
         # Check for "Range" HTTP header
