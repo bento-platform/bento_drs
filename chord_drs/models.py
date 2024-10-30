@@ -60,7 +60,7 @@ class DrsBlob(Base):
             self.location = object_to_copy.location
             self.size = object_to_copy.size
             self.checksum = object_to_copy.checksum
-            self.mime_type
+            self.mime_type = object_to_copy.mime_type
             del kwargs["object_to_copy"]
         else:
             location = kwargs.get("location")
