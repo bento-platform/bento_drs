@@ -90,6 +90,8 @@ def build_blob_json(
         "name": drs_blob.name,
         # Description should be excluded if null in the database
         **({"description": drs_blob.description} if drs_blob.description is not None else {}),
+        # MIME type should be excluded if null in the database
+        **({"mime_type": drs_blob.mime_type} if drs_blob.mime_type is not None else {}),
         "id": drs_blob.id,
         "self_uri": create_drs_uri(drs_blob.id),
         **({"bento": build_bento_object_json(drs_blob)} if with_bento_properties else {}),

@@ -412,6 +412,17 @@ def test_object_ingest_fail_2(client):
     assert res.status_code == 400
 
 
+@pytest.mark.parametrize("mime_type", ["image/*", "invalid/mime", "text/html;"])
+@responses.activate
+def test_object_ingest_bad_mime_type(client, mime_type: str):
+    authz_everything_true()
+    res = client.post("/ingest", data={"path": dummy_file_path(), "mime_type": mime_type})
+    assert res.status_code == 400
+    data = res.get_json()
+    assert data["code"] == 400
+    assert data["errors"] == [{"message": "400 Bad Request: Invalid MIME type"}]
+
+
 def _ingest_one(client, existing_id=None, params=None):
     res = client.post("/ingest", data={"path": dummy_file_path(), **(params or {})})
     data = res.get_json()
@@ -425,7 +436,17 @@ def _ingest_one(client, existing_id=None, params=None):
 @responses.activate
 def test_object_ingest(client):
     authz_everything_true()
-    _ingest_one(client)
+    data = _ingest_one(client)
+    # check we don't have fields we didn't specify
+    assert "description" not in data
+    assert "mime_type" not in data
+
+
+@responses.activate
+def test_object_ingest_with_mime(client):
+    authz_everything_true()
+    data = _ingest_one(client, params={"mime_type": "text/plain"})
+    assert data["mime_type"] == "text/plain"
 
 
 @responses.activate

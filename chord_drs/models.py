@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from .backend import get_backend
 from .backends.minio import MinioBackend
+from .constants import RE_INGESTABLE_MIME_TYPE
 from .utils import drs_file_checksum
 
 __all__ = [
@@ -33,6 +34,8 @@ class DrsBlob(Base):
     size = Column(Integer, default=0)
     name = Column(String(250), nullable=True)
     description = Column(String(1000), nullable=True)
+
+    mime_type = Column(String(128), nullable=True)  # if null, MIME type has not been set / isn't known
 
     # Permissions/Bento-specific project & dataset tagging for DRS items
     # TODO: Make some of these not nullable in the future:
@@ -57,6 +60,7 @@ class DrsBlob(Base):
             self.location = object_to_copy.location
             self.size = object_to_copy.size
             self.checksum = object_to_copy.checksum
+            self.mime_type = object_to_copy.mime_type
             del kwargs["object_to_copy"]
         else:
             location = kwargs.get("location")
@@ -69,6 +73,13 @@ class DrsBlob(Base):
 
             self.name = secure_filename(filename or p.name)
             new_filename = f"{self.id[:12]}-{self.name}"  # TODO: use checksum for filename instead
+
+            # MIME type, if set, must be a valid ingestable mime type (not a made up supertype and not, e.g.,
+            # multipart/form-data.
+            mime_type: str | None = kwargs.get("mime_type")
+            if mime_type is not None and not RE_INGESTABLE_MIME_TYPE.match(mime_type):
+                raise ValueError("Invalid MIME type")
+            self.mime_type = mime_type
 
             backend = get_backend()
 
