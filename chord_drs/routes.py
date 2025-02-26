@@ -251,13 +251,13 @@ def object_download(object_id: str):
     drs_object = fetch_and_check_object_permissions(object_id, P_DOWNLOAD_DATA, logger)
 
     obj_name = drs_object.name
-    minio_obj = drs_object.return_minio_object()
+    s3_obj = drs_object.return_s3_object()
 
     # DRS objects have a nullable mime_type in the database. If mime_type is None, serve the object as a generic
     # application/octet-stream.
     mime_type: str = drs_object.mime_type or MIME_OCTET_STREAM
 
-    if not minio_obj:
+    if not s3_obj:
         # Check for "Range" HTTP header
         range_header = request.headers.get("Range")  # supports "headers={'Range': 'bytes=x-y'}"
 
@@ -309,13 +309,11 @@ def object_download(object_id: str):
         )
         return r
 
-    # TODO: Support range headers for MinIO objects - only the local backend supports it for now
+    # TODO: Support range headers for S3 objects - only the local backend supports it for now
     # TODO: kinda greasy, not really sure we want to support such a feature later on
-    response = make_response(
-        send_file(minio_obj["Body"], mimetype=mime_type, as_attachment=True, download_name=obj_name)
-    )
+    response = make_response(send_file(s3_obj["Body"], mimetype=mime_type, as_attachment=True, download_name=obj_name))
 
-    response.headers["Content-Length"] = minio_obj["ContentLength"]
+    response.headers["Content-Length"] = s3_obj["ContentLength"]
     return response
 
 

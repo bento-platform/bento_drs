@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from .constants import SERVICE_NAME, SERVICE_TYPE
-from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
+from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
 from .logger import logger
 
 
@@ -50,26 +50,14 @@ SERVICE_DATA: str = str(
 AUTHZ_ENABLED = str_to_bool(os.environ.get("AUTHZ_ENABLED", "true"))
 AUTHZ_URL: str = _get_from_environ_or_fail("BENTO_AUTHZ_SERVICE_URL").strip().rstrip("/") if AUTHZ_ENABLED else ""
 
-# MinIO-related, check if the credentials have been provided in a file
-MINIO_URL = os.environ.get("MINIO_URL")
-MINIO_ACCESS_KEY_FILE = os.environ.get("MINIO_ACCESS_KEY_FILE")
-MINIO_SECRET_KEY_FILE = os.environ.get("MINIO_ACCESS_KEY_FILE")
-
-MINIO_USERNAME = os.environ.get("MINIO_USERNAME")
-MINIO_PASSWORD = os.environ.get("MINIO_PASSWORD")
-
-if MINIO_SECRET_KEY_FILE:
-    MINIO_ACCESS_KEY_PATH = Path(MINIO_ACCESS_KEY_FILE).resolve()
-
-    if MINIO_ACCESS_KEY_PATH.exists():
-        with open(MINIO_ACCESS_KEY_PATH, "r") as f:
-            MINIO_USERNAME = f.read().strip()
-
-if MINIO_SECRET_KEY_FILE:
-    MINIO_SECRET_KEY_PATH = Path(MINIO_SECRET_KEY_FILE).resolve()
-    if MINIO_SECRET_KEY_PATH.exists():
-        with open(MINIO_SECRET_KEY_PATH, "r") as f:
-            MINIO_PASSWORD = f.read().strip()
+# S3 variables
+S3_ACCESS_KEY = os.environ.get("S3_ACCESS_KEY")
+S3_SECRET_KEY = os.environ.get("S3_SECRET_KEY")
+S3_ENDPOINT = os.environ.get("S3_ENDPOINT")
+S3_BUCKET = os.environ.get("S3_BUCKET")
+S3_REGION_NAME = os.environ.get("S3_REGION_NAME")
+S3_VALIDATE_SSL = os.environ.get("S3_VALIDATE_SSL", "false")
+S3_USE_HTTPS = os.environ.get("S3_USE_HTTPS", "false")
 
 
 class Config:
@@ -79,14 +67,17 @@ class Config:
     PROMETHEUS_ENABLED: bool = str_to_bool(os.environ.get("PROMETHEUS_ENABLED", "false"))
 
     SERVICE_ID: str = os.environ.get("SERVICE_ID", ":".join(list(SERVICE_TYPE.values())[:2]))
-    SERVICE_DATA_SOURCE: str = DATA_SOURCE_MINIO if MINIO_URL else DATA_SOURCE_LOCAL
-    SERVICE_DATA: str | None = None if MINIO_URL else SERVICE_DATA
+    SERVICE_DATA_SOURCE: str = DATA_SOURCE_S3 if S3_ENDPOINT else DATA_SOURCE_LOCAL
+    SERVICE_DATA: str | None = None if S3_ENDPOINT else SERVICE_DATA
     SERVICE_BASE_URL: str = os.environ.get("SERVICE_BASE_URL", "http://127.0.0.1").strip().rstrip("/")
 
-    MINIO_URL: str | None = MINIO_URL
-    MINIO_USERNAME: str | None = MINIO_USERNAME
-    MINIO_PASSWORD: str | None = MINIO_PASSWORD
-    MINIO_BUCKET: str | None = os.environ.get("MINIO_BUCKET") if MINIO_URL else None
+    S3_ENDPOINT: str | None = S3_ENDPOINT
+    S3_ACCESS_KEY: str | None = S3_ACCESS_KEY
+    S3_SECRET_KEY: str | None = S3_SECRET_KEY
+    S3_BUCKET: str | None = S3_BUCKET
+    S3_REGION_NAME: str | None = S3_REGION_NAME
+    S3_VALIDATE_SSL: bool = str_to_bool(S3_VALIDATE_SSL)
+    S3_USE_HTTPS: bool = str_to_bool(S3_USE_HTTPS)
     BENTO_DEBUG: bool = BENTO_DEBUG
     BENTO_VALIDATE_SSL: bool = BENTO_VALIDATE_SSL
     BENTO_CONTAINER_LOCAL: bool = str_to_bool(os.environ.get("BENTO_CONTAINER_LOCAL", "false"))
@@ -107,4 +98,4 @@ class Config:
 print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
 print(f"[{SERVICE_NAME}]         data source {Config.SERVICE_DATA_SOURCE}")
 print(f"[{SERVICE_NAME}]           data path {Config.SERVICE_DATA}")
-print(f"[{SERVICE_NAME}]           minio URL {Config.MINIO_URL}", flush=True)
+print(f"[{SERVICE_NAME}]           S3 URL {Config.S3_ENDPOINT}", flush=True)

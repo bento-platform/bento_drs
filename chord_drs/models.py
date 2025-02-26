@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 from .backend import get_backend
-from .backends.minio import MinioBackend
+from .backends.s3 import S3Backend
 from .constants import RE_INGESTABLE_MIME_TYPE
 from .utils import drs_file_checksum
 
@@ -102,7 +102,7 @@ class DrsBlob(Base):
 
         super().__init__(*args, **kwargs)
 
-    def return_minio_object(self) -> dict:
+    def return_s3_object(self) -> dict:
         parsed_url = urlparse(self.location)
 
         if parsed_url.scheme != "s3":
@@ -110,7 +110,7 @@ class DrsBlob(Base):
 
         backend = get_backend()
 
-        if not backend or not isinstance(backend, MinioBackend):
+        if not backend or not isinstance(backend, S3Backend):
             raise Exception("The backend for this instance is not properly configured.")
 
-        return backend.get_minio_object_dict(self.location)
+        return backend.get_s3_object_dict(self.location)

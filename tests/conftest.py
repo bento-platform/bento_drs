@@ -10,8 +10,8 @@ from moto import mock_s3
 from pytest_lazyfixture import lazy_fixture
 
 # Must only be imports that don't import authz/app/config/db
-from chord_drs.backends.minio import MinioBackend
-from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
+from chord_drs.backends.s3 import S3Backend
+from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
 
 
 AUTHZ_URL = "http://bento-authz.local"
@@ -48,20 +48,21 @@ def empty_file_path():  # Function rather than constant so we can set environ fi
 
 
 @pytest.fixture
-def client_minio() -> FlaskClient:
+def client_s3() -> FlaskClient:
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import application, db
 
     bucket_name = "test"
-    application.config["MINIO_URL"] = "http://127.0.0.1:9000"
-    application.config["MINIO_BUCKET"] = bucket_name
-    application.config["SERVICE_DATA_SOURCE"] = DATA_SOURCE_MINIO
+    application.config["S3_ENDPOINT"] = "http://127.0.0.1:9000"
+    application.config["S3_USE_HTTPS"] = False
+    application.config["S3_BUCKET"] = bucket_name
+    application.config["SERVICE_DATA_SOURCE"] = DATA_SOURCE_S3
 
     with application.app_context(), mock_s3():
         s3 = boto3.resource("s3")
-        minio_backend = MinioBackend(application.config, resource=s3)
-        g.backend = minio_backend
+        s3_backend = S3Backend(application.config, resource=s3)
+        g.backend = s3_backend
 
         s3.create_bucket(Bucket=bucket_name)
         db.create_all()
@@ -102,7 +103,7 @@ def client_local(local_volume: pathlib.Path) -> FlaskClient:
         db.drop_all()
 
 
-@pytest.fixture(params=[lazy_fixture("client_minio"), lazy_fixture("client_local")])
+@pytest.fixture(params=[lazy_fixture("client_s3"), lazy_fixture("client_local")])
 def client(request) -> FlaskClient:
     return request.param
 
@@ -154,7 +155,7 @@ def drs_multi_object():
 
 
 @pytest.fixture
-def drs_object_minio():
+def drs_object_s3():
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import db
