@@ -8,6 +8,7 @@ from flask import g
 from flask.testing import FlaskClient
 from moto import mock_s3
 from pytest_lazyfixture import lazy_fixture
+from unittest.mock import patch, MagicMock
 
 # Must only be imports that don't import authz/app/config/db
 from chord_drs.backends.s3 import S3Backend
@@ -53,18 +54,23 @@ def client_s3() -> FlaskClient:
 
     from chord_drs.app import application, db
 
-    bucket_name = "test"
     application.config["S3_ENDPOINT"] = "http://127.0.0.1:9000"
-    application.config["S3_USE_HTTPS"] = False
-    application.config["S3_BUCKET"] = bucket_name
+    application.config["S3_USE_HTTPS"] = True
+    application.config["S3_BUCKET"] = "test"
+    application.config["S3_ACCESS_KEY"] = "test_access_key"
+    application.config["S3_SECRET_KEY"] = "test_secret_key"
+    application.config["S3_VALIDATE_SSL"] = True
+    application.config["S3_REGION_NAME"] = "us-east-1"
+
     application.config["SERVICE_DATA_SOURCE"] = DATA_SOURCE_S3
 
-    with application.app_context(), mock_s3():
-        s3 = boto3.resource("s3")
-        s3_backend = S3Backend(application.config, resource=s3)
+    with application.app_context(), mock_s3(), patch("aioboto3.Session", new_callable=MagicMock) as mock_session:
+        mock_s3_session = MagicMock()
+        mock_session.return_value = mock_s3_session
+
+        s3_backend = S3Backend(application.config)
         g.backend = s3_backend
 
-        s3.create_bucket(Bucket=bucket_name)
         db.create_all()
 
         yield application.test_client()
@@ -109,13 +115,14 @@ def client(request) -> FlaskClient:
 
 
 @pytest.fixture
-def drs_object():
+@pytest.mark.asyncio
+async def drs_object():
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import db
     from chord_drs.models import DrsBlob
 
-    drs_object = DrsBlob(
+    drs_object = await DrsBlob.create(
         location=dummy_file_path(),
         project_id=DUMMY_PROJECT_ID,
         dataset_id=DUMMY_DATASET_ID,
@@ -129,7 +136,8 @@ def drs_object():
 
 
 @pytest.fixture
-def drs_multi_object():
+@pytest.mark.asyncio
+async def drs_multi_object():
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import db
@@ -139,7 +147,7 @@ def drs_multi_object():
 
     for f in dummy_directory_path().glob("*"):
         if f.is_file():
-            obj = DrsBlob(
+            obj = await DrsBlob.create(
                 location=str(f),
                 project_id=DUMMY_PROJECT_ID,
                 dataset_id=DUMMY_DATASET_ID,
@@ -155,13 +163,14 @@ def drs_multi_object():
 
 
 @pytest.fixture
-def drs_object_s3():
+@pytest.mark.asyncio
+async def drs_object_s3():
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     from chord_drs.app import db
     from chord_drs.models import DrsBlob
 
-    drs_object = DrsBlob(
+    drs_object = await DrsBlob.create(
         location=dummy_file_path(),
         project_id=DUMMY_PROJECT_ID,
         dataset_id=DUMMY_DATASET_ID,

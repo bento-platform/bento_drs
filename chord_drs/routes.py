@@ -19,6 +19,7 @@ from flask import (
     request,
     send_file,
     make_response,
+    Response,
 )
 from sqlalchemy import or_
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError, RequestedRangeNotSatisfiable
@@ -153,7 +154,7 @@ def get_drs_object(object_id: str) -> DrsBlob | None:
     return DrsBlob.query.filter_by(id=object_id).first()
 
 
-def delete_drs_object(object_id: str, logger: logging.Logger):
+async def delete_drs_object(object_id: str, logger: logging.Logger):
     drs_object = fetch_and_check_object_permissions(object_id, P_DELETE_DATA, logger)
 
     logger.info(f"Deleting object {drs_object.id}")
@@ -167,7 +168,7 @@ def delete_drs_object(object_id: str, logger: logging.Logger):
             f"Deleting file at {drs_object.location}, since {drs_object.id} is the only object referring to it."
         )
         backend = get_backend()
-        backend.delete(drs_object.location)
+        await backend.delete(drs_object.location)
 
     db.session.delete(drs_object)
     db.session.commit()
@@ -175,11 +176,11 @@ def delete_drs_object(object_id: str, logger: logging.Logger):
 
 @drs_service.route("/objects/<string:object_id>", methods=["GET", "DELETE"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET", "DELETE"])
-def object_info(object_id: str):
+async def object_info(object_id: str):
     logger = current_app.logger
 
     if request.method == "DELETE":
-        delete_drs_object(object_id, logger)
+        await delete_drs_object(object_id, logger)
         return current_app.response_class(status=204)
 
     drs_object = fetch_and_check_object_permissions(object_id, P_QUERY_DATA, logger)
@@ -245,13 +246,13 @@ def object_search():
 
 
 @drs_service.route("/objects/<string:object_id>/download", methods=["GET", "POST"])
-def object_download(object_id: str):
+async def object_download(object_id: str):
     logger = current_app.logger
 
     drs_object = fetch_and_check_object_permissions(object_id, P_DOWNLOAD_DATA, logger)
 
     obj_name = drs_object.name
-    s3_obj = drs_object.return_s3_object()
+    s3_obj = await drs_object.return_s3_object()
 
     # DRS objects have a nullable mime_type in the database. If mime_type is None, serve the object as a generic
     # application/octet-stream.
@@ -311,14 +312,17 @@ def object_download(object_id: str):
 
     # TODO: Support range headers for S3 objects - only the local backend supports it for now
     # TODO: kinda greasy, not really sure we want to support such a feature later on
-    response = make_response(send_file(s3_obj["Body"], mimetype=mime_type, as_attachment=True, download_name=obj_name))
+    response = Response(s3_obj["Body"], mimetype=mime_type)
 
     response.headers["Content-Length"] = s3_obj["ContentLength"]
+    response.headers["Content-Disposition"] = (
+        f"attachment; filename*=UTF-8'{urllib.parse.quote(obj_name, encoding='utf-8')}'"
+    )
     return response
 
 
 @drs_service.route("/ingest", methods=["POST"])
-def object_ingest():
+async def object_ingest():
     logger = current_app.logger
     data = request.form or {}
 
@@ -409,7 +413,7 @@ def object_ingest():
 
         if not drs_object:
             try:
-                drs_object = DrsBlob(
+                drs_object = await DrsBlob.create(
                     **(dict(object_to_copy=object_to_copy) if object_to_copy else dict(location=obj_path)),
                     filename=filename,
                     mime_type=mime_type,

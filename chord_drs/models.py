@@ -45,6 +45,10 @@ class DrsBlob(Base):
     public = Column(Boolean, default=False, nullable=False)  # If true, the object is accessible by anyone
 
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    async def create(cls, *args, **kwargs):
         logger = current_app.logger
 
         # If set, we are deduplicating with an existing file object
@@ -53,14 +57,15 @@ class DrsBlob(Base):
         # If set, we are overriding the filename to save the file to
         filename: str | None = kwargs.get("filename")
 
-        self.id = str(uuid4())
+        instance = cls()
+        instance.id = str(uuid4())
 
         if object_to_copy:
-            self.name = secure_filename(filename) if filename else object_to_copy.name
-            self.location = object_to_copy.location
-            self.size = object_to_copy.size
-            self.checksum = object_to_copy.checksum
-            self.mime_type = object_to_copy.mime_type
+            instance.name = secure_filename(filename) if filename else object_to_copy.name
+            instance.location = object_to_copy.location
+            instance.size = object_to_copy.size
+            instance.checksum = object_to_copy.checksum
+            instance.mime_type = object_to_copy.mime_type
             del kwargs["object_to_copy"]
         else:
             location = kwargs.get("location")
@@ -71,38 +76,40 @@ class DrsBlob(Base):
                 # TODO: we will need to account for URLs at some point
                 raise FileNotFoundError("Provided file path does not exists")
 
-            self.name = secure_filename(filename or p.name)
-            new_filename = f"{self.id[:12]}-{self.name}"  # TODO: use checksum for filename instead
+            instance.name = secure_filename(filename or p.name)
+            new_filename = f"{instance.id[:12]}-{instance.name}"  # TODO: use checksum for filename instead
 
             # MIME type, if set, must be a valid ingestable mime type (not a made up supertype and not, e.g.,
             # multipart/form-data.
             mime_type: str | None = kwargs.get("mime_type")
             if mime_type is not None and not RE_INGESTABLE_MIME_TYPE.match(mime_type):
                 raise ValueError("Invalid MIME type")
-            self.mime_type = mime_type
+            instance.mime_type = mime_type
 
             backend = get_backend()
 
             if not backend:
                 raise Exception("The backend for this instance is not properly configured.")
             try:
-                self.location = backend.save(location, new_filename)
-                self.size = os.path.getsize(p)
-                self.checksum = drs_file_checksum(location)
+                instance.location = await backend.save(location, new_filename)
+                instance.size = os.path.getsize(p)
+                instance.checksum = drs_file_checksum(location)
             except Exception as e:
                 logger.error(f"Encountered exception during DRS object creation: {e}")
                 # TODO: implement more specific exception handling
                 raise Exception("Well if the file is not saved... we can't do squat")
 
-            logger.info(f"Creating new DRS object: name={self.name}; size={self.size}; sha256={self.checksum}")
+            logger.info(
+                f"Creating new DRS object: name={instance.name}; size={instance.size}; sha256={instance.checksum}"
+            )
 
         for key_to_remove in ("location", "filename"):
             if key_to_remove in kwargs:
                 del kwargs[key_to_remove]
 
-        super().__init__(*args, **kwargs)
+        return instance
 
-    def return_s3_object(self) -> dict:
+    async def return_s3_object(self) -> dict:
         parsed_url = urlparse(self.location)
 
         if parsed_url.scheme != "s3":
@@ -113,4 +120,4 @@ class DrsBlob(Base):
         if not backend or not isinstance(backend, S3Backend):
             raise Exception("The backend for this instance is not properly configured.")
 
-        return backend.get_s3_object_dict(self.location)
+        return await backend.get_s3_object_dict(self.location)

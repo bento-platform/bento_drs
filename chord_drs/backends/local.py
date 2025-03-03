@@ -19,12 +19,12 @@ class LocalBackend(Backend):
         # We can use mkdir, since resolve has been called in config.py
         self.base_location.mkdir(parents=True, exist_ok=True)
 
-    def save(self, current_location: str | Path, filename: str) -> str:
+    async def save(self, current_location: str | Path, filename: str) -> str:
         new_location = self.base_location / filename
         copy(current_location, new_location)
         return str(new_location.resolve())
 
-    def delete(self, location: str | Path) -> None:
+    async def delete(self, location: str | Path) -> None:
         loc = location if isinstance(location, Path) else Path(location)
         if self.base_location in loc.parents:
             loc.unlink()

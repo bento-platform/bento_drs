@@ -57,7 +57,7 @@ S3_ENDPOINT = os.environ.get("S3_ENDPOINT")
 S3_BUCKET = os.environ.get("S3_BUCKET")
 S3_REGION_NAME = os.environ.get("S3_REGION_NAME")
 S3_VALIDATE_SSL = os.environ.get("S3_VALIDATE_SSL", "false")
-S3_USE_HTTPS = os.environ.get("S3_USE_HTTPS", "false")
+S3_USE_HTTPS = os.environ.get("S3_USE_HTTPS", "true")
 
 
 class Config:

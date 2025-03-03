@@ -11,9 +11,9 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def save(self, current_location: str, filename: str) -> str:  # pragma: no cover
+    async def save(self, current_location: str, filename: str) -> str:  # pragma: no cover
         pass
 
     @abstractmethod
-    def delete(self, location: str) -> None:  # pragma: no cover
+    async def delete(self, location: str) -> None:  # pragma: no cover
         pass
