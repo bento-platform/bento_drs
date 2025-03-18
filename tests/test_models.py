@@ -29,8 +29,7 @@ async def test_drs_blob_init_bad_backend():
 
 @pytest.mark.asyncio
 async def tests3_method_wrong_backend(client_local, drs_object):
-    async for obj in drs_object:
-        assert await obj.return_s3_object() is None
+    assert await drs_object.return_s3_object() is None
 
 
 @pytest.mark.asyncio

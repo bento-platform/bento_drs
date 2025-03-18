@@ -1,4 +1,4 @@
-import boto3
+from typing import Generator
 import os
 import pathlib
 import pytest
@@ -6,7 +6,7 @@ import shutil
 
 from flask import g
 from flask.testing import FlaskClient
-from moto import mock_s3
+import pytest_asyncio
 from pytest_lazyfixture import lazy_fixture
 from unittest.mock import patch, MagicMock
 
@@ -49,10 +49,8 @@ def empty_file_path():  # Function rather than constant so we can set environ fi
 
 
 @pytest.fixture
-def client_s3() -> FlaskClient:
-    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
-
-    from chord_drs.app import application, db
+def s3_app():
+    from chord_drs.app import application
 
     application.config["S3_ENDPOINT"] = "http://127.0.0.1:9000"
     application.config["S3_USE_HTTPS"] = True
@@ -61,19 +59,27 @@ def client_s3() -> FlaskClient:
     application.config["S3_SECRET_KEY"] = "test_secret_key"
     application.config["S3_VALIDATE_SSL"] = True
     application.config["S3_REGION_NAME"] = "us-east-1"
-
     application.config["SERVICE_DATA_SOURCE"] = DATA_SOURCE_S3
 
-    with application.app_context(), mock_s3(), patch("aioboto3.Session", new_callable=MagicMock) as mock_session:
+    yield application
+
+
+@pytest.fixture
+def client_s3(s3_app) -> Generator[FlaskClient, None, None]:
+    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
+
+    from chord_drs.app import db
+
+    with s3_app.app_context(), patch("aioboto3.Session", new_callable=MagicMock) as mock_session:
         mock_s3_session = MagicMock()
         mock_session.return_value = mock_s3_session
 
-        s3_backend = S3Backend(application.config)
+        s3_backend = S3Backend(s3_app.config)
         g.backend = s3_backend
 
         db.create_all()
 
-        yield application.test_client()
+        yield s3_app.test_client()
 
         db.session.remove()
         db.drop_all()
@@ -91,7 +97,7 @@ def local_volume():
 
 
 @pytest.fixture
-def client_local(local_volume: pathlib.Path) -> FlaskClient:
+def client_local(local_volume: pathlib.Path) -> Generator[FlaskClient, None, None]:
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
     os.environ["DATA"] = str(local_volume)
 
@@ -99,6 +105,7 @@ def client_local(local_volume: pathlib.Path) -> FlaskClient:
 
     application.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
     application.config["SERVICE_DATA_SOURCE"] = DATA_SOURCE_LOCAL
+    application.config["SERVICE_DATA"] = str(local_volume)
 
     with application.app_context():
         db.create_all()
@@ -114,8 +121,7 @@ def client(request) -> FlaskClient:
     return request.param
 
 
-@pytest.fixture
-@pytest.mark.asyncio
+@pytest_asyncio.fixture
 async def drs_object():
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
@@ -135,8 +141,7 @@ async def drs_object():
     yield drs_object
 
 
-@pytest.fixture
-@pytest.mark.asyncio
+@pytest_asyncio.fixture
 async def drs_multi_object():
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
@@ -162,8 +167,7 @@ async def drs_multi_object():
     return objs
 
 
-@pytest.fixture
-@pytest.mark.asyncio
+@pytest_asyncio.fixture
 async def drs_object_s3():
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 

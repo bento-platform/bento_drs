@@ -210,8 +210,7 @@ def _test_object_and_download(client, obj, test_range=False):
 @pytest.mark.asyncio
 async def test_object_and_download_s3(client_s3, drs_object_s3):
     authz_everything_true()
-    async for obj in drs_object_s3:
-        _test_object_and_download(client_s3, obj)
+    _test_object_and_download(client_s3, drs_object_s3)
 
 
 @responses.activate
