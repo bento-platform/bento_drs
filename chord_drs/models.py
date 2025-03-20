@@ -1,4 +1,6 @@
 import os
+import botocore
+import botocore.exceptions
 from flask import current_app
 from hashlib import sha256
 from pathlib import Path
@@ -94,6 +96,10 @@ class DrsBlob(Base):
                 instance.location = await backend.save(location, new_filename)
                 instance.size = os.path.getsize(p)
                 instance.checksum = drs_file_checksum(location)
+            except botocore.exceptions.ClientError as err:
+                msg = f"S3 related error during DRS object creation: {err}"
+                logger.error(msg)
+                raise Exception(msg)
             except Exception as e:
                 logger.error(f"Encountered exception during DRS object creation: {e}")
                 # TODO: implement more specific exception handling

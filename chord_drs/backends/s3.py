@@ -3,6 +3,8 @@ from boto3.s3.transfer import S3TransferConfig
 
 from urllib.parse import urlparse
 
+import botocore
+
 from .base import Backend
 
 __all__ = ["S3Backend"]
@@ -32,9 +34,20 @@ class S3Backend(Backend):
             verify=False,
         )
 
+    async def _init_bucket_if_required(self):
+        # Mostly for tests with S3 mocks
+        async with await self._create_s3_client() as s3_client:
+            try:
+                # Raises ClientError 404 if the bucket is missing
+                return await s3_client.head_bucket(Bucket=self.bucket_name)
+            except botocore.exceptions.ClientError as err:
+                if err.response["ResponseMetadata"]["HTTPStatusCode"] == 404:
+                    return await s3_client.create_bucket(Bucket=self.bucket_name)
+
     def build_s3_location(self, filename):
-        host = urlparse(self._s3_url).netloc
-        return f"s3://{host}/{self.bucket_name}/{filename}"
+        # host = urlparse(self._s3_url).netloc
+        # return f"s3://{host}/{self.bucket_name}/{filename}"
+        return f"s3://{self.bucket_name}/{filename}"
 
     async def get_s3_object_dict(self, location: str) -> dict:
         async with await self._create_s3_client() as s3_client:

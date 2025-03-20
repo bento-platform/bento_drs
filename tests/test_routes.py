@@ -128,6 +128,7 @@ def test_object_access_fail(client):
     assert res.status_code == 404
 
 
+@responses.activate
 def _test_object_and_download(client, obj, test_range=False):
     res = client.get(f"/objects/{obj.id}")
     data = res.get_json()
@@ -207,8 +208,7 @@ def _test_object_and_download(client, obj, test_range=False):
 
 
 @responses.activate
-@pytest.mark.asyncio
-async def test_object_and_download_s3(client_s3, drs_object_s3):
+def test_object_and_download_s3(client_s3, drs_object_s3):
     authz_everything_true()
     _test_object_and_download(client_s3, drs_object_s3)
 
