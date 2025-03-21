@@ -1,10 +1,9 @@
 import os
 from flask import current_app
-from hashlib import sha256
 from pathlib import Path
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.sql import func
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base
 from werkzeug.utils import secure_filename
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -16,7 +15,6 @@ from .utils import drs_file_checksum
 
 __all__ = [
     "Base",
-    "DrsMixin",
     "DrsBlob",
 ]
 

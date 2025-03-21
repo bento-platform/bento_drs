@@ -36,15 +36,15 @@ tox = "^4.12.1"
 debugpy = "^1.8.6"
 pytest-lazy-fixture = "^0.6.3"
 sqlalchemy-stubs = "^0.4"
-mypy = "~1.10.1"
+mypy = "~1.15.0"
 types-flask-cors = "^4.0.0.2"
 types-flask-migrate = "^4.0.0.7"
-black = "^24.4.0"
+ruff = "^0.11.2"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.black]
+[tool.ruff]
 line-length = 120
-exclude = "migrations"
+exclude = ["wsgi.py", "chord_drs/migrations"]
