@@ -49,3 +49,6 @@ build-backend = "poetry.core.masonry.api"
 [tool.black]
 line-length = 120
 exclude = "migrations"
+
+[tool.poetry.plugins."pytest11"]
+s3_server_mock = 'tests.s3_server_mock'
