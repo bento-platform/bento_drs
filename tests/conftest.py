@@ -163,7 +163,16 @@ def s3_session(s3_server):
 
 
 @pytest.fixture
-def client_s3(s3_session) -> Generator[FlaskClient, None, None]:
+def drs_base_url():
+    base_url = "http://127.0.0.1:5000"
+    os.environ["SERVICE_BASE_URL"] = base_url
+    from chord_drs.app import application
+
+    application.config["SERVICE_BASE_URL"] = base_url
+
+
+@pytest.fixture
+def client_s3(s3_session, drs_base_url) -> Generator[FlaskClient, None, None]:
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     import asyncio
@@ -191,20 +200,6 @@ def client_s3(s3_session) -> Generator[FlaskClient, None, None]:
         db.session.remove()
         db.drop_all()
 
-    # with s3_app.app_context(), patch("aioboto3.Session", new_callable=AsyncMock) as mock_session:
-    #     mock_s3_session = AsyncMock()
-    #     mock_session.return_value = mock_s3_session
-
-    #     s3_backend = S3Backend(s3_app.config)
-    #     g.backend = s3_backend
-
-    #     db.create_all()
-
-    #     yield s3_app.test_client()
-
-    #     db.session.remove()
-    #     db.drop_all()
-
 
 @pytest.fixture
 def local_volume():
@@ -218,7 +213,7 @@ def local_volume():
 
 
 @pytest.fixture
-def client_local(local_volume: pathlib.Path) -> Generator[FlaskClient, None, None]:
+def client_local(local_volume: pathlib.Path, drs_base_url) -> Generator[FlaskClient, None, None]:
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
     os.environ["DATA"] = str(local_volume)
 

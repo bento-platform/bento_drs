@@ -12,32 +12,29 @@ from tests.conftest import (
 
 
 # TODO: Issue with app context and backends. On hold for now
-@pytest.mark.asyncio
-async def test_ingest_fail(client_local):
+def test_ingest_fail(client_local):
     # cannot ingest non-existant file
 
     runner = CliRunner()
-    result = await asyncio.to_thread(runner.invoke, ingest, [non_existant_dummy_file_path()])
+    result = runner.invoke(ingest, [non_existant_dummy_file_path()])
 
     assert result.exit_code == 1
 
 
-@pytest.mark.asyncio
-async def test_ingest_fail_dir(client_local):
+def test_ingest_fail_dir(client_local):
     # cannot ingest directory
 
     runner = CliRunner()
-    result = await asyncio.to_thread(runner.invoke, ingest, [str(dummy_directory_path())])
+    result = runner.invoke(ingest, [str(dummy_directory_path())])
 
     assert result.exit_code == 1
 
 
-@pytest.mark.asyncio
-async def test_ingest(client_local):
+def test_ingest(client_local):
     dummy_file = dummy_file_path()
 
     runner = CliRunner()
-    result = await asyncio.to_thread(runner.invoke, ingest, [dummy_file])
+    result = runner.invoke(ingest, [dummy_file])
 
     filename = dummy_file.split("/")[-1]
     obj = DrsBlob.query.filter_by(name=filename).first()

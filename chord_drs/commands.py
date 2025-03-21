@@ -1,3 +1,4 @@
+import asyncio
 import click
 import logging
 import os
@@ -5,9 +6,18 @@ import os
 from click import ClickException
 from flask import current_app
 from flask.cli import with_appcontext
+from functools import wraps
 
 from .db import db
 from .models import DrsBlob
+
+
+def async_wrapper(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        return asyncio.run(f(*args, **kwargs))
+
+    return wrapper
 
 
 async def create_drs_blob(
@@ -32,6 +42,7 @@ async def create_drs_blob(
 @click.option("--project", default="", help="Project ID this object is attached to.")
 @click.option("--dataset", default="", help="Dataset ID this object is attached to.")
 @click.option("--data-type", default="", help="Data type this object is attached to.")
+@async_wrapper
 @with_appcontext
 async def ingest(source: str, project: str, dataset: str, data_type: str) -> None:
     """

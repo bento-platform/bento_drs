@@ -54,12 +54,12 @@ class DrsBlob(Base):
         logger = current_app.logger
 
         # If set, we are deduplicating with an existing file object
-        object_to_copy: DrsBlob | None = kwargs.get("object_to_copy")
+        object_to_copy: DrsBlob | None = kwargs.pop("object_to_copy", None)
 
         # If set, we are overriding the filename to save the file to
-        filename: str | None = kwargs.get("filename")
+        filename: str | None = kwargs.pop("filename", None)
 
-        instance = cls()
+        instance = cls(*args, **kwargs)
         instance.id = str(uuid4())
 
         if object_to_copy:
@@ -68,10 +68,8 @@ class DrsBlob(Base):
             instance.size = object_to_copy.size
             instance.checksum = object_to_copy.checksum
             instance.mime_type = object_to_copy.mime_type
-            del kwargs["object_to_copy"]
         else:
             location = kwargs.get("location")
-
             try:
                 p = Path(location).resolve(strict=True)
             except FileNotFoundError:
@@ -108,10 +106,6 @@ class DrsBlob(Base):
             logger.info(
                 f"Creating new DRS object: name={instance.name}; size={instance.size}; sha256={instance.checksum}"
             )
-
-        for key_to_remove in ("location", "filename"):
-            if key_to_remove in kwargs:
-                del kwargs[key_to_remove]
 
         return instance
 
