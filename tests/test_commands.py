@@ -1,6 +1,3 @@
-import pytest
-import asyncio
-
 from click.testing import CliRunner
 from chord_drs.commands import ingest
 from chord_drs.models import DrsBlob
@@ -11,8 +8,7 @@ from tests.conftest import (
 )
 
 
-# TODO: Issue with app context and backends. On hold for now
-def test_ingest_fail(client_local):
+def test_ingest_fail(client):
     # cannot ingest non-existant file
 
     runner = CliRunner()
@@ -21,7 +17,7 @@ def test_ingest_fail(client_local):
     assert result.exit_code == 1
 
 
-def test_ingest_fail_dir(client_local):
+def test_ingest_fail_dir(client):
     # cannot ingest directory
 
     runner = CliRunner()
@@ -30,7 +26,7 @@ def test_ingest_fail_dir(client_local):
     assert result.exit_code == 1
 
 
-def test_ingest(client_local):
+def test_ingest(client):
     dummy_file = dummy_file_path()
 
     runner = CliRunner()
