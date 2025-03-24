@@ -1,8 +1,6 @@
 import aioboto3
 from boto3.s3.transfer import S3TransferConfig
 
-from urllib.parse import urlparse
-
 import botocore
 
 from .base import Backend

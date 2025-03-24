@@ -16,7 +16,17 @@ from unittest.mock import patch
 from chord_drs.backends.s3 import S3Backend
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
 
-from .constants import *
+from tests.constants import (
+    AUTHZ_URL,
+    DATA_TYPE_PHENOPACKET,
+    DUMMY_DATASET_ID,
+    DUMMY_PROJECT_ID,
+    S3_HOST,
+    S3_PORT,
+    S3_SECRET_KEY,
+    S3_ACCESS_KEY,
+    SQLALCHEMY_DATABASE_URI,
+)
 
 
 T = TypeVar("T")
@@ -62,7 +72,6 @@ def create_fake_session(base_class: Type[T], url_overrides: dict[str, str]) -> T
             self.__access_key = S3_ACCESS_KEY
 
         def client(self, *args, **kwargs):
-
             if "endpoint_url" not in kwargs and args[0] in self.__url_overrides:
                 kwargs["endpoint_url"] = self.__url_overrides[args[0]]
 
@@ -72,7 +81,6 @@ def create_fake_session(base_class: Type[T], url_overrides: dict[str, str]) -> T
             return super(FakeSession, self).client(*args, **kwargs)
 
         def resource(self, *args, **kwargs):
-
             if "endpoint_url" not in kwargs and args[0] in self.__url_overrides:
                 kwargs["endpoint_url"] = self.__url_overrides[args[0]]
 
