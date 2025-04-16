@@ -210,7 +210,13 @@ def _test_object_and_download(client, obj, test_range=False):
 @responses.activate
 def test_object_and_download_s3(client_s3, drs_object_s3):
     authz_everything_true()
-    _test_object_and_download(client_s3, drs_object_s3)
+    res = client_s3.get(f"/objects/{drs_object_s3.id}")
+    data = res.get_json()
+    assert res.status_code == 200
+
+    # Range requests are not implemented for S3
+    res = client_s3.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=0-4"),))
+    assert res.status_code == 400
 
 
 @responses.activate

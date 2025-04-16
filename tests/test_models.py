@@ -28,7 +28,7 @@ async def test_drs_blob_init_bad_backend():
 
 
 @pytest.mark.asyncio
-async def tests3_method_wrong_backend(client_local, drs_object):
+async def test_s3_method_wrong_backend(client_local, drs_object):
     assert await drs_object.return_s3_object() is None
 
 
@@ -42,3 +42,11 @@ async def test_s3_method_wrong_backend_2(client_s3, drs_object_s3):
         g.backend = None  # force a backend re-init with local source, mismatching with DRS object
         await drs_object_s3.return_s3_object()
         assert "not properly configured" in str(e)
+
+
+@pytest.mark.asyncio
+async def test_s3_stream_range(client_s3, drs_object_s3):
+    with pytest.raises(Exception) as e:
+        bytes_range = [0, 100]
+        await drs_object_s3.get_streaming_generator(bytes_range)
+        assert "S3 range requests are not implemented in the S3 backend" in str(e)
