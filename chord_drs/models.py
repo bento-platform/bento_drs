@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 from .backend import get_backend
-from .backends.s3 import S3Backend
+from .backends.s3 import S3Backend, S3ObjectGenerator
 from .constants import RE_INGESTABLE_MIME_TYPE
 from .utils import drs_file_checksum
 
@@ -107,7 +107,7 @@ class DrsBlob(Base):
 
         return instance
 
-    async def return_s3_object(self) -> dict:
+    async def return_s3_object(self) -> S3ObjectGenerator | None:
         parsed_url = urlparse(self.location)
 
         if parsed_url.scheme != "s3":

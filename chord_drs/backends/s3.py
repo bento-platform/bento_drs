@@ -1,11 +1,18 @@
 import aioboto3
 from boto3.s3.transfer import S3TransferConfig
-
+from typing import AsyncIterator, TypedDict
 import botocore
+
+from chord_drs.constants import CHUNK_SIZE
 
 from .base import Backend
 
 __all__ = ["S3Backend"]
+
+
+class S3ObjectGenerator(TypedDict):
+    generator: AsyncIterator[bytes]
+    headers: dict[str, str]
 
 
 class S3Backend(Backend):
@@ -42,16 +49,35 @@ class S3Backend(Backend):
                 if err.response["ResponseMetadata"]["HTTPStatusCode"] == 404:
                     return await s3_client.create_bucket(Bucket=self.bucket_name)
 
-    def build_s3_location(self, filename):
-        # host = urlparse(self._s3_url).netloc
-        # return f"s3://{host}/{self.bucket_name}/{filename}"
-        return f"s3://{self.bucket_name}/{filename}"
+    def _build_s3_location(self, object_key: str):
+        return f"s3://{self.bucket_name}/{object_key}"
 
-    async def get_s3_object_dict(self, location: str) -> dict:
-        async with await self._create_s3_client() as s3_client:
-            response = await s3_client.get_object(Bucket=self.bucket_name, Key=location.split("/")[-1])
-            body = await response["Body"].read()
-            return {"Body": body, "ContentLength": response["ContentLength"]}
+    async def _retrieve_headers(self, object_key: str):
+        async with await self._create_s3_client() as s3:
+            head = await s3.head_object(Bucket=self.bucket_name, Key=object_key)
+        return {
+            "Content-Length": str(head["ContentLength"]),
+            "Content-Type": head["ContentType"],
+            "ETag": head["ETag"],
+            "Last-Modified": str(head["LastModified"]),
+        }
+
+    async def get_s3_object_dict(self, location: str) -> S3ObjectGenerator:
+        # Where location is a full s3 path
+        object_key = location.split(f"s3://{self.bucket_name}/")[-1]
+        headers = await self._retrieve_headers(object_key)
+
+        async def stream_object():
+            async with await self._create_s3_client() as s3_client:
+                response = await s3_client.get_object(Bucket=self.bucket_name, Key=location.split("/")[-1])
+                body_stream = response["Body"]
+                while chunk := await body_stream.read(CHUNK_SIZE):
+                    yield chunk
+
+        return {
+            "generator": stream_object(),
+            "headers": headers,
+        }
 
     async def save(self, current_location: str, filename: str) -> str:
         async with await self._create_s3_client() as s3_client:
@@ -62,7 +88,7 @@ class S3Backend(Backend):
             await s3_client.upload_file(
                 Bucket=self.bucket_name, Key=filename, Filename=current_location, Config=transfer_config
             )
-            location = self.build_s3_location(filename)
+            location = self._build_s3_location(filename)
             return location
 
     async def delete(self, location: str) -> None:

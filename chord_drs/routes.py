@@ -19,7 +19,6 @@ from flask import (
     request,
     send_file,
     make_response,
-    Response,
 )
 from sqlalchemy import or_
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError, RequestedRangeNotSatisfiable
@@ -27,15 +26,14 @@ from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerE
 from . import __version__
 from .authz import authz_middleware
 from .backend import get_backend
-from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE, MIME_OCTET_STREAM
+from .constants import BENTO_SERVICE_KIND, CHUNK_SIZE, SERVICE_NAME, SERVICE_TYPE, MIME_OCTET_STREAM
 from .db import db
 from .models import DrsBlob
 from .serialization import build_blob_json
-from .utils import drs_file_checksum
+from .utils import drs_file_checksum, sync_generator_stream
 
 
 RE_STARTING_SLASH = re.compile(r"^/")
-CHUNK_SIZE = 1024 * 128  # Read 128 KB at a time
 
 drs_service = Blueprint("drs_service", __name__)
 
@@ -257,7 +255,7 @@ async def object_download(object_id: str):
     # DRS objects have a nullable mime_type in the database. If mime_type is None, serve the object as a generic
     # application/octet-stream.
     mime_type: str = drs_object.mime_type or MIME_OCTET_STREAM
-
+    content_disposition = f"attachment; filename*=UTF-8''{urllib.parse.quote(obj_name, encoding='utf-8')}"
     if not s3_obj:
         # Check for "Range" HTTP header
         range_header = request.headers.get("Range")  # supports "headers={'Range': 'bytes=x-y'}"
@@ -305,20 +303,16 @@ async def object_download(object_id: str):
         r = current_app.response_class(generate_bytes(), status=206, mimetype=mime_type)
         r.headers["Content-Length"] = str(end + 1 - start)  # byte range is inclusive, so need to add one
         r.headers["Content-Range"] = f"bytes {start}-{end}/{obj_size}"
-        r.headers["Content-Disposition"] = (
-            f"attachment; filename*=UTF-8'{urllib.parse.quote(obj_name, encoding='utf-8')}'"
-        )
+        r.headers["Content-Disposition"] = content_disposition
         return r
 
     # TODO: Support range headers for S3 objects - only the local backend supports it for now
     # TODO: kinda greasy, not really sure we want to support such a feature later on
-    response = Response(s3_obj["Body"], mimetype=mime_type)
 
-    response.headers["Content-Length"] = s3_obj["ContentLength"]
-    response.headers["Content-Disposition"] = (
-        f"attachment; filename*=UTF-8'{urllib.parse.quote(obj_name, encoding='utf-8')}'"
-    )
-    return response
+    sync_generator = sync_generator_stream(s3_obj["generator"])
+    r = current_app.response_class(sync_generator, status=200, mimetype=mime_type)
+    r.headers = {**r.headers, **s3_obj["headers"], "Content-Disposition": content_disposition}
+    return r
 
 
 @drs_service.route("/ingest", methods=["POST"])
