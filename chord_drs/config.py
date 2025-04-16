@@ -98,4 +98,6 @@ class Config:
 print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
 print(f"[{SERVICE_NAME}]         data source {Config.SERVICE_DATA_SOURCE}")
 print(f"[{SERVICE_NAME}]           data path {Config.SERVICE_DATA}")
-print(f"[{SERVICE_NAME}]           S3 URL {Config.S3_ENDPOINT}", flush=True)
+
+if Config.SERVICE_DATA_SOURCE == DATA_SOURCE_S3:
+    print(f"[{SERVICE_NAME}]           S3 URL {Config.S3_ENDPOINT}", flush=True)
