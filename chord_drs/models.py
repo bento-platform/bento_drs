@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.sql import func
 from sqlalchemy.orm import declarative_base
+from typing import Any, Generator
 from werkzeug.utils import secure_filename
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -119,3 +120,8 @@ class DrsBlob(Base):
             raise Exception("The backend for this instance is not properly configured.")
 
         return await backend.get_s3_object_dict(self.location)
+
+    async def get_streaming_generator(self, range: tuple[int, int] | None = None) -> Generator[Any, None, None]:
+        backend = get_backend()
+        generator = await backend.get_stream_generator(self.location, range)
+        return generator
