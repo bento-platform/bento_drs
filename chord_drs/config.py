@@ -94,6 +94,8 @@ class Config:
     AUTHZ_URL: str = AUTHZ_URL
     AUTHZ_ENABLED: bool = AUTHZ_ENABLED
 
+    LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "info")
+
 
 print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
 print(f"[{SERVICE_NAME}]         data source {Config.SERVICE_DATA_SOURCE}")

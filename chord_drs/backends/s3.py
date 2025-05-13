@@ -1,9 +1,11 @@
+import logging
 import aioboto3
 from boto3.s3.transfer import S3TransferConfig
 from typing import Any, AsyncIterator, Generator, TypedDict
 import botocore
 
 from bento_lib.streaming.exceptions import StreamingException
+from bento_lib.logging import log_level_from_str
 
 from chord_drs.constants import CHUNK_SIZE
 from chord_drs.utils import sync_generator_stream
@@ -20,6 +22,9 @@ class S3ObjectGenerator(TypedDict):
 
 class S3Backend(Backend):
     def __init__(self, config: dict):  # config is dict or flask.Config, which is a subclass of dict.
+        logging.getLogger("boto3").setLevel(log_level_from_str(config["LOG_LEVEL"]))
+        logging.getLogger("botocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
+        logging.getLogger("aiobotocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
         protocol = "https" if config["S3_USE_HTTPS"] else "http"
         endpoint_url = f"{protocol}://{config['S3_ENDPOINT']}"
 
