@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Generator
+from typing import Generator
 
 
 __all__ = ["Backend"]
@@ -22,5 +22,5 @@ class Backend(ABC):
     @abstractmethod
     async def get_stream_generator(
         self, location: str, range: tuple[int, int] | None = None
-    ) -> Generator[Any, None, None]:  # pragma: no cover
+    ) -> Generator[bytes, None, None]:  # pragma: no cover
         pass

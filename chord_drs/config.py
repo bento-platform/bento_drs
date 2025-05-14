@@ -50,14 +50,8 @@ SERVICE_DATA: str = str(
 AUTHZ_ENABLED = str_to_bool(os.environ.get("AUTHZ_ENABLED", "true"))
 AUTHZ_URL: str = _get_from_environ_or_fail("BENTO_AUTHZ_SERVICE_URL").strip().rstrip("/") if AUTHZ_ENABLED else ""
 
-# S3 variables
-S3_ACCESS_KEY = os.environ.get("S3_ACCESS_KEY")
-S3_SECRET_KEY = os.environ.get("S3_SECRET_KEY")
-S3_ENDPOINT = os.environ.get("S3_ENDPOINT")
-S3_BUCKET = os.environ.get("S3_BUCKET")
-S3_REGION_NAME = os.environ.get("S3_REGION_NAME")
-S3_VALIDATE_SSL = os.environ.get("S3_VALIDATE_SSL", "false")
-S3_USE_HTTPS = os.environ.get("S3_USE_HTTPS", "true")
+# S3 variables: S3_ENDPOINT loaded here for conditional init of Config fields
+S3_ENDPOINT: str | None = os.environ.get("S3_ENDPOINT")
 
 
 class Config:
@@ -72,12 +66,12 @@ class Config:
     SERVICE_BASE_URL: str = os.environ.get("SERVICE_BASE_URL", "http://127.0.0.1").strip().rstrip("/")
 
     S3_ENDPOINT: str | None = S3_ENDPOINT
-    S3_ACCESS_KEY: str | None = S3_ACCESS_KEY
-    S3_SECRET_KEY: str | None = S3_SECRET_KEY
-    S3_BUCKET: str | None = S3_BUCKET
-    S3_REGION_NAME: str | None = S3_REGION_NAME
-    S3_VALIDATE_SSL: bool = str_to_bool(S3_VALIDATE_SSL)
-    S3_USE_HTTPS: bool = str_to_bool(S3_USE_HTTPS)
+    S3_ACCESS_KEY: str | None = os.environ.get("S3_ACCESS_KEY")
+    S3_SECRET_KEY: str | None = os.environ.get("S3_SECRET_KEY")
+    S3_BUCKET: str | None = os.environ.get("S3_BUCKET")
+    S3_REGION_NAME: str | None = os.environ.get("S3_REGION_NAME")
+    S3_VALIDATE_SSL: bool = str_to_bool(os.environ.get("S3_VALIDATE_SSL", "false"))
+    S3_USE_HTTPS: bool = str_to_bool(os.environ.get("S3_USE_HTTPS", "true"))
     BENTO_DEBUG: bool = BENTO_DEBUG
     BENTO_VALIDATE_SSL: bool = BENTO_VALIDATE_SSL
     BENTO_CONTAINER_LOCAL: bool = str_to_bool(os.environ.get("BENTO_CONTAINER_LOCAL", "false"))
@@ -98,8 +92,8 @@ class Config:
 
 
 print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
-print(f"[{SERVICE_NAME}]         data source {Config.SERVICE_DATA_SOURCE}")
-print(f"[{SERVICE_NAME}]           data path {Config.SERVICE_DATA}")
+print(f"[{SERVICE_NAME}]            Data source: {Config.SERVICE_DATA_SOURCE}")
+print(f"[{SERVICE_NAME}]                     Data path: {Config.SERVICE_DATA}")
 
 if Config.SERVICE_DATA_SOURCE == DATA_SOURCE_S3:
     print(f"[{SERVICE_NAME}]           S3 URL {Config.S3_ENDPOINT}", flush=True)

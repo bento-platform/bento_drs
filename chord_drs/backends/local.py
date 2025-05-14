@@ -1,7 +1,8 @@
-import aiofiles
 from shutil import copy
 from pathlib import Path
-from typing import Any, Generator
+from typing import Generator
+
+from bento_lib.streaming.file import stream_file
 
 from chord_drs.constants import CHUNK_SIZE
 from chord_drs.utils import sync_generator_stream
@@ -36,38 +37,9 @@ class LocalBackend(Backend):
             return
         raise ValueError(f"Location {loc} is not a subpath of backend base location {self.base_location}")
 
-    async def get_stream_generator(self, location: str, range: tuple[int, int]) -> Generator[Any, None, None]:
+    async def get_stream_generator(self, location: str, range: tuple[int, int]) -> Generator[bytes, None, None]:
         if range:
-            start, end = range
-            generator = self._stream_range(location, start, end)
+            generator = stream_file(location, range, CHUNK_SIZE)
         else:
-            generator = self._stream_whole(location)
+            generator = stream_file(location, None, CHUNK_SIZE)
         return sync_generator_stream(generator)
-
-    async def _stream_range(self, location: str, start: int, end: int):
-        async with aiofiles.open(location, mode="rb") as file:
-            # First, skip over <start> bytes to get to the beginning of the range
-            await file.seek(start)
-
-            # Then, read in either CHUNK_SIZE byte segments or however many bytes are left to send, whichever is
-            # left. This avoids filling memory with the contents of large files.
-            byte_offset: int = start
-            while True:
-                # Add a 1 to the amount to read if it's below chunk size, because the last coordinate is inclusive.
-                data = await file.read(min(CHUNK_SIZE, end + 1 - byte_offset))
-                byte_offset += len(data)
-                yield data
-
-                # If we've hit the end of the file and are reading empty byte strings, or we've reached the
-                # end of our range (inclusive), then escape the loop.
-                # This is guaranteed to terminate with a finite-sized file.
-                if len(data) == 0 or byte_offset > end:
-                    break
-
-    async def _stream_whole(self, location: str):
-        """
-        Streams the whole file by chunk size.
-        """
-        async with aiofiles.open(location, mode="rb") as file:
-            while chunk := await file.read(CHUNK_SIZE):
-                yield chunk

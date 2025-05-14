@@ -1,7 +1,7 @@
 import logging
 import aioboto3
 from boto3.s3.transfer import S3TransferConfig
-from typing import Any, AsyncIterator, Generator, TypedDict
+from typing import AsyncIterator, Generator, TypedDict
 import botocore
 
 from bento_lib.streaming.exceptions import StreamingException
@@ -105,7 +105,7 @@ class S3Backend(Backend):
 
     async def get_stream_generator(
         self, location: str, range: tuple[int, int] | None = None
-    ) -> Generator[Any, None, None]:
+    ) -> Generator[bytes, None, None]:
         if range:
             raise S3StreamRangeException("S3 range requests are not implemented in the S3 backend")
         s3_dict = await self.get_s3_object_dict(location)
