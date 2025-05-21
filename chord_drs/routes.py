@@ -275,8 +275,6 @@ async def object_download(object_id: str):
     try:
         obj_generator = await drs_object.get_streaming_generator(bytes_range)
     except StreamingException as e:
-        # TODO: Support range headers for S3 objects - only the local backend supports it for now
-        # TODO: kinda greasy, not really sure we want to support such a feature later on
         raise bad_request_log_mark(str(e))
 
     status: int = 206 if range_header else 200  # partial/full content based on range

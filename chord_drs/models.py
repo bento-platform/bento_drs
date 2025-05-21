@@ -45,11 +45,13 @@ class DrsBlob(Base):
     data_type = Column(String(24), nullable=True)  # NULL if multi-data type or something else
     public = Column(Boolean, default=False, nullable=False)  # If true, the object is accessible by anyone
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     @classmethod
     async def create(cls, *args, **kwargs):
+        """
+        Class method for creating a DrsBlob and saving it to the storage backend.
+
+        **Warning**: Using the default constructor will only instanciate a sqlalchemy ORM declarative base.
+        """
         logger = current_app.logger
 
         # If set, we are deduplicating with an existing file object

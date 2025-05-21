@@ -37,7 +37,9 @@ class LocalBackend(Backend):
             return
         raise ValueError(f"Location {loc} is not a subpath of backend base location {self.base_location}")
 
-    async def get_stream_generator(self, location: str, range: tuple[int, int]) -> Generator[bytes, None, None]:
+    async def get_stream_generator(
+        self, location: str, range: tuple[int, int] | None = None
+    ) -> Generator[bytes, None, None]:
         if range:
             generator = stream_file(location, range, CHUNK_SIZE)
         else:
