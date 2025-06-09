@@ -31,7 +31,7 @@ def _iter_over_async(async_generator: AsyncGenerator):
             return False, obj
         except StopAsyncIteration:
             return True, None
-        except Exception as e:
+        except Exception as e: # pragma: no cover
             current_app.logger.exception(e)
             return True, None
 
