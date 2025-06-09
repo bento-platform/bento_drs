@@ -95,5 +95,5 @@ print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
 print(f"[{SERVICE_NAME}] Data source: {Config.SERVICE_DATA_SOURCE}")
 print(f"[{SERVICE_NAME}] Data path: {Config.SERVICE_DATA}")
 
-if Config.SERVICE_DATA_SOURCE == DATA_SOURCE_S3: # pragma: no cover
+if Config.SERVICE_DATA_SOURCE == DATA_SOURCE_S3:  # pragma: no cover
     print(f"[{SERVICE_NAME}] S3 URL {Config.S3_ENDPOINT}", flush=True)
