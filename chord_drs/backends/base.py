@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Generator
 
 
 __all__ = ["Backend"]
@@ -11,9 +12,15 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def save(self, current_location: str, filename: str) -> str:  # pragma: no cover
+    async def save(self, current_location: str, filename: str) -> str:  # pragma: no cover
         pass
 
     @abstractmethod
-    def delete(self, location: str) -> None:  # pragma: no cover
+    async def delete(self, location: str) -> None:  # pragma: no cover
+        pass
+
+    @abstractmethod
+    async def get_stream_generator(
+        self, location: str, range: tuple[int, int] | None = None
+    ) -> Generator[bytes, None, None]:  # pragma: no cover
         pass

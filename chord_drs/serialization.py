@@ -6,7 +6,7 @@ from flask import (
 )
 from urllib.parse import urlparse
 
-from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
+from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
 from .models import DrsBlob
 from .types import DRSAccessMethodDict, DRSObjectBentoDict, DRSObjectDict
 
@@ -67,7 +67,7 @@ def build_blob_json(
                 "type": "file",
             }
         )
-    elif data_source == DATA_SOURCE_MINIO:
+    elif data_source == DATA_SOURCE_S3:
         access_methods.append(
             {
                 "access_url": {
