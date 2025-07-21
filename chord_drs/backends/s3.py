@@ -61,6 +61,7 @@ class S3Backend(Backend):
         return f"s3://{self.bucket_name}/{object_key}"
 
     async def _retrieve_headers(self, object_key: str):
+        logging.debug(object_key)
         async with await self._create_s3_client() as s3:
             head = await s3.head_object(Bucket=self.bucket_name, Key=object_key)
         return {
@@ -72,6 +73,7 @@ class S3Backend(Backend):
 
     async def get_s3_object_dict(self, location: str) -> S3ObjectGenerator:
         # Where location is a full s3 path
+        logging.debug(location)
         object_key = location.split(f"s3://{self.bucket_name}/")[-1]
         headers = await self._retrieve_headers(object_key)
 
