@@ -1,11 +1,11 @@
 import logging
 import aioboto3
-from boto3.s3.transfer import S3TransferConfig
-from typing import AsyncIterator, Generator, TypedDict
 import botocore
-
 from bento_lib.streaming.exceptions import StreamingException
 from bento_lib.logging import log_level_from_str
+from boto3.s3.transfer import S3TransferConfig
+from flask import current_app
+from typing import AsyncIterator, Generator, TypedDict
 
 from chord_drs.constants import CHUNK_SIZE
 from chord_drs.utils import sync_generator_stream
@@ -36,6 +36,7 @@ class S3Backend(Backend):
         self.bucket_name = config["S3_BUCKET"]
 
         self.session = aioboto3.Session()
+        self.logger = current_app.logger
 
     async def _create_s3_client(self):
         return self.session.client(
@@ -73,7 +74,10 @@ class S3Backend(Backend):
 
     async def get_s3_object_dict(self, location: str) -> S3ObjectGenerator:
         # Where location is a full s3 path
-        logging.debug(location)
+        if location.startswith("/"):
+            self.logger.debug(f"Using object location: {location}")
+            self.logger.debug(f"Non S3 paths cannot start with a slash")
+            location = location[1:]
         object_key = location.split(f"s3://{self.bucket_name}/")[-1]
         headers = await self._retrieve_headers(object_key)
 
