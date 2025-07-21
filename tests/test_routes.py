@@ -9,7 +9,7 @@ import uuid
 from flask import current_app
 from jsonschema import validate
 from tests.conftest import AUTHZ_URL, non_existant_dummy_file_path, dummy_file_path
-from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_MINIO
+from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
 
 
 NON_EXISTENT_ID = "123"
@@ -22,7 +22,7 @@ def validate_object_fields(
     with_bento_properties: bool = False,
 ):
     is_local = current_app.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_LOCAL
-    is_minio = current_app.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_MINIO
+    is_s3 = current_app.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_S3
 
     assert "contents" not in data
     assert "access_methods" in data
@@ -36,7 +36,7 @@ def validate_object_fields(
 
     method_types = [method["type"] for method in data["access_methods"]]
     assert "https" in method_types
-    if is_minio:
+    if is_s3:
         assert "s3" in method_types
     elif is_local and with_internal_path:
         assert "file" in method_types
@@ -128,6 +128,7 @@ def test_object_access_fail(client):
     assert res.status_code == 404
 
 
+@responses.activate
 def _test_object_and_download(client, obj, test_range=False):
     res = client.get(f"/objects/{obj.id}")
     data = res.get_json()
@@ -207,16 +208,22 @@ def _test_object_and_download(client, obj, test_range=False):
 
 
 @responses.activate
-def test_object_and_download_minio(client_minio, drs_object_minio):
+def test_object_and_download_s3(client_s3, drs_object_s3):
     authz_everything_true()
-    _test_object_and_download(client_minio, drs_object_minio)
+    res = client_s3.get(f"/objects/{drs_object_s3.id}")
+    data = res.get_json()
+    assert res.status_code == 200
+
+    # Range requests are not implemented for S3
+    res = client_s3.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=0-4"),))
+    assert res.status_code == 400
 
 
 @responses.activate
-def test_object_and_download_minio_specific_perms(client_minio, drs_object_minio):
+def test_object_and_download_s3_specific_perms(client_s3, drs_object_s3):
     # _test_object_and_download does 5 different accesses
     authz_drs_specific_obj(iters=5)
-    _test_object_and_download(client_minio, drs_object_minio)
+    _test_object_and_download(client_s3, drs_object_s3)
 
 
 @responses.activate

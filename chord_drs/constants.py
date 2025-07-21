@@ -28,3 +28,4 @@ RE_INGESTABLE_MIME_TYPE = re.compile(
     r"(;\s?[a-zA-Z0-9\-_.]+=\"?[a-zA-Z0-9\-_./+ ]*\"?)?$"
 )
 MIME_OCTET_STREAM = "application/octet-stream"
+CHUNK_SIZE = 1024 * 128  # Read 128 KB at a time

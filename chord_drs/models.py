@@ -1,15 +1,18 @@
 import os
+import botocore
+import botocore.exceptions
 from flask import current_app
 from pathlib import Path
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.sql import func
 from sqlalchemy.orm import declarative_base
+from typing import Any, Generator
 from werkzeug.utils import secure_filename
 from urllib.parse import urlparse
 from uuid import uuid4
 
 from .backend import get_backend
-from .backends.minio import MinioBackend
+from .backends.s3 import S3Backend, S3ObjectGenerator
 from .constants import RE_INGESTABLE_MIME_TYPE
 from .utils import drs_file_checksum
 
@@ -42,65 +45,72 @@ class DrsBlob(Base):
     data_type = Column(String(24), nullable=True)  # NULL if multi-data type or something else
     public = Column(Boolean, default=False, nullable=False)  # If true, the object is accessible by anyone
 
-    def __init__(self, *args, **kwargs):
+    @classmethod
+    async def create(cls, *args, **kwargs):
+        """
+        Class method for creating a DrsBlob and saving it to the storage backend.
+
+        **Warning**: Using the default constructor will only instanciate a sqlalchemy ORM declarative base.
+        """
         logger = current_app.logger
 
         # If set, we are deduplicating with an existing file object
-        object_to_copy: DrsBlob | None = kwargs.get("object_to_copy")
+        object_to_copy: DrsBlob | None = kwargs.pop("object_to_copy", None)
 
         # If set, we are overriding the filename to save the file to
-        filename: str | None = kwargs.get("filename")
+        filename: str | None = kwargs.pop("filename", None)
 
-        self.id = str(uuid4())
+        instance = cls(*args, **kwargs)
+        instance.id = str(uuid4())
 
         if object_to_copy:
-            self.name = secure_filename(filename) if filename else object_to_copy.name
-            self.location = object_to_copy.location
-            self.size = object_to_copy.size
-            self.checksum = object_to_copy.checksum
-            self.mime_type = object_to_copy.mime_type
-            del kwargs["object_to_copy"]
+            instance.name = secure_filename(filename) if filename else object_to_copy.name
+            instance.location = object_to_copy.location
+            instance.size = object_to_copy.size
+            instance.checksum = object_to_copy.checksum
+            instance.mime_type = object_to_copy.mime_type
         else:
             location = kwargs.get("location")
-
             try:
                 p = Path(location).resolve(strict=True)
             except FileNotFoundError:
                 # TODO: we will need to account for URLs at some point
                 raise FileNotFoundError("Provided file path does not exists")
 
-            self.name = secure_filename(filename or p.name)
-            new_filename = f"{self.id[:12]}-{self.name}"  # TODO: use checksum for filename instead
+            instance.name = secure_filename(filename or p.name)
+            new_filename = f"{instance.id[:12]}-{instance.name}"  # TODO: use checksum for filename instead
 
             # MIME type, if set, must be a valid ingestable mime type (not a made up supertype and not, e.g.,
             # multipart/form-data.
             mime_type: str | None = kwargs.get("mime_type")
             if mime_type is not None and not RE_INGESTABLE_MIME_TYPE.match(mime_type):
                 raise ValueError("Invalid MIME type")
-            self.mime_type = mime_type
+            instance.mime_type = mime_type
 
             backend = get_backend()
 
             if not backend:
                 raise Exception("The backend for this instance is not properly configured.")
             try:
-                self.location = backend.save(location, new_filename)
-                self.size = os.path.getsize(p)
-                self.checksum = drs_file_checksum(location)
+                instance.location = await backend.save(location, new_filename)
+                instance.size = os.path.getsize(p)
+                instance.checksum = drs_file_checksum(location)
+            except botocore.exceptions.ClientError as err:
+                msg = f"S3 related error during DRS object creation: {err}"
+                logger.error(msg)
+                raise Exception(msg)
             except Exception as e:
                 logger.error(f"Encountered exception during DRS object creation: {e}")
                 # TODO: implement more specific exception handling
                 raise Exception("Well if the file is not saved... we can't do squat")
 
-            logger.info(f"Creating new DRS object: name={self.name}; size={self.size}; sha256={self.checksum}")
+            logger.info(
+                f"Creating new DRS object: name={instance.name}; size={instance.size}; sha256={instance.checksum}"
+            )
 
-        for key_to_remove in ("location", "filename"):
-            if key_to_remove in kwargs:
-                del kwargs[key_to_remove]
+        return instance
 
-        super().__init__(*args, **kwargs)
-
-    def return_minio_object(self) -> dict:
+    async def return_s3_object(self) -> S3ObjectGenerator | None:
         parsed_url = urlparse(self.location)
 
         if parsed_url.scheme != "s3":
@@ -108,7 +118,12 @@ class DrsBlob(Base):
 
         backend = get_backend()
 
-        if not backend or not isinstance(backend, MinioBackend):
+        if not backend or not isinstance(backend, S3Backend):
             raise Exception("The backend for this instance is not properly configured.")
 
-        return backend.get_minio_object_dict(self.location)
+        return await backend.get_s3_object_dict(self.location)
+
+    async def get_streaming_generator(self, range: tuple[int, int] | None = None) -> Generator[Any, None, None]:
+        backend = get_backend()
+        generator = await backend.get_stream_generator(self.location, range)
+        return generator
