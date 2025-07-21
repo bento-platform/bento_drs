@@ -83,7 +83,7 @@ class S3Backend(Backend):
 
         async def stream_object():
             async with await self._create_s3_client() as s3_client:
-                response = await s3_client.get_object(Bucket=self.bucket_name, Key=location.split("/")[-1])
+                response = await s3_client.get_object(Bucket=self.bucket_name, Key=object_key)
                 body_stream = response["Body"]
                 while chunk := await body_stream.read(CHUNK_SIZE):
                     yield chunk
