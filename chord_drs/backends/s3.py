@@ -73,12 +73,7 @@ class S3Backend(Backend):
         }
 
     async def get_s3_object_dict(self, location: str) -> S3ObjectGenerator:
-        # Where location is a full s3 path
-        if location.startswith("/"):
-            self.logger.debug(f"Using object location: {location}")
-            self.logger.debug(f"Non S3 paths cannot start with a slash")
-            location = location[1:]
-        object_key = location.split(f"s3://{self.bucket_name}/")[-1]
+        object_key = self._location_to_object_key(location)
         headers = await self._retrieve_headers(object_key)
 
         async def stream_object():
@@ -106,8 +101,9 @@ class S3Backend(Backend):
             return location
 
     async def delete(self, location: str) -> None:
+        object_key = self._location_to_object_key(location)
         async with await self._create_s3_client() as s3_client:
-            await s3_client.delete_object(Bucket=self.bucket_name, Key=location.split("/")[-1])
+            await s3_client.delete_object(Bucket=self.bucket_name, Key=object_key)
 
     async def get_stream_generator(
         self, location: str, range: tuple[int, int] | None = None
@@ -116,6 +112,22 @@ class S3Backend(Backend):
             raise S3StreamRangeException("S3 range requests are not implemented in the S3 backend")
         s3_dict = await self.get_s3_object_dict(location)
         return sync_generator_stream(s3_dict["generator"])
+
+    def _location_to_object_key(self, location: str) -> str:
+        if location.startswith(f"s3://{self.bucket_name}"):
+            # Regular S3 object path
+            return location.split(f"s3://{self.bucket_name}/")[-1]
+        elif location.startswith("/"):
+            # Path reconciliation for DRS objects that were created with block-storage.
+            # Such DRS objects can be preserved when switching to S3 by uploading the objects to the same path:
+            #   A DRS blob created on block-storage has this location:
+            #       /drs/bento_drs/data/obj/<some blob>
+            #   DRS can work with this location if blobs are uploaded to:
+            #       s3://<BUCKET NAME>/drs/bento_drs/data/obj/<some blob>
+            # The absolute path location with a leading slash can cause errors when used as a object key.
+            return location[1:]
+        else:
+            raise ValueError(f"Location path is invalid, should be s3 path or absolute file system: {location}")
 
 
 class S3StreamRangeException(StreamingException):

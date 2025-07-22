@@ -120,21 +120,28 @@ def drs_base_url():
 
 
 @pytest.fixture
-def client_s3(s3_session, drs_base_url) -> Generator[FlaskClient, None, None]:
+def s3_config() -> dict:
+    return {
+        "S3_ENDPOINT": f"{S3_HOST}:{S3_PORT}",
+        "S3_ACCESS_KEY": "test_access_key",
+        "S3_SECRET_KEY": "test_secret_key",
+        "S3_BUCKET": "test",
+        "S3_REGION_NAME": "us-east-1",
+        "S3_VALIDATE_SSL": False,
+        "S3_USE_HTTPS": False,
+        "SERVICE_DATA_SOURCE": DATA_SOURCE_S3,
+        "AUTHZ_URL": AUTHZ_URL,
+    }
+
+
+@pytest.fixture
+def client_s3(s3_session, drs_base_url, s3_config) -> Generator[FlaskClient, None, None]:
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     import asyncio
     from chord_drs.app import db, application
 
-    application.config["S3_ENDPOINT"] = f"{S3_HOST}:{S3_PORT}"
-    application.config["S3_ACCESS_KEY"] = "test_access_key"
-    application.config["S3_SECRET_KEY"] = "test_secret_key"
-    application.config["S3_BUCKET"] = "test"
-    application.config["S3_REGION_NAME"] = "us-east-1"
-    application.config["S3_VALIDATE_SSL"] = False
-    application.config["S3_USE_HTTPS"] = False
-    application.config["SERVICE_DATA_SOURCE"] = DATA_SOURCE_S3
-    application.config["AUTHZ_URL"] = AUTHZ_URL
+    application.config.update(s3_config)
 
     with application.app_context():
         s3_backend = S3Backend(application.config)
