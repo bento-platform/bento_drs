@@ -4,7 +4,6 @@ import botocore
 from bento_lib.streaming.exceptions import StreamingException
 from bento_lib.logging import log_level_from_str
 from boto3.s3.transfer import S3TransferConfig
-from flask import current_app
 from typing import AsyncIterator, Generator, TypedDict
 
 from chord_drs.constants import CHUNK_SIZE
@@ -36,7 +35,6 @@ class S3Backend(Backend):
         self.bucket_name = config["S3_BUCKET"]
 
         self.session = aioboto3.Session()
-        self.logger = current_app.logger
 
     async def _create_s3_client(self):
         return self.session.client(
@@ -62,7 +60,6 @@ class S3Backend(Backend):
         return f"s3://{self.bucket_name}/{object_key}"
 
     async def _retrieve_headers(self, object_key: str):
-        logging.debug(object_key)
         async with await self._create_s3_client() as s3:
             head = await s3.head_object(Bucket=self.bucket_name, Key=object_key)
         return {

@@ -131,7 +131,6 @@ def s3_config() -> dict:
         "S3_USE_HTTPS": False,
         "SERVICE_DATA_SOURCE": DATA_SOURCE_S3,
         "AUTHZ_URL": AUTHZ_URL,
-        "LOG_LEVEL": "info",
     }
 
 
