@@ -113,7 +113,7 @@ class S3Backend(Backend):
     def _location_to_object_key(self, location: str) -> str:
         if location.startswith(f"s3://{self.bucket_name}"):
             # Regular S3 object path
-            return location.split(f"s3://{self.bucket_name}/")[-1]
+            return location.removeprefix(f"s3://{self.bucket_name}/")
         elif location.startswith("/"):
             # Path reconciliation for DRS objects that were created with block-storage.
             # Such DRS objects can be preserved when switching to S3 by uploading the objects to the same path:
