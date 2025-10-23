@@ -1,23 +1,14 @@
-# CHORD Data Repository Service
+# Bento Data Repository Service
 
 ![Test Status](https://github.com/bento-platform/bento_drs/workflows/Test/badge.svg)
 ![Lint Status](https://github.com/bento-platform/bento_drs/workflows/Lint/badge.svg)
 [![codecov](https://codecov.io/gh/bento-platform/bento_drs/branch/master/graph/badge.svg)](https://codecov.io/gh/bento-platform/bento_drs)
 
-A proof of concept based on [GA4GH's DRS specifications](https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-1.0.0/docs/).
-This flask application offers an interface to query files in such 
-a fashion: `drs://some-domain/some-ID`.
+A data repository / object storage service based on 
+[GA4GH's DRS specifications](https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-1.4.0/docs/).
 
-For storing the files, two methods are currently supported : in the current filesystem
-or inside a MinIO instance (which is a s3-like software).
-
-
-## TODO / Future considerations
-
- - Ingesting is either through the command line or by the endpoint of the same name
- (which will create a single object).
- - Consider how to be aware of http vs https depending on the deployment setup
- (in singularity, docker, as is).
+For storing the files, two methods are currently supported: on-disk, or in an S3-compatible storage backend such as 
+[MinIO](https://github.com/minio/minio).
 
 
 ## Configuration
