@@ -26,8 +26,8 @@ werkzeug = "~3.0.6"
 asgiref = "^3.7.2"
 
 [tool.poetry.group.dev.dependencies]
-coverage = "^7.4.4"
-moto = "^4.2.14"
+coverage = "^7.11.0"
+moto = "^5.1.15"
 pytest = "^7.4.4"  # 8.x not supported by pytest-lazy-fixture
 pytest-asyncio = "~0.23.8"  # last version supporting pytest 7.x
 pytest-cov = "^7.0.0"
