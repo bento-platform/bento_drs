@@ -1,4 +1,4 @@
-FROM ghcr.io/bento-platform/bento_base_image:python-debian-2025.10.16
+FROM ghcr.io/bento-platform/bento_base_image:python-debian-2025.11.24
 
 RUN apt-get update -y && \
     apt-get install gcc libffi-dev -y && \
