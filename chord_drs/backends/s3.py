@@ -11,7 +11,7 @@ from chord_drs.utils import sync_generator_stream
 
 from .base import Backend
 
-__all__ = ["S3Backend"]
+__all__ = ["S3ObjectGenerator", "S3Backend"]
 
 
 class S3ObjectGenerator(TypedDict):
@@ -20,7 +20,11 @@ class S3ObjectGenerator(TypedDict):
 
 
 class S3Backend(Backend):
-    def __init__(self, config: dict):  # config is dict or flask.Config, which is a subclass of dict.
+    def __init__(
+        self,
+        config: dict,  # config is dict or flask.Config, which is a subclass of dict.
+        logger: logging.Logger,
+    ):
         logging.getLogger("boto3").setLevel(log_level_from_str(config["LOG_LEVEL"]))
         logging.getLogger("botocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
         logging.getLogger("aiobotocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
@@ -35,6 +39,8 @@ class S3Backend(Backend):
         self.bucket_name = config["S3_BUCKET"]
 
         self.session = aioboto3.Session()
+
+        self.logger = logger
 
     async def _create_s3_client(self):
         return self.session.client(
@@ -108,7 +114,7 @@ class S3Backend(Backend):
         if range:
             raise S3StreamRangeException("S3 range requests are not implemented in the S3 backend")
         s3_dict = await self.get_s3_object_dict(location)
-        return sync_generator_stream(s3_dict["generator"])
+        return sync_generator_stream(s3_dict["generator"], self.logger)
 
     def _location_to_object_key(self, location: str) -> str:
         if location.startswith(f"s3://{self.bucket_name}"):
