@@ -1,3 +1,4 @@
+from logging import Logger
 from shutil import copy
 from pathlib import Path
 from typing import Generator
@@ -20,10 +21,11 @@ class LocalBackend(Backend):
     specified by the DATA var env, the default being in ~/chord_drs_data
     """
 
-    def __init__(self, config: dict):  # config is dict or flask.Config, which is a subclass of dict.
+    def __init__(self, config: dict, logger: Logger):  # config is dict or flask.Config, which is a subclass of dict.
         self.base_location = Path(config["SERVICE_DATA"])
         # We can use mkdir, since resolve has been called in config.py
         self.base_location.mkdir(parents=True, exist_ok=True)
+        self.logger = logger
 
     async def save(self, current_location: str | Path, filename: str) -> str:
         new_location = self.base_location / filename
@@ -40,8 +42,6 @@ class LocalBackend(Backend):
     async def get_stream_generator(
         self, location: str, range: tuple[int, int] | None = None
     ) -> Generator[bytes, None, None]:
-        if range:
-            generator = stream_file(location, range, CHUNK_SIZE)
-        else:
-            generator = stream_file(location, None, CHUNK_SIZE)
-        return sync_generator_stream(generator)
+        location_path = Path(location)
+        generator = stream_file(location_path, range, CHUNK_SIZE)
+        return sync_generator_stream(generator, self.logger)

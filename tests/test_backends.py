@@ -6,8 +6,8 @@ from chord_drs.backends.s3 import S3Backend
 
 
 @pytest.mark.asyncio
-async def test_local_backend(local_volume):
-    backend = LocalBackend({"SERVICE_DATA": str(local_volume)})
+async def test_local_backend(local_volume, test_logger):
+    backend = LocalBackend({"SERVICE_DATA": str(local_volume)}, test_logger)
 
     file_to_ingest = pathlib.Path(__file__).parent / "dummy_file.txt"
 
@@ -19,16 +19,16 @@ async def test_local_backend(local_volume):
 
 
 @pytest.mark.asyncio
-async def test_local_backend_raises(local_volume):
-    backend = LocalBackend({"SERVICE_DATA": str(local_volume)})
+async def test_local_backend_raises(local_volume, test_logger):
+    backend = LocalBackend({"SERVICE_DATA": str(local_volume)}, test_logger)
 
     with pytest.raises(ValueError):
         # before we can even figure out file does not exist, this is not a local volume subpath:
         await backend.delete("/tmp/does_not_exist.txt")
 
 
-def test_s3_backend_location_handling(s3_config):
-    backend = S3Backend(s3_config)
+def test_s3_backend_location_handling(s3_config, test_logger):
+    backend = S3Backend(s3_config, test_logger)
 
     # S3 location: DRS blobs created on an S3 backend
     s3_location = f"s3://{backend.bucket_name}/some-blob"

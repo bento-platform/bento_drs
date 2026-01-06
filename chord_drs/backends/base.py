@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from logging import Logger
 from typing import Generator
 
 
@@ -8,7 +9,7 @@ __all__ = ["Backend"]
 # noinspection PyUnusedLocal
 class Backend(ABC):
     @abstractmethod
-    def __init__(self, config: dict):  # pragma: no cover
+    def __init__(self, config: dict, logger: Logger):  # pragma: no cover
         pass
 
     @abstractmethod

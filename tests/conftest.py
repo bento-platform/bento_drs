@@ -1,4 +1,5 @@
 from typing import Generator, Type, TypeVar
+import logging
 import os
 import pathlib
 import pytest
@@ -54,6 +55,11 @@ def empty_file_path():  # Function rather than constant so we can set environ fi
     from chord_drs.config import APP_DIR
 
     return str(APP_DIR.parent / "tests" / "empty_file.txt")
+
+
+@pytest.fixture
+def test_logger():
+    return logging.getLogger("drs_test")
 
 
 def create_fake_session(base_class: Type[T], url_overrides: dict[str, str]) -> Type[T]:
@@ -136,7 +142,7 @@ def s3_config() -> dict:
 
 
 @pytest.fixture
-def client_s3(s3_session, drs_base_url, s3_config) -> Generator[FlaskClient, None, None]:
+def client_s3(s3_session, drs_base_url, s3_config, test_logger) -> Generator[FlaskClient, None, None]:
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     import asyncio
@@ -145,7 +151,7 @@ def client_s3(s3_session, drs_base_url, s3_config) -> Generator[FlaskClient, Non
     application.config.update(s3_config)
 
     with application.app_context():
-        s3_backend = S3Backend(application.config)
+        s3_backend = S3Backend(application.config, test_logger)
         asyncio.run(s3_backend._init_bucket_if_required())
         g.backend = s3_backend
 
@@ -247,17 +253,17 @@ async def drs_object_s3():
     from chord_drs.app import db
     from chord_drs.models import DrsBlob
 
-    drs_object = await DrsBlob.create(
+    drs_obj = await DrsBlob.create(
         location=dummy_file_path(),
         project_id=DUMMY_PROJECT_ID,
         dataset_id=DUMMY_DATASET_ID,
         data_type=DATA_TYPE_PHENOPACKET,
     )
 
-    db.session.add(drs_object)
+    db.session.add(drs_obj)
     db.session.commit()
 
-    yield drs_object
+    yield drs_obj
 
 
 pytest_plugins = ["s3_server_mock"]

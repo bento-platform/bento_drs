@@ -4,7 +4,6 @@ import re
 import tempfile
 import urllib.parse
 
-from asgiref.sync import async_to_sync
 from bento_lib.auth.permissions import Permission, P_INGEST_DATA, P_QUERY_DATA, P_DELETE_DATA, P_DOWNLOAD_DATA
 from bento_lib.auth.resources import RESOURCE_EVERYTHING, build_resource
 from bento_lib.service_info.constants import SERVICE_ORGANIZATION_C3G
@@ -19,6 +18,7 @@ from flask import (
     request,
 )
 from sqlalchemy import or_
+from typing import Sequence
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError, RequestedRangeNotSatisfiable
 
 from . import __version__
@@ -34,8 +34,6 @@ from .utils import drs_file_checksum
 RE_STARTING_SLASH = re.compile(r"^/")
 
 drs_service = Blueprint("drs_service", __name__)
-
-build_service_info_sync = async_to_sync(build_service_info)
 
 
 def str_to_bool(val: str) -> bool:
@@ -61,7 +59,7 @@ def _post_headers_getter(r: Request) -> dict[str, str]:
 
 
 def check_objects_permission(
-    drs_objs: list[DrsBlob], permission: Permission, mark_authz_done: bool = False
+    drs_objs: Sequence[DrsBlob], permission: Permission, mark_authz_done: bool = False
 ) -> tuple[bool, ...]:
     if not authz_enabled():
         return tuple([True] * len(drs_objs))  # Assume we have permission for everything if authz disabled
@@ -108,25 +106,27 @@ def fetch_and_check_object_permissions(object_id: str, permission: Permission, l
     return drs_object
 
 
-def bad_request_log_mark(err: str) -> BadRequest:
+def bad_request_log_mark(err: str, logger: logging.Logger) -> BadRequest:
     authz_middleware.mark_authz_done(request)
-    current_app.logger.error(err)
+    logger.error(err)
     return BadRequest(err)
 
 
-def range_not_satisfiable_log_mark(description: str, length: int) -> RequestedRangeNotSatisfiable:
+def range_not_satisfiable_log_mark(
+    description: str, length: int, logger: logging.Logger
+) -> RequestedRangeNotSatisfiable:
     authz_middleware.mark_authz_done(request)
-    current_app.logger.error(f"Requested range not satisfiable: {description}; true length: {length}")
+    logger.error("Requested range not satisfiable: %s; true length: %d", description, length)
     return RequestedRangeNotSatisfiable(description=description, length=length)
 
 
 @drs_service.route("/service-info", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/service-info", methods=["GET"])
 @authz_middleware.deco_public_endpoint
-def service_info():
+async def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
     return jsonify(
-        build_service_info_sync(
+        await build_service_info(
             {
                 "id": current_app.config["SERVICE_ID"],
                 "name": SERVICE_NAME,
@@ -137,6 +137,7 @@ def service_info():
                 "version": __version__,
                 "bento": {
                     "serviceKind": BENTO_SERVICE_KIND,
+                    "gitRepository": "https://github.com/bento-platform/bento_drs",
                 },
             },
             debug=current_app.config["BENTO_DEBUG"],
@@ -153,7 +154,7 @@ def get_drs_object(object_id: str) -> DrsBlob | None:
 async def delete_drs_object(object_id: str, logger: logging.Logger):
     drs_object = fetch_and_check_object_permissions(object_id, P_DELETE_DATA, logger)
 
-    logger.info(f"Deleting object {drs_object.id}")
+    logger.info("Deleting object %s", drs_object.id)
 
     q = DrsBlob.query.filter_by(location=drs_object.location)
     n_using_file = q.count()
@@ -232,7 +233,9 @@ def object_search():
         authz_middleware.mark_authz_done(request)
         raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
 
-    # TODO: map objects to resources to avoid duplicate calls to same resource in check_objects_permission
+    # TODO: invert the permissions logic - get IDs of projects/datasets where we have query:data access, to avoid this
+    #  gross O(n) lookup when searching.
+
     for obj, p in zip(objects, check_objects_permission(list(objects), P_QUERY_DATA)):
         if p:  # Only include the blob in the search results if we have permissions to view it.
             response.append(build_blob_json(obj, internal_path, with_bento_properties=with_bento_properties))
@@ -260,9 +263,9 @@ async def object_download(object_id: str):
         try:
             range_intervals = parse_range_header(range_header, obj_size)
         except StreamingBadRange as e:
-            raise bad_request_log_mark(str(e))
+            raise bad_request_log_mark(str(e), logger)
         except StreamingRangeNotSatisfiable as e:
-            raise range_not_satisfiable_log_mark(str(e), obj_size)
+            raise range_not_satisfiable_log_mark(str(e), obj_size, logger)
         bytes_range = range_intervals[0]
         start, end = bytes_range
         response_headers["Content-Length"] = str(end + 1 - start)  # byte range is inclusive, so need to add one
@@ -275,7 +278,7 @@ async def object_download(object_id: str):
     try:
         obj_generator = await drs_object.get_streaming_generator(bytes_range)
     except StreamingException as e:
-        raise bad_request_log_mark(str(e))
+        raise bad_request_log_mark(str(e), logger)
 
     status: int = 206 if range_header else 200  # partial/full content based on range
     stream_response = current_app.response_class(obj_generator, status=status, mimetype=mime_type)
@@ -315,7 +318,7 @@ async def object_ingest():
         raise Forbidden("Forbidden")
 
     if (obj_path is not None and file is not None) or (obj_path is None and file is None):
-        raise bad_request_log_mark("Must specify exactly one of path or file contents")
+        raise bad_request_log_mark("Must specify exactly one of path or file contents", logger)
 
     drs_object: DrsBlob | None = None  # either the new object, or the object to fully reuse
     object_to_copy: DrsBlob | None = None
@@ -324,8 +327,8 @@ async def object_ingest():
     try:
         filename: str | None = None  # no override, use path filename if path is specified instead of a file upload
         if file is not None:
-            logger.debug(f"ingest - received file object: {file}")
-            logger.debug(f"ingest - writing to temporary path: {t_obj_path}")
+            logger.debug("ingest - received file object: %s", file)
+            logger.debug("ingest - writing to temporary path: %s", t_obj_path)
             file.save(t_obj_path)
             obj_path = t_obj_path
             filename = file.filename  # still may be none, in which case the temporary filename will be used
@@ -336,7 +339,7 @@ async def object_ingest():
             try:
                 checksum = drs_file_checksum(obj_path)
             except FileNotFoundError:
-                raise bad_request_log_mark(f"File not found at path {obj_path}")
+                raise bad_request_log_mark(f"File not found at path {obj_path}", logger)
 
             # Currently, we require exact permissions compatibility for deduplication of IDs.
             # It might be possible to relax this a bit, but we can't fully relax this for two reasons:
@@ -385,12 +388,12 @@ async def object_ingest():
                 )
                 db.session.add(drs_object)
                 db.session.commit()
-                logger.info(f"Added DRS object: {drs_object}")
+                logger.info("added DRS object: %s", drs_object)
             except ValueError as e:
-                raise bad_request_log_mark(str(e))
+                raise bad_request_log_mark(str(e), logger)
             except Exception as e:  # TODO: More specific handling
                 authz_middleware.mark_authz_done(request)
-                logger.error(f"Encountered exception during ingest: {e}")
+                logger.exception("encountered exception during ingest", exc_info=e)
                 raise InternalServerError("Error while creating the object")
 
         return build_blob_json(drs_object, with_bento_properties=True), 201

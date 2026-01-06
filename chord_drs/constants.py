@@ -9,6 +9,7 @@ __all__ = [
     "SERVICE_TYPE",
     "RE_INGESTABLE_MIME_TYPE",
     "MIME_OCTET_STREAM",
+    "CHUNK_SIZE",
 ]
 
 BENTO_SERVICE_KIND = "drs"
