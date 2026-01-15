@@ -215,10 +215,23 @@ def object_search():
     internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
     with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
 
+    project: str | None = request.args.get("project")
+    dataset: str | None = request.args.get("dataset")
+    data_type: str | None = request.args.get("data_type")
+
+    # we can optionally pass query params limiting/filtering the search response to a specific scope
+    scope_clauses = []
+    if project:
+        scope_clauses.append(DrsBlob.project_id == project)
+    if dataset:
+        scope_clauses.append(DrsBlob.dataset_id == dataset)
+    if data_type:
+        scope_clauses.append(DrsBlob.data_type == data_type)
+
     if name:
-        objects = DrsBlob.query.filter_by(name=name).all()
+        objects = DrsBlob.query.filter(DrsBlob.name == name, *scope_clauses).all()
     elif fuzzy_name:
-        objects = DrsBlob.query.filter(DrsBlob.name.contains(fuzzy_name)).all()
+        objects = DrsBlob.query.filter(DrsBlob.name.contains(fuzzy_name), *scope_clauses).all()
     elif search_q:
         objects = DrsBlob.query.filter(
             or_(
@@ -226,7 +239,8 @@ def object_search():
                 DrsBlob.name.contains(search_q),
                 DrsBlob.checksum.contains(search_q),
                 DrsBlob.description.contains(search_q),
-            )
+            ),
+            *scope_clauses,
         )
     else:
         authz_middleware.mark_authz_done(request)
