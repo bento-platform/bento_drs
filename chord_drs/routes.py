@@ -62,9 +62,7 @@ def attachment_header(filename: str) -> dict[str, str]:
     """
     Constructs a Content-Disposition header for responding with a file as an attachment.
     """
-    return {
-        "Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(filename, encoding='utf-8')}"
-    }
+    return {"Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(filename, encoding='utf-8')}"}
 
 
 def check_objects_permission(
