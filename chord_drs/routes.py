@@ -58,6 +58,15 @@ def _post_headers_getter(r: Request) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"} if token else {}
 
 
+def attachment_header(filename: str) -> dict[str, str]:
+    """
+    Constructs a Content-Disposition header for responding with a file as an attachment.
+    """
+    return {
+        "Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(filename, encoding='utf-8')}"
+    }
+
+
 def check_objects_permission(
     drs_objs: Sequence[DrsBlob], permission: Permission, mark_authz_done: bool = False
 ) -> tuple[bool, ...]:
@@ -252,9 +261,7 @@ async def object_download(object_id: str):
     obj_size = drs_object.size
 
     mime_type: str = drs_object.mime_type or MIME_OCTET_STREAM
-    response_headers = {
-        "Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(drs_object.name, encoding='utf-8')}"
-    }
+    response_headers = attachment_header(drs_object.name)
 
     # Adjust headers and streaming args if a range is provided
     range_header = request.headers.get("Range")

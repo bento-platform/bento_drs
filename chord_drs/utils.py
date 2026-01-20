@@ -12,11 +12,11 @@ __all__ = [
 CHUNK_SIZE = 16 * 1024
 
 
-def drs_file_checksum(path: str) -> str:
+def drs_file_checksum(path: str, chunk_size: int = CHUNK_SIZE) -> str:
     hash_obj = sha256()
 
     with open(path, "rb") as f:
-        while chunk := f.read(CHUNK_SIZE):
+        while chunk := f.read(chunk_size):
             hash_obj.update(chunk)
 
     return hash_obj.hexdigest()
