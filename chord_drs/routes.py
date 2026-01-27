@@ -1,4 +1,5 @@
 import logging
+import orjson
 import os
 import re
 import tempfile
@@ -60,27 +61,64 @@ def _post_headers_getter(r: Request) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"} if token else {}
 
 
+def attachment_header(filename: str) -> dict[str, str]:
+    """
+    Constructs a Content-Disposition header for responding with a file as an attachment.
+    """
+    return {"Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(filename, encoding='utf-8')}"}
+
+
+def resource_from_object(drs_obj: DrsBlob) -> dict:
+    """
+    Constructs a Bento authorization resource dictionary from a DRS blob record.
+    """
+    return build_resource(drs_obj.project_id, drs_obj.dataset_id, drs_obj.data_type)
+
+
+def resources_from_objects(drs_objs: list[DrsBlob]) -> tuple[dict[str, int], list[dict]]:
+    """
+    Constructs a map of DRS ID --> index of resource in returned resource list for fast deduplicated permissions
+    evaluations on multiple DRS objects. Skips any public DRS objects so we don't waste time with lookups we don't need,
+    as public objects are a free-for-all.
+    """
+
+    id_resource_map: dict[str, int] = {}
+    resource_idx_map: dict[bytes, int] = {}
+    resources_dedup: list[dict] = []
+
+    for drs_obj, resource in zip(drs_objs, map(resource_from_object, drs_objs)):
+        rk = orjson.dumps(resource, option=orjson.OPT_SORT_KEYS)
+        resource_idx = resource_idx_map.get(rk)
+        if resource_idx is None:
+            new_idx = len(resources_dedup)
+            id_resource_map[drs_obj.id] = new_idx
+            resource_idx_map[rk] = new_idx
+            resources_dedup.append(resource)
+        else:
+            id_resource_map[drs_obj.id] = resource_idx
+
+    return id_resource_map, resources_dedup
+
+
 def check_objects_permission(
     drs_objs: list[DrsBlob], permission: Permission, mark_authz_done: bool = False
 ) -> tuple[bool, ...]:
     if not authz_enabled():
         return tuple([True] * len(drs_objs))  # Assume we have permission for everything if authz disabled
 
-    return tuple(
-        r[0] or drs_obj.public
-        for r, drs_obj in (
-            zip(
-                authz_middleware.evaluate(
-                    request,
-                    [build_resource(drs_obj.project_id, drs_obj.dataset_id, drs_obj.data_type) for drs_obj in drs_objs],
-                    [permission],
-                    headers_getter=_post_headers_getter if request.method == "POST" else None,
-                    mark_authz_done=mark_authz_done,
-                ),  # gets us a matrix of len(drs_objs) rows, 1 column with the permission evaluation result
-                drs_objs,
-            )
-        )
-    )  # now a tuple of length len(drs_objs) of whether we have the permission for each object
+    id_resource_map, resources_list = resources_from_objects(drs_objs)
+
+    # gets us a matrix of len(resources_list) rows, 1 column with the permission evaluation result:
+    authz_results = authz_middleware.evaluate(
+        request,
+        resources_list,
+        [permission],
+        headers_getter=_post_headers_getter if request.method == "POST" else None,
+        mark_authz_done=mark_authz_done,
+    )
+
+    # return a tuple of length len(drs_objs) of whether we have the permission for each object
+    return tuple(drs_obj.public or authz_results[id_resource_map[drs_obj.id]][0] for drs_obj in drs_objs)
 
 
 def fetch_and_check_object_permissions(object_id: str, permission: Permission, logger: logging.Logger) -> DrsBlob:
@@ -220,33 +258,39 @@ def object_search():
     data_type: str | None = request.args.get("data_type")
 
     # we can optionally pass query params limiting/filtering the search response to a specific scope
-    scope_clauses = []
+    filter_clauses = []
     if project:
-        scope_clauses.append(DrsBlob.project_id == project)
+        filter_clauses.append(DrsBlob.project_id == project)
     if dataset:
-        scope_clauses.append(DrsBlob.dataset_id == dataset)
+        filter_clauses.append(DrsBlob.dataset_id == dataset)
     if data_type:
-        scope_clauses.append(DrsBlob.data_type == data_type)
+        filter_clauses.append(DrsBlob.data_type == data_type)
 
+    # different branches for different possible searches - we only use one of them.
     if name:
-        objects = DrsBlob.query.filter(DrsBlob.name == name, *scope_clauses).all()
+        filter_clauses.append(DrsBlob.name == name)
     elif fuzzy_name:
-        objects = DrsBlob.query.filter(DrsBlob.name.contains(fuzzy_name), *scope_clauses).all()
+        filter_clauses.append(DrsBlob.name.contains(fuzzy_name))
     elif search_q:
-        objects = DrsBlob.query.filter(
+        filter_clauses.append(
             or_(
                 DrsBlob.id.contains(search_q),
                 DrsBlob.name.contains(search_q),
                 DrsBlob.checksum.contains(search_q),
                 DrsBlob.description.contains(search_q),
-            ),
-            *scope_clauses,
+            )
         )
     else:
         authz_middleware.mark_authz_done(request)
         raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
 
-    # TODO: map objects to resources to avoid duplicate calls to same resource in check_objects_permission
+    objects = DrsBlob.query.filter(*filter_clauses).all()
+
+    # TODO: invert the permissions logic - get IDs of projects/datasets where we have query:data access, to avoid this
+    #  gross O(n) lookup when searching. Although at least it's now O(n) in terms of number of resources, not number
+    #  of objects.
+    # TODO: it's also important to pre-check list of resources with query:data access to avoid timing attacks.
+
     for obj, p in zip(objects, check_objects_permission(list(objects), P_QUERY_DATA)):
         if p:  # Only include the blob in the search results if we have permissions to view it.
             response.append(build_blob_json(obj, internal_path, with_bento_properties=with_bento_properties))
