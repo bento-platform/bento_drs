@@ -10,7 +10,7 @@ from flask import current_app
 from jsonschema import validate
 from tests.conftest import AUTHZ_URL, non_existant_dummy_file_path, dummy_file_path
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
-from tests.constants import DUMMY_PROJECT_ID
+from tests.constants import DUMMY_PROJECT_ID, DUMMY_DATASET_ID_1, DUMMY_DATASET_ID_2
 
 NON_EXISTENT_ID = "123"
 
@@ -382,7 +382,9 @@ def test_search_object_empty(client, drs_multi_object, url):
         ("/search?q=alembic.ini&internal_path=1", 1, 1),
         ("/search?fuzzy_name=.py", 2, 1),  # two objects, same resource (idx 1 and 3)
         (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}", 2, 1),  # "
+        (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}&dataset={DUMMY_DATASET_ID_2}", 2, 1),  # "
         (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}&data_type=phenopacket", 2, 1),  # "
+        (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}&dataset={DUMMY_DATASET_ID_1}", 0, 0),  # wrong dataset
         ("/search?fuzzy_name=e", 3, 2),  # three objects, two resources
     ),
 )
@@ -396,7 +398,8 @@ def test_search_object(client, drs_multi_object, url, count, n_resources):
     assert res.status_code == 200
     assert len(data) == count
 
-    validate_object_fields(data[0], with_internal_path=has_internal_path)
+    for obj in data:
+        validate_object_fields(obj, with_internal_path=has_internal_path)
 
 
 @responses.activate

@@ -106,13 +106,16 @@ def check_objects_permission(
     id_resource_map, resources_list = resources_from_objects(drs_objs)
 
     # gets us a matrix of len(resources_list) rows, 1 column with the permission evaluation result:
-    authz_results = authz_middleware.evaluate(
-        request,
-        resources_list,
-        [permission],
-        headers_getter=_post_headers_getter if request.method == "POST" else None,
-        mark_authz_done=mark_authz_done,
-    )
+    if resources_list:
+        authz_results = authz_middleware.evaluate(
+            request,
+            resources_list,
+            [permission],
+            headers_getter=_post_headers_getter if request.method == "POST" else None,
+            mark_authz_done=mark_authz_done,
+        )
+    else:  # TODO: when evaluate does this optimization for us, don't bother with this if/else
+        authz_results = ()
 
     # return a tuple of length len(drs_objs) of whether we have the permission for each object
     return tuple(drs_obj.public or authz_results[id_resource_map[drs_obj.id]][0] for drs_obj in drs_objs)
