@@ -11,7 +11,7 @@ jobs:
       matrix:
         python-version: [ "3.12", "3.13" ]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         name: Set up Python
         with:
@@ -23,7 +23,7 @@ jobs:
       - name: Test
         run: python -m poetry run pytest -svv --cov=chord_drs --cov-branch --cov-report xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           fail_ci_if_error: true
           verbose: true
