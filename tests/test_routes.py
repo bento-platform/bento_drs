@@ -371,6 +371,7 @@ def test_search_bad_query(client, drs_multi_object):
         "/search?name=asd",
         "/search?fuzzy_name=asd",
         "/search?fuzzy_name=alembic.ini&data_type=experiment",  # data type wrong
+        "/search?data_type=experiment",  # data type wrong
     ),
 )
 def test_search_object_empty(client, drs_multi_object, url):
@@ -394,7 +395,12 @@ def test_search_object_empty(client, drs_multi_object, url):
         ("/search?q=mbic.i", 1, 1),
         ("/search?q=alembic.ini&internal_path=1", 1, 1),
         ("/search?fuzzy_name=.py", 2, 1),  # two objects, same resource (idx 1 and 3)
+        (f"/search?dataset={DUMMY_DATASET_ID_1}", 2, 1),  # two objects, same resource (idx 1 and 3)
+        (f"/search?dataset={DUMMY_DATASET_ID_1}&dataset={DUMMY_DATASET_ID_2}", 4, 2),  # both datasets, all objects
         (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}", 2, 1),  # "
+        (f"/search?project={DUMMY_PROJECT_ID}", 4, 2),  # all objects are part of the same project, with two datasets
+        ("/search?data_type=phenopacket", 4, 2),  # all test objects are have the same data type value
+        ("/search?data_type=phenopacket&data_type=experiment", 4, 2),  # no contribution from experiments
         (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}&dataset={DUMMY_DATASET_ID_2}", 2, 1),  # "
         (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}&data_type=phenopacket", 2, 1),  # "
         (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}&dataset={DUMMY_DATASET_ID_1}", 0, 0),  # wrong dataset

@@ -256,18 +256,20 @@ def object_search():
     internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
     with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
 
+    # search requires: (name XOR fuzzy_name XOR q) | project | dataset (1+) | data_type (1+)
+
     project: str | None = request.args.get("project")
-    dataset: str | None = request.args.get("dataset")
-    data_type: str | None = request.args.get("data_type")
+    datasets: list[str] = request.args.getlist("dataset")
+    data_types: list[str] = request.args.getlist("data_type")
 
     # we can optionally pass query params limiting/filtering the search response to a specific scope
     filter_clauses = []
     if project:
         filter_clauses.append(DrsBlob.project_id == project)
-    if dataset:
-        filter_clauses.append(DrsBlob.dataset_id == dataset)
-    if data_type:
-        filter_clauses.append(DrsBlob.data_type == data_type)
+    if datasets:
+        filter_clauses.append(or_(*(DrsBlob.dataset_id == d for d in datasets)))
+    if data_types:
+        filter_clauses.append(or_(*(DrsBlob.data_type == dt for dt in data_types)))
 
     # different branches for different possible searches - we only use one of them.
     if name:
@@ -283,9 +285,10 @@ def object_search():
                 DrsBlob.description.contains(search_q),
             )
         )
-    else:
+
+    if not filter_clauses:
         authz_middleware.mark_authz_done(request)
-        raise BadRequest("Missing GET search terms (name | fuzzy_name | q)")
+        raise BadRequest("Missing GET search terms: (name XOR fuzzy_name XOR q) | project | dataset | data_type")
 
     objects = DrsBlob.query.filter(*filter_clauses).all()
 
