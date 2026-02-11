@@ -47,7 +47,7 @@ def _iter_over_async(async_generator: AsyncGenerator, logger: Logger):
         loop.close()
 
 
-def sync_generator_stream(async_generator: AsyncGenerator, logger: Logger) -> Generator[bytes, None, None]:
+def sync_generator_stream[T](async_generator: AsyncGenerator[T, None], logger: Logger) -> Generator[T, None, None]:
     """
     Flask cannot handle async generators for streaming responses on its own.
     This function takes in an AsyncGenerator and returns a sync Generator

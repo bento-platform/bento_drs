@@ -1,10 +1,9 @@
 import logging
 import aioboto3
 import botocore
-from bento_lib.streaming.exceptions import StreamingException
 from bento_lib.logging import log_level_from_str
 from boto3.s3.transfer import S3TransferConfig
-from typing import AsyncIterator, Generator, TypedDict
+from typing import AsyncGenerator, Generator, TypedDict
 
 from chord_drs.constants import CHUNK_SIZE
 from chord_drs.utils import sync_generator_stream
@@ -15,7 +14,7 @@ __all__ = ["S3ObjectGenerator", "S3Backend"]
 
 
 class S3ObjectGenerator(TypedDict):
-    generator: AsyncIterator[bytes]
+    generator: AsyncGenerator[bytes, None]
     headers: dict[str, str]
 
 
@@ -75,13 +74,18 @@ class S3Backend(Backend):
             "Last-Modified": str(head["LastModified"]),
         }
 
-    async def get_s3_object_dict(self, location: str) -> S3ObjectGenerator:
+    async def get_s3_object_dict(self, location: str, bytes_range: tuple[int, int] | None = None) -> S3ObjectGenerator:
         object_key = self._location_to_object_key(location)
         headers = await self._retrieve_headers(object_key)
 
-        async def stream_object():
+        async def stream_object() -> AsyncGenerator[bytes, None]:
             async with await self._create_s3_client() as s3_client:
-                response = await s3_client.get_object(Bucket=self.bucket_name, Key=object_key)
+                response = await s3_client.get_object(
+                    Bucket=self.bucket_name,
+                    Key=object_key,
+                    # if a byte range is set, pass a Range: bytes=... header to boto3
+                    **(dict(Range=f"bytes={bytes_range[0]}-{bytes_range[1]}") if bytes_range else {}),
+                )
                 body_stream = response["Body"]
                 while chunk := await body_stream.read(CHUNK_SIZE):
                     yield chunk
@@ -109,11 +113,9 @@ class S3Backend(Backend):
             await s3_client.delete_object(Bucket=self.bucket_name, Key=object_key)
 
     async def get_stream_generator(
-        self, location: str, range: tuple[int, int] | None = None
+        self, location: str, bytes_range: tuple[int, int] | None = None
     ) -> Generator[bytes, None, None]:
-        if range:
-            raise S3StreamRangeException("S3 range requests are not implemented in the S3 backend")
-        s3_dict = await self.get_s3_object_dict(location)
+        s3_dict = await self.get_s3_object_dict(location, bytes_range)
         return sync_generator_stream(s3_dict["generator"], self.logger)
 
     def _location_to_object_key(self, location: str) -> str:
@@ -131,7 +133,3 @@ class S3Backend(Backend):
             return location[1:]
         else:
             raise ValueError(f"Location path is invalid, should be s3 path or absolute file system: {location}")
-
-
-class S3StreamRangeException(StreamingException):
-    pass

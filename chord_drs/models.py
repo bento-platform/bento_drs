@@ -123,9 +123,9 @@ class DrsBlob(Base):
 
         return await backend.get_s3_object_dict(self.location)
 
-    async def get_streaming_generator(self, range: tuple[int, int] | None = None) -> Generator[Any, None, None]:
+    async def get_streaming_generator(self, bytes_range: tuple[int, int] | None = None) -> Generator[Any, None, None]:
         backend = get_backend()
-        generator = await backend.get_stream_generator(self.location, range)
+        generator = await backend.get_stream_generator(self.location, bytes_range)
         return generator
 
     def __repr__(self):

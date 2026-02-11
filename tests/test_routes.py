@@ -214,9 +214,22 @@ def test_object_and_download_s3(client_s3, drs_object_s3):
     data = res.get_json()
     assert res.status_code == 200
 
-    # Range requests are not implemented for S3
+    res = client_s3.get(data["access_methods"][0]["access_url"]["url"])
+    assert res.status_code == 200
+
+    with open(dummy_file_path(), "rb") as fh:
+        assert res.get_data() == fh.read()
+
+
+@responses.activate
+def test_object_and_download_s3_range(client_s3, drs_object_s3):
+    authz_everything_true()
+    res = client_s3.get(f"/objects/{drs_object_s3.id}")
+    data = res.get_json()
+
     res = client_s3.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=0-4"),))
-    assert res.status_code == 400
+    assert res.status_code == 206
+    assert res.get_data() == b"# CHO"  # first five bytes (0-4 inclusive) of dummy_file.txt
 
 
 @responses.activate
