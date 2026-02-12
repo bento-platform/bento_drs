@@ -20,8 +20,9 @@ from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
 from tests.constants import (
     AUTHZ_URL,
     DATA_TYPE_PHENOPACKET,
-    DUMMY_DATASET_ID,
     DUMMY_PROJECT_ID,
+    DUMMY_DATASET_ID_1,
+    DUMMY_DATASET_ID_2,
     S3_HOST,
     S3_PORT,
     S3_SECRET_KEY,
@@ -210,7 +211,7 @@ async def drs_object():
     drs_object = await DrsBlob.create(
         location=dummy_file_path(),
         project_id=DUMMY_PROJECT_ID,
-        dataset_id=DUMMY_DATASET_ID,
+        dataset_id=DUMMY_DATASET_ID_1,
         data_type=DATA_TYPE_PHENOPACKET,
     )
 
@@ -229,12 +230,12 @@ async def drs_multi_object():
 
     objs = []
 
-    for f in dummy_directory_path().glob("*"):
+    for f in sorted(dummy_directory_path().glob("*"), key=lambda ff: ff.name.casefold()):
         if f.is_file():
             obj = await DrsBlob.create(
                 location=str(f),
                 project_id=DUMMY_PROJECT_ID,
-                dataset_id=DUMMY_DATASET_ID,
+                dataset_id=(DUMMY_DATASET_ID_1, DUMMY_DATASET_ID_2)[len(objs) % 2],  # 0, 2 are ID 1; 1, 3 are ID 2
                 data_type=DATA_TYPE_PHENOPACKET,
             )
 
@@ -256,7 +257,7 @@ async def drs_object_s3():
     drs_obj = await DrsBlob.create(
         location=dummy_file_path(),
         project_id=DUMMY_PROJECT_ID,
-        dataset_id=DUMMY_DATASET_ID,
+        dataset_id=DUMMY_DATASET_ID_1,
         data_type=DATA_TYPE_PHENOPACKET,
     )
 

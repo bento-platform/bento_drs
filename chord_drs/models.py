@@ -127,3 +127,6 @@ class DrsBlob(Base):
         backend = get_backend()
         generator = await backend.get_stream_generator(self.location, bytes_range)
         return generator
+
+    def __repr__(self):
+        return f"<DrsBlob id={self.id} name={self.name}>"

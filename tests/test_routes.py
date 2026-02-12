@@ -10,7 +10,7 @@ from flask import current_app
 from jsonschema import validate
 from tests.conftest import AUTHZ_URL, non_existant_dummy_file_path, dummy_file_path
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
-
+from tests.constants import DUMMY_PROJECT_ID, DUMMY_DATASET_ID_1, DUMMY_DATASET_ID_2
 
 NON_EXISTENT_ID = "123"
 
@@ -370,10 +370,12 @@ def test_search_bad_query(client, drs_multi_object):
     (
         "/search?name=asd",
         "/search?fuzzy_name=asd",
+        "/search?fuzzy_name=alembic.ini&data_type=experiment",  # data type wrong
+        "/search?data_type=experiment",  # data type wrong
     ),
 )
 def test_search_object_empty(client, drs_multi_object, url):
-    authz_everything_true(count=len(drs_multi_object))
+    authz_everything_true(count=2)
 
     res = client.get(url)
     data = res.get_json()
@@ -384,27 +386,39 @@ def test_search_object_empty(client, drs_multi_object, url):
 
 @responses.activate
 @pytest.mark.parametrize(
-    "url",
+    "url,count,n_resources",
     (
-        "/search?name=alembic.ini",
-        "/search?fuzzy_name=mbic",
-        "/search?name=alembic.ini&internal_path=1",
-        "/search?q=alembic.ini",
-        "/search?q=mbic.i",
-        "/search?q=alembic.ini&internal_path=1",
+        ("/search?name=alembic.ini", 1, 1),
+        ("/search?fuzzy_name=mbic", 1, 1),
+        ("/search?name=alembic.ini&internal_path=1", 1, 1),
+        ("/search?q=alembic.ini", 1, 1),
+        ("/search?q=mbic.i", 1, 1),
+        ("/search?q=alembic.ini&internal_path=1", 1, 1),
+        ("/search?fuzzy_name=.py", 2, 1),  # two objects, same resource (idx 1 and 3)
+        (f"/search?dataset={DUMMY_DATASET_ID_1}", 2, 1),  # two objects, same resource (idx 1 and 3)
+        (f"/search?dataset={DUMMY_DATASET_ID_1}&dataset={DUMMY_DATASET_ID_2}", 4, 2),  # both datasets, all objects
+        (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}", 2, 1),  # "
+        (f"/search?project={DUMMY_PROJECT_ID}", 4, 2),  # all objects are part of the same project, with two datasets
+        ("/search?data_type=phenopacket", 4, 2),  # all test objects are have the same data type value
+        ("/search?data_type=phenopacket&data_type=experiment", 4, 2),  # no contribution from experiments
+        (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}&dataset={DUMMY_DATASET_ID_2}", 2, 1),  # "
+        (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}&data_type=phenopacket", 2, 1),  # "
+        (f"/search?fuzzy_name=.py&project={DUMMY_PROJECT_ID}&dataset={DUMMY_DATASET_ID_1}", 0, 0),  # wrong dataset
+        ("/search?fuzzy_name=e", 3, 2),  # three objects, two resources
     ),
 )
-def test_search_object(client, drs_multi_object, url):
-    authz_everything_true(count=len(drs_multi_object))
+def test_search_object(client, drs_multi_object, url, count, n_resources):
+    authz_everything_true(count=n_resources)
 
     res = client.get(url)
     data = res.get_json()
     has_internal_path = "internal_path" in url
 
     assert res.status_code == 200
-    assert len(data) == 1
+    assert len(data) == count
 
-    validate_object_fields(data[0], with_internal_path=has_internal_path)
+    for obj in data:
+        validate_object_fields(obj, with_internal_path=has_internal_path)
 
 
 @responses.activate
