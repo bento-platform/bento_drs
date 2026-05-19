@@ -18,7 +18,7 @@ from flask import (
     jsonify,
     request,
 )
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError, RequestedRangeNotSatisfiable
 
 from . import __version__
@@ -165,6 +165,13 @@ def range_not_satisfiable_log_mark(
 @authz_middleware.deco_public_endpoint
 async def service_info():
     # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
+    stats = db.session.query(func.count(), func.sum(DrsBlob.size)).first()
+    object_count: int = 0
+    total_object_size: int = 0
+    if stats:  # TODO: censorship
+        object_count = stats[0]
+        total_object_size = stats[1]
+    print(object_count, total_object_size)
     return jsonify(
         await build_service_info(
             {
@@ -178,6 +185,11 @@ async def service_info():
                 "bento": {
                     "serviceKind": BENTO_SERVICE_KIND,
                     "gitRepository": "https://github.com/bento-platform/bento_drs",
+                },
+                "drs": {
+                    # "maxBulkRequestLength": TODO,
+                    "objectCount": object_count,
+                    "totalObjectSize": total_object_size,
                 },
             },
             debug=current_app.config["BENTO_DEBUG"],
