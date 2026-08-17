@@ -1,19 +1,24 @@
 import os
+from collections.abc import Generator
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
+from uuid import uuid4
+
 import botocore
 import botocore.exceptions
 from flask import current_app
-from pathlib import Path
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
-from sqlalchemy.sql import func
 from sqlalchemy.orm import declarative_base
-from typing import Any, Generator
+from sqlalchemy.sql import func
 from werkzeug.utils import secure_filename
-from urllib.parse import urlparse
-from uuid import uuid4
+
+from chord_drs.backends.exceptions import BackendImproperlyConfigured
 
 from .backend import get_backend
 from .backends.s3 import S3Backend, S3ObjectGenerator
 from .constants import RE_INGESTABLE_MIME_TYPE
+from .exceptions import DrsBlobSaveError
 from .utils import drs_file_checksum
 
 __all__ = [
@@ -90,7 +95,7 @@ class DrsBlob(Base):
             backend = get_backend()
 
             if not backend:
-                raise Exception("The backend for this instance is not properly configured.")
+                raise BackendImproperlyConfigured("The backend for this instance is not properly configured.")
             try:
                 instance.location = await backend.save(location, new_filename)
                 instance.size = os.path.getsize(p)
@@ -98,11 +103,11 @@ class DrsBlob(Base):
             except botocore.exceptions.ClientError as err:
                 msg = f"S3 related error during DRS object creation: {err}"
                 logger.error(msg)
-                raise Exception(msg)
-            except Exception as e:
-                logger.error(f"Encountered exception during DRS object creation: {e}")
+                raise DrsBlobSaveError(msg)
+            except Exception:
+                logger.exception("Encountered exception during DRS object creation")
                 # TODO: implement more specific exception handling
-                raise Exception("Well if the file is not saved... we can't do squat")
+                raise
 
             logger.info(
                 f"Creating new DRS object: name={instance.name}; size={instance.size}; sha256={instance.checksum}"
@@ -119,7 +124,7 @@ class DrsBlob(Base):
         backend = get_backend()
 
         if not backend or not isinstance(backend, S3Backend):
-            raise Exception("The backend for this instance is not properly configured.")
+            raise BackendImproperlyConfigured("The backend for this instance is not properly configured.")
 
         return await backend.get_s3_object_dict(self.location)
 

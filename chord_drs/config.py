@@ -1,13 +1,13 @@
 import os
-import urllib3
+import sys
 from pathlib import Path
 
+import urllib3
 from dotenv import load_dotenv
 
 from .constants import SERVICE_NAME, SERVICE_TYPE
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
 from .logger import logger
-
 
 __all__ = [
     "APP_DIR",
@@ -22,7 +22,7 @@ load_dotenv()
 def _get_from_environ_or_fail(var: str) -> str:
     if (val := os.environ.get(var, "")) == "":
         logger.critical(f"{var} must be set")
-        exit(1)
+        sys.exit(1)
     return val
 
 

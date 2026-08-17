@@ -1,7 +1,7 @@
+from collections.abc import Generator
 from logging import Logger
-from shutil import copy
 from pathlib import Path
-from typing import Generator
+from shutil import copy
 
 from bento_lib.streaming.file import stream_file
 
@@ -9,7 +9,6 @@ from chord_drs.constants import CHUNK_SIZE
 from chord_drs.utils import sync_generator_stream
 
 from .base import Backend
-
 
 __all__ = ["LocalBackend"]
 

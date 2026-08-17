@@ -1,23 +1,24 @@
-import bento_lib
 import json
 import os.path
-import pytest
-import responses
 import tempfile
 import uuid
 
+import bento_lib
+import pytest
+import responses
 from flask import current_app
 from jsonschema import validate
-from tests.conftest import AUTHZ_URL, non_existant_dummy_file_path, dummy_file_path
+
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
-from tests.constants import DUMMY_PROJECT_ID, DUMMY_DATASET_ID_1, DUMMY_DATASET_ID_2
+from tests.conftest import AUTHZ_URL, dummy_file_path, non_existant_dummy_file_path
+from tests.constants import DUMMY_DATASET_ID_1, DUMMY_DATASET_ID_2, DUMMY_PROJECT_ID
 
 NON_EXISTENT_ID = "123"
 
 
 def validate_object_fields(
     data,
-    existing_id: bool = None,
+    existing_id: str | None = None,
     with_internal_path: bool = False,
     with_bento_properties: bool = False,
 ):

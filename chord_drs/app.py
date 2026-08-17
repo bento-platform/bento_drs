@@ -4,17 +4,16 @@ from bento_lib.responses import flask_errors
 from flask import Flask
 from flask_cors import CORS
 from flask_migrate import Migrate
-from werkzeug.exceptions import BadRequest, Forbidden, NotFound, MethodNotAllowed, RequestedRangeNotSatisfiable
+from werkzeug.exceptions import BadRequest, Forbidden, MethodNotAllowed, NotFound, RequestedRangeNotSatisfiable
 
 from .authz import authz_middleware
 from .backend import close_backend
 from .commands import ingest
-from .config import Config, APP_DIR
+from .config import APP_DIR, Config
 from .db import db
 from .metrics import metrics
 from .request import DrsRequest
 from .routes import drs_service
-
 
 MIGRATION_DIR = os.path.join(APP_DIR, "migrations")
 

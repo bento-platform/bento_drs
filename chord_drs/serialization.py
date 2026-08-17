@@ -1,15 +1,11 @@
 import urllib.parse
-
-from flask import (
-    current_app,
-    url_for,
-)
 from urllib.parse import urlparse
+
+from flask import current_app, url_for
 
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
 from .models import DrsBlob
 from .types import DRSAccessMethodDict, DRSObjectBentoDict, DRSObjectDict
-
 
 __all__ = [
     "build_blob_json",
