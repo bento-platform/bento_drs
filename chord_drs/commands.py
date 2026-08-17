@@ -1,12 +1,12 @@
 import asyncio
-import click
 import logging
 import os
+from functools import wraps
 
+import click
 from click import ClickException
 from flask import current_app
 from flask.cli import with_appcontext
-from functools import wraps
 
 from .db import db
 from .models import DrsBlob

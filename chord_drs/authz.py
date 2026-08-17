@@ -1,4 +1,5 @@
 from bento_lib.auth.middleware.flask import FlaskAuthMiddleware
+
 from .config import Config
 
 __all__ = [

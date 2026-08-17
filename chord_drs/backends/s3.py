@@ -1,9 +1,11 @@
 import logging
+from collections.abc import AsyncGenerator, Generator
+from typing import TypedDict
+
 import aioboto3
 import botocore
 from bento_lib.logging import log_level_from_str
 from boto3.s3.transfer import S3TransferConfig
-from typing import AsyncGenerator, Generator, TypedDict
 
 from chord_drs.constants import CHUNK_SIZE
 from chord_drs.utils import sync_generator_stream
@@ -84,7 +86,7 @@ class S3Backend(Backend):
                     Bucket=self.bucket_name,
                     Key=object_key,
                     # if a byte range is set, pass a Range: bytes=... header to boto3
-                    **(dict(Range=f"bytes={bytes_range[0]}-{bytes_range[1]}") if bytes_range else {}),
+                    **({"Range": f"bytes={bytes_range[0]}-{bytes_range[1]}"} if bytes_range else {}),
                 )
                 body_stream = response["Body"]
                 while chunk := await body_stream.read(CHUNK_SIZE):

@@ -3,7 +3,6 @@ from flask import current_app, g
 from chord_drs.backends.base import Backend
 from chord_drs.data_sources import DATA_SOURCE_BACKENDS
 
-
 __all__ = [
     "get_backend",
     "close_backend",

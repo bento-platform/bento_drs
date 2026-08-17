@@ -1,35 +1,33 @@
-from typing import Generator, Type, TypeVar
 import logging
 import os
 import pathlib
-import pytest
 import shutil
+from collections.abc import Generator
+from typing import TypeVar
+from unittest.mock import patch
 
+import pytest
+import pytest_asyncio
 from aioboto3 import Session
 from flask import g
 from flask.testing import FlaskClient
-import pytest_asyncio
 from pytest_lazyfixture import lazy_fixture
-from unittest.mock import patch
-
 
 # Must only be imports that don't import authz/app/config/db
 from chord_drs.backends.s3 import S3Backend
 from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
-
 from tests.constants import (
     AUTHZ_URL,
     DATA_TYPE_PHENOPACKET,
-    DUMMY_PROJECT_ID,
     DUMMY_DATASET_ID_1,
     DUMMY_DATASET_ID_2,
+    DUMMY_PROJECT_ID,
+    S3_ACCESS_KEY,
     S3_HOST,
     S3_PORT,
     S3_SECRET_KEY,
-    S3_ACCESS_KEY,
     SQLALCHEMY_DATABASE_URI,
 )
-
 
 T = TypeVar("T")
 
@@ -63,7 +61,7 @@ def test_logger():
     return logging.getLogger("drs_test")
 
 
-def create_fake_session(base_class: Type[T], url_overrides: dict[str, str]) -> Type[T]:
+def create_fake_session(base_class: type[T], url_overrides: dict[str, str]) -> type[T]:
     """
     Taken from aioboto3's unit tests: https://github.com/terricain/aioboto3/blob/main/tests/conftest.py
 
@@ -72,7 +70,7 @@ def create_fake_session(base_class: Type[T], url_overrides: dict[str, str]) -> T
 
     class FakeSession(base_class):
         def __init__(self, *args, **kwargs):
-            super(FakeSession, self).__init__(*args, **kwargs)
+            super().__init__(*args, **kwargs)
 
             self.__url_overrides = url_overrides
             self.__secret_key = S3_SECRET_KEY
@@ -85,7 +83,7 @@ def create_fake_session(base_class: Type[T], url_overrides: dict[str, str]) -> T
             kwargs["aws_access_key_id"] = self.__secret_key
             kwargs["aws_secret_access_key"] = self.__access_key
 
-            return super(FakeSession, self).client(*args, **kwargs)
+            return super().client(*args, **kwargs)
 
         def resource(self, *args, **kwargs):
             if "endpoint_url" not in kwargs and args[0] in self.__url_overrides:
@@ -94,7 +92,7 @@ def create_fake_session(base_class: Type[T], url_overrides: dict[str, str]) -> T
             kwargs["aws_access_key_id"] = self.__secret_key
             kwargs["aws_secret_access_key"] = self.__access_key
 
-            return super(FakeSession, self).resource(*args, **kwargs)
+            return super().resource(*args, **kwargs)
 
     return FakeSession
 
@@ -147,7 +145,8 @@ def client_s3(s3_session, drs_base_url, s3_config, test_logger) -> Generator[Fla
     os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
 
     import asyncio
-    from chord_drs.app import db, application
+
+    from chord_drs.app import application, db
 
     application.config.update(s3_config)
 

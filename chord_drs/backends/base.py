@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
+from collections.abc import Generator
 from logging import Logger
-from typing import Generator
-
 
 __all__ = ["Backend"]
 

@@ -1,5 +1,7 @@
 import pytest
 
+from chord_drs.backends.exceptions import BackendImproperlyConfigured
+
 from .conftest import dummy_file_path
 
 
@@ -8,9 +10,8 @@ async def test_drs_blob_init_bad_file():
     from chord_drs.app import application
     from chord_drs.models import DrsBlob
 
-    with application.app_context():
-        with pytest.raises(FileNotFoundError):
-            await DrsBlob.create(location="path/to/dne")
+    with application.app_context(), pytest.raises(FileNotFoundError):
+        await DrsBlob.create(location="path/to/dne")
 
 
 @pytest.mark.asyncio
@@ -35,10 +36,11 @@ async def test_s3_method_wrong_backend(client_local, drs_object):
 @pytest.mark.asyncio
 async def test_s3_method_wrong_backend_2(client_s3, drs_object_s3):
     from flask import g
+
     from chord_drs.app import application
 
     application.config["SERVICE_DATA_SOURCE"] = "local"
-    with pytest.raises(Exception) as e:
+    with pytest.raises(BackendImproperlyConfigured) as e:
         g.backend = None  # force a backend re-init with local source, mismatching with DRS object
         await drs_object_s3.return_s3_object()
         assert "not properly configured" in str(e)
