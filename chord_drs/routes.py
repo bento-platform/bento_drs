@@ -1,15 +1,15 @@
 import logging
-import orjson
 import os
 import re
 import tempfile
 import urllib.parse
 
-from bento_lib.auth.permissions import Permission, P_INGEST_DATA, P_QUERY_DATA, P_DELETE_DATA, P_DOWNLOAD_DATA
+import orjson
+from bento_lib.auth.permissions import P_DELETE_DATA, P_DOWNLOAD_DATA, P_INGEST_DATA, P_QUERY_DATA, Permission
 from bento_lib.auth.resources import RESOURCE_EVERYTHING, build_resource
 from bento_lib.service_info.constants import SERVICE_ORGANIZATION_C3G
 from bento_lib.service_info.helpers import build_service_info
-from bento_lib.streaming.exceptions import StreamingBadRange, StreamingRangeNotSatisfiable, StreamingException
+from bento_lib.streaming.exceptions import StreamingBadRange, StreamingException, StreamingRangeNotSatisfiable
 from bento_lib.streaming.range import parse_range_header
 from flask import (
     Blueprint,
@@ -19,17 +19,16 @@ from flask import (
     request,
 )
 from sqlalchemy import func, or_
-from werkzeug.exceptions import BadRequest, Forbidden, NotFound, InternalServerError, RequestedRangeNotSatisfiable
+from werkzeug.exceptions import BadRequest, Forbidden, InternalServerError, NotFound, RequestedRangeNotSatisfiable
 
 from . import __version__
 from .authz import authz_middleware
 from .backend import get_backend
-from .constants import BENTO_SERVICE_KIND, SERVICE_NAME, SERVICE_TYPE, MIME_OCTET_STREAM
+from .constants import BENTO_SERVICE_KIND, MIME_OCTET_STREAM, SERVICE_NAME, SERVICE_TYPE
 from .db import db
 from .models import DrsBlob
 from .serialization import build_blob_json
 from .utils import drs_file_checksum
-
 
 RE_STARTING_SLASH = re.compile(r"^/")
 
@@ -449,7 +448,7 @@ async def object_ingest():
         if not drs_object:
             try:
                 drs_object = await DrsBlob.create(
-                    **(dict(object_to_copy=object_to_copy) if object_to_copy else dict(location=obj_path)),
+                    **({"object_to_copy": object_to_copy} if object_to_copy else {"location": obj_path}),
                     filename=filename,
                     mime_type=mime_type,
                     project_id=project_id,

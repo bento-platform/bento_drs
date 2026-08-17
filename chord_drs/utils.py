@@ -1,8 +1,8 @@
 import asyncio
+from collections.abc import AsyncGenerator, Generator
 from hashlib import sha256
 from logging import Logger
-from typing import Any, AsyncGenerator, Generator
-
+from typing import Any
 
 __all__ = [
     "drs_file_checksum",
@@ -33,8 +33,8 @@ def _iter_over_async(async_generator: AsyncGenerator, logger: Logger):
             return False, obj_
         except StopAsyncIteration:
             return True, None
-        except Exception as e:  # pragma: no cover
-            logger.exception(e)
+        except Exception:  # pragma: no cover
+            logger.exception("exception occurred in _iter_over_async")
             return True, None
 
     try:

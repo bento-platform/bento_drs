@@ -1,10 +1,11 @@
 from click.testing import CliRunner
+
 from chord_drs.commands import ingest
 from chord_drs.models import DrsBlob
 from tests.conftest import (
-    non_existant_dummy_file_path,
     dummy_directory_path,
     dummy_file_path,
+    non_existant_dummy_file_path,
 )
 
 
