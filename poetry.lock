@@ -441,7 +441,7 @@ version = "1.40.76"
 description = "Type annotations for boto3 1.40.76 generated with mypy-boto3-builder 8.12.0"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["dev"]
 files = [
     {file = "boto3_stubs-1.40.76-py3-none-any.whl", hash = "sha256:ef8e64109bf2981e965402dc30b5c33e6730aa9e22412ec6037c181810cc2760"},
     {file = "boto3_stubs-1.40.76.tar.gz", hash = "sha256:cd9c02039ae75be420c7f35ff04271354ccade40f49eebaa247dde03e9f7bb74"},
@@ -890,7 +890,7 @@ version = "1.43.67"
 description = "Type annotations and code completion for botocore"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["dev"]
 files = [
     {file = "botocore_stubs-1.43.67-py3-none-any.whl", hash = "sha256:c51262bac3341c1cda71f05fa01141fffd3990d7a92c7960e3b755c1bc830373"},
     {file = "botocore_stubs-1.43.67.tar.gz", hash = "sha256:853e74014a1f557055c4ffae5fb38d7c65c7c0520e1aab366cac41d5428f419d"},
@@ -3902,7 +3902,7 @@ version = "0.16.0"
 description = "Type annotations and code completion for s3transfer"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["dev"]
 files = [
     {file = "types_s3transfer-0.16.0-py3-none-any.whl", hash = "sha256:1c0cd111ecf6e21437cb410f5cddb631bfb2263b77ad973e79b9c6d0cb24e0ef"},
     {file = "types_s3transfer-0.16.0.tar.gz", hash = "sha256:b4636472024c5e2b62278c5b759661efeb52a81851cde5f092f24100b1ecb443"},
@@ -4217,4 +4217,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "989de0a9a43355f91227910ad95af933b24f33aba5fd205053562992245d2132"
+content-hash = "0b03fc227c564f7537943897d55364fec5584a293187c93ec1ae1610a886d4f6"
