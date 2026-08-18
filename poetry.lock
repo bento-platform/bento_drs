@@ -370,14 +370,14 @@ files = [
 
 [[package]]
 name = "bento-lib"
-version = "16.1.2"
+version = "17.2.0"
 description = "A set of common utilities and helpers for Bento platform services."
 optional = false
 python-versions = "<4.0,>=3.12"
 groups = ["main"]
 files = [
-    {file = "bento_lib-16.1.2-py3-none-any.whl", hash = "sha256:f6dc86f78bcd126e70059532ba47d6ec78b431c0d51d81f0ac13bffe80bf9b64"},
-    {file = "bento_lib-16.1.2.tar.gz", hash = "sha256:8c1f48559d34bb8a8e9a6b769004f7396c6575bfcc5c59db64a09519f5eb90cf"},
+    {file = "bento_lib-17.2.0-py3-none-any.whl", hash = "sha256:d91f7b3ed42e51bf472e7265fc59cf4a1e65bf66ca1994bacac1d9cedd39e1dd"},
+    {file = "bento_lib-17.2.0.tar.gz", hash = "sha256:a32340d74ae8dc59e9e6d27c0fcf19ed4e0aa7529206a4f875996f6cff777036"},
 ]
 
 [package.dependencies]
@@ -399,7 +399,7 @@ werkzeug = ">=3.0.6,<4"
 
 [package.extras]
 asyncpg = ["asyncpg (>=0.29.0,<0.32.0)"]
-django = ["django (>=5.1.8,<6.1)", "djangorestframework (>=3.16.0,<3.18)"]
+django = ["django (>=6.0,<6.2)", "djangorestframework (>=3.17.1,<3.19)"]
 fastapi = ["fastapi (>=0.136.0,<0.142)", "uvicorn"]
 flask = ["flask (>=3.0.3,<4)"]
 
@@ -1872,18 +1872,18 @@ test = ["objgraph", "psutil", "setuptools"]
 
 [[package]]
 name = "idna"
-version = "3.18"
+version = "3.19"
 description = "Internationalized Domain Names in Applications (IDNA)"
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "idna-3.18-py3-none-any.whl", hash = "sha256:7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2"},
-    {file = "idna-3.18.tar.gz", hash = "sha256:ffb385a7e039654cef1ab9ef32c6fafe283c0c0467bba1d9029738ce4a14a848"},
+    {file = "idna-3.19-py3-none-any.whl", hash = "sha256:815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4"},
+    {file = "idna-3.19.tar.gz", hash = "sha256:5e0811a4383b21dc5838069f801c4fb62113b7447663d2530d2bd6e77b49bf15"},
 ]
 
 [package.extras]
-all = ["mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2)"]
+all = ["coverage (>=7.10.0)", "hypothesis (>=6.141.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.16.0)", "ty (>=0.0.37)"]
 
 [[package]]
 name = "iniconfig"
@@ -4217,4 +4217,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "0b03fc227c564f7537943897d55364fec5584a293187c93ec1ae1610a886d4f6"
+content-hash = "ee5ae083d3bfa726e1dba281c9efaad44eeddc24927667ea6b86ab5b0b712de2"
