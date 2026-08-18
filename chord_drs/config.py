@@ -90,6 +90,9 @@ class Config:
 
     LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "info")
 
+    # DRS behaviour-related configuration
+    OBJECT_COUNT_THRESHOLD: int = int(os.environ.get("OBJECT_COUNT_THRESHOLD", "10"))  # for censorship
+
 
 print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
 print(f"[{SERVICE_NAME}] Data source: {Config.SERVICE_DATA_SOURCE}")

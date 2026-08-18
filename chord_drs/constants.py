@@ -16,7 +16,7 @@ __all__ = [
 BENTO_SERVICE_KIND = "drs"
 SERVICE_NAME = "Bento Data Repository Service"
 SERVICE_ARTIFACT = BENTO_SERVICE_KIND
-DRS_SPEC_VERSION = "1.4.0"  # update to match whatever version of the DRS spec is implemented.
+DRS_SPEC_VERSION = "1.5.0"  # update to match whatever version of the DRS spec is implemented.
 SERVICE_TYPE = build_service_type("org.ga4gh", SERVICE_ARTIFACT, DRS_SPEC_VERSION)
 
 # See https://datatracker.ietf.org/doc/html/rfc2045#section-5.1
