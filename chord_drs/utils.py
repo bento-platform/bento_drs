@@ -7,6 +7,7 @@ from typing import Any
 __all__ = [
     "drs_file_checksum",
     "sync_generator_stream",
+    "len_zero",
 ]
 
 CHUNK_SIZE = 16 * 1024
@@ -61,3 +62,7 @@ def sync_generator_stream[T](async_generator: AsyncGenerator[T, None], logger: L
             yield chunk
 
     return _iter_over_async(iterator(), logger)
+
+
+def len_zero(x: list) -> bool:
+    return len(x) == 0
