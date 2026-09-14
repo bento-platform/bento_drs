@@ -18,7 +18,7 @@ from flask import (
     jsonify,
     request,
 )
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.orm import Session
 from werkzeug.exceptions import BadRequest, Forbidden, InternalServerError, NotFound, RequestedRangeNotSatisfiable
 
@@ -250,22 +250,14 @@ def object_access(object_id: str, access_id: str):
     raise NotFound(f"No access ID '{access_id}' exists for object '{object_id}'")
 
 
-@drs_service.route("/search", methods=["GET"])
-def object_search():
-    response = []
-
-    name: str | None = request.args.get("name")
-    fuzzy_name: str | None = request.args.get("fuzzy_name")
-    search_q: str | None = request.args.get("q")
-    internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
-    with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
-
-    # search requires: (name XOR fuzzy_name XOR q) | project | dataset (1+) | data_type (1+)
-
-    project: str | None = request.args.get("project")
-    datasets: list[str] = request.args.getlist("dataset")
-    data_types: list[str] = request.args.getlist("data_type")
-
+def _build_filter_clauses(
+    name: str | None,
+    fuzzy_name: str | None,
+    search_q: str | None,
+    project: str | None,
+    datasets: list[str],
+    data_types: list[str],
+) -> list[ColumnElement]:
     # we can optionally pass query params limiting/filtering the search response to a specific scope
     filter_clauses = []
     if project:
@@ -289,7 +281,27 @@ def object_search():
                 DrsBlob.description.contains(search_q),
             )
         )
+    return filter_clauses
 
+
+@drs_service.route("/search", methods=["GET"])
+def object_search():
+    response = []
+
+    internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
+    with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
+
+    # we can optionally pass query params limiting/filtering the search response to a specific scope
+    filter_clauses = _build_filter_clauses(
+        name=request.args.get("name"),
+        fuzzy_name=request.args.get("fuzzy_name"),
+        search_q=request.args.get("q"),
+        project=request.args.get("project"),
+        datasets=request.args.getlist("dataset"),
+        data_types=request.args.getlist("data_type"),
+    )
+
+    # search requires: (name XOR fuzzy_name XOR q) | project | dataset (1+) | data_type (1+)
     if not filter_clauses:
         authz_middleware.mark_authz_done(request)
         raise BadRequest("Missing GET search terms: (name XOR fuzzy_name XOR q) | project | dataset | data_type")
