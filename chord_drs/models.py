@@ -1,5 +1,6 @@
 import os
 from collections.abc import Generator
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -8,8 +9,8 @@ from uuid import uuid4
 import botocore
 import botocore.exceptions
 from flask import current_app
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy.orm import Mapped, declarative_base, mapped_column
 from sqlalchemy.sql import func
 from werkzeug.utils import secure_filename
 
@@ -32,23 +33,27 @@ Base = declarative_base()
 class DrsBlob(Base):
     __tablename__ = "drs_object"
 
-    id = Column(String, primary_key=True)
-    location = Column(String(500), nullable=False)
+    id: Mapped[str] = mapped_column(primary_key=True)
+    location: Mapped[str] = mapped_column(String(500), nullable=False)
 
-    created = Column(DateTime, server_default=func.now())
-    checksum = Column(String(64), nullable=False)
-    size = Column(Integer, default=0)
-    name = Column(String(250), nullable=True)
-    description = Column(String(1000), nullable=True)
+    created: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+    size: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    name: Mapped[str | None] = mapped_column(String(250), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
-    mime_type = Column(String(128), nullable=True)  # if null, MIME type has not been set / isn't known
+    # if mime_type is null, MIME type has not been set / isn't known
+    mime_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     # Permissions/Bento-specific project & dataset tagging for DRS items
     # TODO: Make some of these not nullable in the future:
-    project_id = Column(String(64), nullable=True)  # Nullable for backwards-compatibility
-    dataset_id = Column(String(64), nullable=True)  # Nullable for backwards-compatibility / project-only stuff?
-    data_type = Column(String(24), nullable=True)  # NULL if multi-data type or something else
-    public = Column(Boolean, default=False, nullable=False)  # If true, the object is accessible by anyone
+    project_id: Mapped[str | None] = mapped_column(String(64), nullable=True)  # Nullable for backwards-compatibility
+    # Nullable for backwards-compatibility / project-only stuff?:
+    dataset_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # NULL if multi-data type or something else:
+    data_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    # If true, the object is accessible by anyone:
+    public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     @classmethod
     async def create(cls, *args, **kwargs):
