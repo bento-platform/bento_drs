@@ -18,7 +18,8 @@ from flask import (
     jsonify,
     request,
 )
-from sqlalchemy import or_
+from sqlalchemy import ColumnElement, func, or_, select
+from sqlalchemy.orm import Session
 from werkzeug.exceptions import BadRequest, Forbidden, InternalServerError, NotFound, RequestedRangeNotSatisfiable
 
 from . import __version__
@@ -120,10 +121,12 @@ def check_objects_permission(
     return tuple(drs_obj.public or authz_results[id_resource_map[drs_obj.id]][0] for drs_obj in drs_objs)
 
 
-def fetch_and_check_object_permissions(object_id: str, permission: Permission, logger: logging.Logger) -> DrsBlob:
+def fetch_and_check_object_permissions(
+    session: Session, object_id: str, permission: Permission, logger: logging.Logger
+) -> DrsBlob:
     has_permission_on_everything = check_everything_permission(permission)
 
-    drs_object = get_drs_object(object_id)
+    drs_object = get_drs_object(session, object_id)
 
     if not drs_object:
         authz_middleware.mark_authz_done(request)
@@ -186,18 +189,20 @@ async def service_info():
     )
 
 
-def get_drs_object(object_id: str) -> DrsBlob | None:
-    return DrsBlob.query.filter_by(id=object_id).first()
+def get_drs_object(session: Session, object_id: str) -> DrsBlob | None:
+    return session.scalars(select(DrsBlob).where(DrsBlob.id == object_id)).one_or_none()
 
 
-async def delete_drs_object(object_id: str, logger: logging.Logger):
-    drs_object = fetch_and_check_object_permissions(object_id, P_DELETE_DATA, logger)
+async def delete_drs_object(session: Session, object_id: str, logger: logging.Logger):
+    drs_object = fetch_and_check_object_permissions(session, object_id, P_DELETE_DATA, logger)
 
     logger.info("Deleting object %s", drs_object.id)
 
-    q = DrsBlob.query.filter_by(location=drs_object.location)
-    n_using_file = q.count()
-    if n_using_file == 1 and q.first().id == drs_object.id:
+    cond = DrsBlob.location == drs_object.location
+    if (
+        session.scalars(select(func.count("*")).select_from(DrsBlob).where(cond)).one() == 1
+        and session.scalars(select(DrsBlob).where(cond)).one().id == drs_object.id
+    ):
         # If this object is the only one using the file, delete the file too
         # TODO: this can create a race condition and leave files undeleted... should we have a cleanup on start?
         logger.info(
@@ -206,8 +211,8 @@ async def delete_drs_object(object_id: str, logger: logging.Logger):
         backend = get_backend()
         await backend.delete(drs_object.location)
 
-    db.session.delete(drs_object)
-    db.session.commit()
+    session.delete(drs_object)
+    session.commit()
 
 
 @drs_service.route("/objects/<string:object_id>", methods=["GET", "DELETE"])
@@ -216,10 +221,10 @@ async def object_info(object_id: str):
     logger = current_app.logger
 
     if request.method == "DELETE":
-        await delete_drs_object(object_id, logger)
+        await delete_drs_object(db.session, object_id, logger)
         return current_app.response_class(status=204)
 
-    drs_object = fetch_and_check_object_permissions(object_id, P_QUERY_DATA, logger)
+    drs_object = fetch_and_check_object_permissions(db.session, object_id, P_QUERY_DATA, logger)
 
     # The requester can ask for additional, non-spec-compliant Bento properties to be included in the response
     with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
@@ -235,7 +240,7 @@ async def object_info(object_id: str):
 @drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 @drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
 def object_access(object_id: str, access_id: str):
-    fetch_and_check_object_permissions(object_id, P_QUERY_DATA, current_app.logger)
+    fetch_and_check_object_permissions(db.session, object_id, P_QUERY_DATA, current_app.logger)
 
     # We explicitly do not support access_id-based accesses; all of them will be 'not found'
     # since we don't provide access IDs
@@ -245,22 +250,14 @@ def object_access(object_id: str, access_id: str):
     raise NotFound(f"No access ID '{access_id}' exists for object '{object_id}'")
 
 
-@drs_service.route("/search", methods=["GET"])
-def object_search():
-    response = []
-
-    name: str | None = request.args.get("name")
-    fuzzy_name: str | None = request.args.get("fuzzy_name")
-    search_q: str | None = request.args.get("q")
-    internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
-    with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
-
-    # search requires: (name XOR fuzzy_name XOR q) | project | dataset (1+) | data_type (1+)
-
-    project: str | None = request.args.get("project")
-    datasets: list[str] = request.args.getlist("dataset")
-    data_types: list[str] = request.args.getlist("data_type")
-
+def _build_filter_clauses(
+    name: str | None,
+    fuzzy_name: str | None,
+    search_q: str | None,
+    project: str | None,
+    datasets: list[str],
+    data_types: list[str],
+) -> list[ColumnElement]:
     # we can optionally pass query params limiting/filtering the search response to a specific scope
     filter_clauses = []
     if project:
@@ -284,12 +281,32 @@ def object_search():
                 DrsBlob.description.contains(search_q),
             )
         )
+    return filter_clauses
 
+
+@drs_service.route("/search", methods=["GET"])
+def object_search():
+    response = []
+
+    internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
+    with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
+
+    # we can optionally pass query params limiting/filtering the search response to a specific scope
+    filter_clauses = _build_filter_clauses(
+        name=request.args.get("name"),
+        fuzzy_name=request.args.get("fuzzy_name"),
+        search_q=request.args.get("q"),
+        project=request.args.get("project"),
+        datasets=request.args.getlist("dataset"),
+        data_types=request.args.getlist("data_type"),
+    )
+
+    # search requires: (name XOR fuzzy_name XOR q) | project | dataset (1+) | data_type (1+)
     if not filter_clauses:
         authz_middleware.mark_authz_done(request)
         raise BadRequest("Missing GET search terms: (name XOR fuzzy_name XOR q) | project | dataset | data_type")
 
-    objects = DrsBlob.query.filter(*filter_clauses).all()
+    objects = db.session.scalars(select(DrsBlob).where(*filter_clauses)).all()
 
     # TODO: invert the permissions logic - get IDs of projects/datasets where we have query:data access, to avoid this
     #  gross O(n) lookup when searching. Although at least it's now O(n) in terms of number of resources, not number
@@ -308,7 +325,7 @@ def object_search():
 async def object_download(object_id: str):
     logger = current_app.logger
 
-    drs_object = fetch_and_check_object_permissions(object_id, P_DOWNLOAD_DATA, logger)
+    drs_object = fetch_and_check_object_permissions(db.session, object_id, P_DOWNLOAD_DATA, logger)
     obj_size = drs_object.size
 
     mime_type: str = drs_object.mime_type or MIME_OCTET_STREAM
@@ -330,7 +347,7 @@ async def object_download(object_id: str):
         response_headers["Content-Range"] = f"bytes {start}-{end}/{obj_size}"
     else:
         response_headers["Accept-Ranges"] = "bytes"
-        response_headers["Content-Length"] = obj_size
+        response_headers["Content-Length"] = str(obj_size)
 
     # Get the streaming generator from the backend (local | S3)
     try:
@@ -406,7 +423,9 @@ async def object_ingest():
             #    and seeing which files are DRS ID duplicates.
             # However, we can actually deduplicate the files on the filesystem as these are more opaque.
 
-            candidate_drs_object: DrsBlob | None = DrsBlob.query.filter_by(checksum=checksum).first()
+            candidate_drs_object: DrsBlob | None = db.session.scalars(
+                select(DrsBlob).where(DrsBlob.checksum == checksum)
+            ).one_or_none()
 
             if candidate_drs_object is not None:
                 c_project_id = candidate_drs_object.project_id
