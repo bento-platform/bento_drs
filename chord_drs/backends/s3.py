@@ -29,29 +29,17 @@ class S3Backend(Backend):
         logging.getLogger("boto3").setLevel(log_level_from_str(config["LOG_LEVEL"]))
         logging.getLogger("botocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
         logging.getLogger("aiobotocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
-        protocol = "https" if config["S3_USE_HTTPS"] else "http"
-        endpoint_url = f"{protocol}://{config['S3_ENDPOINT']}"
-
-        self._s3_url = endpoint_url
-        self.s3_access_key_id = config["S3_ACCESS_KEY"]
-        self.s3_secret_access_key = config["S3_SECRET_KEY"]
         self.verify = config["S3_VALIDATE_SSL"]
-        self.region_name = config["S3_REGION_NAME"]
         self.bucket_name = config["S3_BUCKET"]
 
+        # Credentials, profile, region and endpoint are resolved by botocore from
+        # standard AWS env vars/config files.
         self.session = aioboto3.Session()
 
         self.logger = logger
 
     async def _create_s3_client(self):
-        return self.session.client(
-            "s3",
-            endpoint_url=self._s3_url,
-            aws_access_key_id=self.s3_access_key_id,
-            aws_secret_access_key=self.s3_secret_access_key,
-            region_name=self.region_name,
-            verify=False,
-        )
+        return self.session.client("s3", verify=self.verify)
 
     async def _init_bucket_if_required(self):
         # Mostly for tests with S3 mocks
