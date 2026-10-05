@@ -10,7 +10,7 @@ RUN mkdir /wes
 # Install dependencies
 COPY pyproject.toml .
 COPY poetry.lock .
-RUN pip install --no-cache-dir gunicorn==26.2.2 && \
+RUN pip install --no-cache-dir gunicorn==26.2.0 && \
     poetry config virtualenvs.create false && \
     poetry install --without dev --no-root
 
