@@ -21,7 +21,7 @@ def test_bento_drs_extension_construction():
 
 
 def test_drs_checksum_construction():
-    cs = hashlib.sha256(data=b"test", usedforsecurity=False)
+    cs = hashlib.sha256(b"test", usedforsecurity=False)
     DrsChecksum(type="sha-256", checksum=cs.hexdigest())
 
     with pytest.raises(ValidationError, match="String should have at least 64 characters"):
