@@ -1,15 +1,16 @@
 import hashlib
+from datetime import UTC, datetime
 
 import pytest
-from pydantic import FileUrl, TypeAdapter, ValidationError
+from pydantic import FileUrl, HttpUrl, TypeAdapter, ValidationError
 
 from chord_drs.pydantic_models import (
     DrsAccessMethod,
     DrsAccessUrl,
     DrsBentoExtension,
+    DrsBlobResponse,
     DrsChecksum,
     DrsUri,
-    HttpsUrl,
     S3Url,
 )
 
@@ -38,12 +39,48 @@ def test_drs_checksum_construction():
 
 def test_access_method_construction():
     DrsAccessMethod(type="file", access_url=DrsAccessUrl(url=FileUrl("file:///whatever.txt")))
-    DrsAccessMethod(type="https", access_url=DrsAccessUrl(url=HttpsUrl("https://dlougheed.com")))
+    DrsAccessMethod(type="https", access_url=DrsAccessUrl(url=HttpUrl("https://dlougheed.com")))
+    # noinspection HttpUrlsUsage
+    DrsAccessMethod(type="https", access_url=DrsAccessUrl(url=HttpUrl("http://dlougheed.com")))
     DrsAccessMethod(type="s3", access_url=DrsAccessUrl(url=S3Url("s3://bucket/object")))
 
     with pytest.raises(ValidationError, match="access method URL scheme does not match type"):
-        DrsAccessMethod(type="file", access_url=DrsAccessUrl(url=HttpsUrl("https://dlougheed.com")))
+        DrsAccessMethod(type="file", access_url=DrsAccessUrl(url=HttpUrl("https://dlougheed.com")))
     with pytest.raises(ValidationError, match="access method URL scheme does not match type"):
         DrsAccessMethod(type="https", access_url=DrsAccessUrl(url=S3Url("s3://bucket/object")))
     with pytest.raises(ValidationError, match="access method URL scheme does not match type"):
         DrsAccessMethod(type="s3", access_url=DrsAccessUrl(url=FileUrl("file:///whatever.txt")))
+
+
+def test_drs_blob_response_construction():
+    cs = hashlib.sha256(b"test", usedforsecurity=False)
+    a = DrsBlobResponse(
+        id="asdf",
+        self_uri=DrsUri("drs://bento-project.github.io/asdf"),
+        name="asdf.txt",
+        description="Some file",
+        created_time=datetime.now(UTC),
+        updated_time=None,
+        size=1000,
+        checksums=[DrsChecksum(type="sha-256", checksum=cs.hexdigest())],
+        access_methods=[DrsAccessMethod(type="file", access_url=DrsAccessUrl(url=FileUrl("file:///whatever.txt")))],
+        bento=DrsBentoExtension(project_id=None, dataset_id=None, data_type=None, public=True),
+    )
+
+    ser = a.model_dump(mode="json")
+    ct = ser["created_time"]
+
+    assert "T" in ct
+    assert ct.endswith("Z")
+
+    assert ser == {
+        "id": "asdf",
+        "name": "asdf.txt",
+        "description": "Some file",
+        "created_time": ct,
+        "self_uri": "drs://bento-project.github.io/asdf",
+        "size": 1000,
+        "checksums": [{"type": "sha-256", "checksum": cs.hexdigest()}],
+        "access_methods": [{"type": "file", "access_url": {"url": "file:///whatever.txt"}}],
+        "bento": {"project_id": None, "dataset_id": None, "data_type": None, "public": True},
+    }

@@ -1,7 +1,7 @@
 from datetime import datetime
 from functools import partial
 from operator import is_
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import AnyUrl, BaseModel, Field, FileUrl, HttpUrl, UrlConstraints, model_validator
 
@@ -14,7 +14,6 @@ __all__ = [
     "DrsAccessUrl",
     "DrsAccessMethod",
     "DrsBlobResponse",
-    "HttpsUrl",
     "S3Url",
 ]
 
@@ -26,10 +25,6 @@ is_none = partial(is_, None)
 
 class DrsUri(AnyUrl):
     _constraints = UrlConstraints(host_required=True, allowed_schemes=["drs"])
-
-
-class HttpsUrl(HttpUrl):
-    _constraints = UrlConstraints(max_length=2083, allowed_schemes=["https"])
 
 
 class S3Url(AnyUrl):
@@ -49,7 +44,7 @@ class DrsChecksum(BaseModel):
 
 
 class DrsAccessUrl(BaseModel):
-    url: FileUrl | HttpsUrl | S3Url
+    url: FileUrl | HttpUrl | S3Url
 
 
 class DrsAccessMethod(BaseModel):
@@ -57,9 +52,13 @@ class DrsAccessMethod(BaseModel):
     access_url: DrsAccessUrl
 
     @model_validator(mode="after")
-    def validate_scheme_matches_type(self):
-        if self.type != self.access_url.url.scheme:
+    def validate_scheme_matches_type(self) -> Self:
+        if self.type != self.access_url.url.scheme and not (
+            self.type == "https" and self.access_url.url.scheme == "http"
+        ):
+            # slightly looser than DRS spec; allow unencrypted HTTP URLs to be access urls
             raise ValueError("access method URL scheme does not match type")
+        return self
 
 
 class DrsBlobResponse(BaseModel):

@@ -2,7 +2,7 @@ import urllib.parse
 from urllib.parse import urlparse
 
 from flask import current_app, url_for
-from pydantic import FileUrl
+from pydantic import FileUrl, HttpUrl
 
 from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
 from .models import DrsBlob
@@ -13,7 +13,6 @@ from .pydantic_models import (
     DrsBlobResponse,
     DrsChecksum,
     DrsUri,
-    HttpsUrl,
     S3Url,
 )
 
@@ -55,7 +54,7 @@ def build_blob_response(
         type="https",
         access_url=DrsAccessUrl(
             # url_for external was giving weird results - build the URL by hand instead using the internal url_for
-            url=HttpsUrl(blob_url),
+            url=HttpUrl(blob_url),
             # No headers --> auth will have to be obtained via some
             # out-of-band method, or the object's contents are public. This
             # will depend on how the service is deployed.
