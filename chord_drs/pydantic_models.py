@@ -34,7 +34,7 @@ class DrsBentoExtension(BaseModel):
 
 
 class DrsChecksum(BaseModel):
-    checksum: str = Field(..., min_length=1)
+    checksum: str = Field(..., min_length=64, max_length=64)
     type: Literal["sha-256"]
 
 
