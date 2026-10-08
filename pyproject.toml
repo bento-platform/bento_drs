@@ -1,8 +1,11 @@
 [tool.poetry]
 name = "chord-drs"
-version = "0.22.0"
+version = "1.0.0"
 description = "An implementation of a data repository system (as per GA4GH's specs) for the Bento platform."
-authors = ["David Lougheed <david.lougheed@mail.mcgill.ca>"]
+authors = [
+    "David Lougheed <david.lougheed@mail.mcgill.ca>",
+    "Sanjeev Lakhwani <sanjeev.lakhwani@mcgill.ca>",
+]
 license = "LGPL-3.0"
 readme = "README.md"
 packages = [{include = "chord_drs"}]
@@ -14,22 +17,17 @@ include = [
 [tool.poetry.dependencies]
 python = "^3.12"
 aioboto3 = "^15.5.0"
-bento-lib = {version = "^18.1.0", extras = ["flask"]}
-flask = "~3.1.2"
-flask-sqlalchemy = "~3.1.1"
-flask-migrate = ">=4.1,<4.2"
-prometheus-flask-exporter = ">=0.23.0,<0.24"
-python-dotenv = "~1.2.1"
+bento-lib = {version = "^18.1.0", extras = ["fastapi"]}
+alembic = "^1.16.0"
 sqlalchemy = ">=2.0.29,<2.1"
-flask-cors = "^6.0.0"
-werkzeug = "~3.1.4"
-asgiref = "^3.7.2"
+python-multipart = "^0.0.20"
+werkzeug = "~3.1.4"  # secure_filename
 orjson = "^3.11.5"
 
 [tool.poetry.group.dev.dependencies]
 boto3-stubs = "~=1.40.61"
 coverage = "^7.11.0"
-moto = "^5.1.15"
+moto = {version = "^5.1.15", extras = ["server"]}
 pytest = "^7.4.4"  # 8.x not supported by pytest-lazy-fixture
 pytest-asyncio = "~0.23.8"  # last version supporting pytest 7.x
 pytest-cov = "^7.0.0"
@@ -39,9 +37,11 @@ tox = "^4.33.0"
 debugpy = "^1.8.19"
 pytest-lazy-fixture = "^0.6.3"
 mypy = "~2.4.0"
-types-flask-cors = "^6.0.0.20250809"
-types-flask-migrate = "^4.1.0.20250809"
+httpx2 = "^2.13.1"
 ruff = "^0.16.1"
+
+[tool.poetry.scripts]
+drs-ingest = "chord_drs.commands:ingest"
 
 [build-system]
 requires = ["poetry-core"]
@@ -49,7 +49,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 120
-exclude = ["wsgi.py", "chord_drs/migrations"]
+exclude = ["chord_drs/migrations"]
 
 [tool.ruff.lint]
 ignore = ["RUF022"]

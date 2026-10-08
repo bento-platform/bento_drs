@@ -1,10 +1,9 @@
-import urllib.parse
 from urllib.parse import urlparse
 
-from flask import current_app, url_for
 from pydantic import AnyUrl
 
-from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
+from .config import Config
+from .constants import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
 from .models import DrsBlob
 from .pydantic_models import DrsAccessMethod, DrsAccessUrl, DrsBentoExtension, DrsBlobResponse, DrsChecksum, DrsUri
 
@@ -13,12 +12,8 @@ __all__ = [
 ]
 
 
-def get_drs_host() -> str:
-    return urlparse(current_app.config["SERVICE_BASE_URL"]).netloc
-
-
-def create_drs_uri(object_id: str) -> DrsUri:
-    return DrsUri(f"drs://{get_drs_host()}/{object_id}")
+def create_drs_uri(config: Config, object_id: str) -> DrsUri:
+    return DrsUri(f"drs://{urlparse(config.service_base_url).netloc}/{object_id}")
 
 
 def build_bento_extension_obj(drs_object: DrsBlob) -> DrsBentoExtension:
@@ -31,22 +26,17 @@ def build_bento_extension_obj(drs_object: DrsBlob) -> DrsBentoExtension:
 
 
 def build_blob_response(
+    config: Config,
     drs_blob: DrsBlob,
     inside_container: bool = False,
     with_bento_properties: bool = False,
 ) -> DrsBlobResponse:
-    data_source = current_app.config["SERVICE_DATA_SOURCE"]
-
-    blob_url: str = urllib.parse.urljoin(
-        current_app.config["SERVICE_BASE_URL"] + "/",
-        url_for("drs_service.object_download", object_id=drs_blob.id).lstrip("/"),
-    )
+    data_source = config.service_data_source
 
     https_access_method = DrsAccessMethod(
         type="https",
         access_url=DrsAccessUrl(
-            # url_for external was giving weird results - build the URL by hand instead using the internal url_for
-            url=AnyUrl(blob_url),
+            url=AnyUrl(f"{config.service_base_url}/objects/{drs_blob.id}/download"),
             # No headers --> auth will have to be obtained via some
             # out-of-band method, or the object's contents are public. This
             # will depend on how the service is deployed.
@@ -71,6 +61,6 @@ def build_blob_response(
         description=drs_blob.description or "",
         mime_type=drs_blob.mime_type or "",
         id=drs_blob.id,
-        self_uri=create_drs_uri(drs_blob.id),
+        self_uri=create_drs_uri(config, drs_blob.id),
         bento=build_bento_extension_obj(drs_blob) if with_bento_properties else None,
     )

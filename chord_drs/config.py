@@ -1,99 +1,111 @@
-import os
-import sys
+from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
-import urllib3
-from dotenv import load_dotenv
+from bento_lib.config.pydantic import BentoFastAPIBaseConfig
+from bento_lib.logging import LogLevelLiteral
+from bento_lib.service_info.types import BentoExtraServiceInfo
+from fastapi import Depends
+from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic_settings import SettingsConfigDict
 
-from .constants import SERVICE_NAME, SERVICE_TYPE
-from .data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
-from .logger import logger
+from .constants import (
+    APP_DIR,
+    BENTO_SERVICE_KIND,
+    DATA_SOURCE_LOCAL,
+    DATA_SOURCE_S3,
+    GIT_REPOSITORY,
+    SERVICE_NAME,
+    SERVICE_TYPE,
+)
 
 __all__ = [
     "APP_DIR",
-    "BASEDIR",
+    "BENTO_EXTRA_SERVICE_INFO",
     "Config",
+    "get_config",
+    "ConfigDep",
 ]
 
-
-load_dotenv()
-
-
-def _get_from_environ_or_fail(var: str) -> str:
-    if (val := os.environ.get(var, "")) == "":
-        logger.critical(f"{var} must be set")
-        sys.exit(1)
-    return val
+BENTO_EXTRA_SERVICE_INFO: BentoExtraServiceInfo = {
+    "serviceKind": BENTO_SERVICE_KIND,
+    "gitRepository": GIT_REPOSITORY,
+}
 
 
-def str_to_bool(value: str) -> bool:
-    return value.strip().lower() in ("true", "1", "t", "yes")
+class Config(BentoFastAPIBaseConfig):
+    model_config = SettingsConfigDict(extra="ignore", frozen=True)
 
+    # FLASK_DEBUG is the legacy (pre-FastAPI) name for this variable
+    bento_debug: bool = Field(False, validation_alias=AliasChoices("BENTO_DEBUG", "FLASK_DEBUG"))
+    # In a development context, we're likely using self-signed certificates, so don't validate SSL by default
+    bento_validate_ssl: bool = Field(default_factory=lambda c: not c["bento_debug"])
 
-BENTO_DEBUG: bool = str_to_bool(os.environ.get("BENTO_DEBUG", os.environ.get("FLASK_DEBUG", "false")))
-BENTO_VALIDATE_SSL = str_to_bool(os.environ.get("BENTO_VALIDATE_SSL", str(not BENTO_DEBUG)))
+    service_id: str = ":".join(list(SERVICE_TYPE.values())[:2])
+    service_name: str = SERVICE_NAME
+    service_description: str = "Data repository service (based on GA4GH's specs) for a Bento platform node."
 
-if not BENTO_VALIDATE_SSL:
-    # Don't let urllib3 spam us with SSL validation warnings if we're operating with SSL validation off, most likely in
-    # a development/test context where we're using self-signed certificates.
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    # Base URL (including any path prefix) the service is exposed at; used to build object download URLs
+    service_base_url: str = "http://127.0.0.1"
 
-APP_DIR = Path(__file__).resolve().parent.absolute()
+    log_level: LogLevelLiteral = "info"
 
-# when deployed inside chord_singularity, DATABASE will be set
-BASEDIR = os.environ.get("DATABASE", APP_DIR.parent)
-SERVICE_DATA: str = str(
-    Path(os.environ.get("DATA", os.path.join(Path.home(), "chord_drs_data"))).expanduser().absolute().resolve()
-)
+    # AUTHZ_ENABLED is the legacy (pre-FastAPI) name for this variable
+    bento_authz_enabled: bool = Field(True, validation_alias=AliasChoices("BENTO_AUTHZ_ENABLED", "AUTHZ_ENABLED"))
+    # Only required if authorization is enabled - checked below.
+    bento_authz_service_url: str = ""
 
-# Authorization variables
-AUTHZ_ENABLED = str_to_bool(os.environ.get("AUTHZ_ENABLED", "true"))
-AUTHZ_URL: str = _get_from_environ_or_fail("BENTO_AUTHZ_SERVICE_URL").strip().rstrip("/") if AUTHZ_ENABLED else ""
+    # (Misleadingly named) path to the **directory** in which db.sqlite3 can be found or created.
+    # When deployed inside chord_singularity, this will be set.
+    database: Path = APP_DIR.parent
+    # Directory to store objects in, when not using S3
+    data: Path = Path.home() / "chord_drs_data"
 
-# S3 variables: S3_ENDPOINT loaded here for conditional init of Config fields
-S3_ENDPOINT: str | None = os.environ.get("S3_ENDPOINT")
-
-
-class Config:
-    SQLALCHEMY_DATABASE_URI = "sqlite:///" + str(Path(os.path.join(BASEDIR, "db.sqlite3")).expanduser().resolve())
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-    PROMETHEUS_ENABLED: bool = str_to_bool(os.environ.get("PROMETHEUS_ENABLED", "false"))
-
-    SERVICE_ID: str = os.environ.get("SERVICE_ID", ":".join(list(SERVICE_TYPE.values())[:2]))
-    SERVICE_DATA_SOURCE: str = DATA_SOURCE_S3 if S3_ENDPOINT else DATA_SOURCE_LOCAL
-    SERVICE_DATA: str | None = None if S3_ENDPOINT else SERVICE_DATA
-    SERVICE_BASE_URL: str = os.environ.get("SERVICE_BASE_URL", "http://127.0.0.1").strip().rstrip("/")
-
-    S3_ENDPOINT: str | None = S3_ENDPOINT
-    S3_ACCESS_KEY: str | None = os.environ.get("S3_ACCESS_KEY")
-    S3_SECRET_KEY: str | None = os.environ.get("S3_SECRET_KEY")
-    S3_BUCKET: str | None = os.environ.get("S3_BUCKET")
-    S3_REGION_NAME: str | None = os.environ.get("S3_REGION_NAME")
-    S3_VALIDATE_SSL: bool = str_to_bool(os.environ.get("S3_VALIDATE_SSL", "false"))
-    S3_USE_HTTPS: bool = str_to_bool(os.environ.get("S3_USE_HTTPS", "true"))
-    BENTO_DEBUG: bool = BENTO_DEBUG
-    BENTO_VALIDATE_SSL: bool = BENTO_VALIDATE_SSL
-    BENTO_CONTAINER_LOCAL: bool = str_to_bool(os.environ.get("BENTO_CONTAINER_LOCAL", "false"))
+    s3_endpoint: str | None = None
+    s3_access_key: str | None = None
+    s3_secret_key: str | None = None
+    s3_bucket: str | None = None
+    s3_region_name: str | None = None
+    s3_validate_ssl: bool = False
+    s3_use_https: bool = True
 
     # Temporary directory to write files to while they're being ingested - useful in containerized contexts, so we can
     # choose to write temporary files to a volume bound to a host directory with sufficient space for ingesting large
     # files such as reference genomes.
-    DRS_INGEST_TMP_DIR: str | None = os.environ.get("DRS_INGEST_TMP_DIR", "").strip() or None
+    drs_ingest_tmp_dir: str | None = None
 
-    # CORS
-    CORS_ORIGINS: list[str] | str = [x for x in os.environ.get("CORS_ORIGINS", "").split(";") if x] or "*"
+    @field_validator("service_base_url", "bento_authz_service_url", mode="after")
+    @classmethod
+    def _strip_trailing_slash(cls, v: str) -> str:
+        return v.strip().rstrip("/")
 
-    # Authn/z-related configuration
-    AUTHZ_URL: str = AUTHZ_URL
-    AUTHZ_ENABLED: bool = AUTHZ_ENABLED
+    @field_validator("s3_endpoint", "drs_ingest_tmp_dir", mode="after")
+    @classmethod
+    def _blank_to_none(cls, v: str | None) -> str | None:
+        return (v or "").strip() or None
 
-    LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "info")
+    @model_validator(mode="after")
+    def _check_authz_url_set_if_enabled(self):
+        if self.bento_authz_enabled and not self.bento_authz_service_url:
+            raise ValueError("BENTO_AUTHZ_SERVICE_URL must be set when authorization is enabled")
+        return self
+
+    @property
+    def database_url(self) -> str:
+        return f"sqlite:///{(self.database / 'db.sqlite3').expanduser().resolve()}"
+
+    @property
+    def service_data_source(self) -> str:
+        return DATA_SOURCE_S3 if self.s3_endpoint else DATA_SOURCE_LOCAL
+
+    @property
+    def service_data(self) -> Path | None:
+        return None if self.s3_endpoint else self.data.expanduser().resolve()
 
 
-print(f"[{SERVICE_NAME}] Using: database URI {Config.SQLALCHEMY_DATABASE_URI}")
-print(f"[{SERVICE_NAME}] Data source: {Config.SERVICE_DATA_SOURCE}")
-print(f"[{SERVICE_NAME}] Data path: {Config.SERVICE_DATA}")
+@lru_cache
+def get_config() -> Config:
+    return Config()
 
-if Config.SERVICE_DATA_SOURCE == DATA_SOURCE_S3:  # pragma: no cover
-    print(f"[{SERVICE_NAME}] S3 URL {Config.S3_ENDPOINT}", flush=True)
+
+ConfigDep = Annotated[Config, Depends(get_config)]

@@ -34,20 +34,20 @@ poetry install
 Afterward, we need to set up the DB:
 
 ```bash
-poetry run flask db upgrade
+poetry run alembic upgrade head
 ```
 
 Most likely you will want to load some objects to serve through this service.
-This can be done with this command (ingestion is recursive for directories):
+This can be done with this command:
 
 ```bash
-poetry run flask ingest $A_FILE_OR_A_DIRECTORY
+poetry run drs-ingest $A_FILE
 ```
 
-The Flask development server can be run with the following command:
+The development server (with auto-reload) can be run with the following command:
 
 ```bash
-FLASK_DEBUG=True poetry run flask run
+BENTO_DEBUG=True poetry run uvicorn --factory chord_drs.app:create_app --reload
 ```
 
 
@@ -57,7 +57,7 @@ To generate migrations while in the shell of a development Docker container,
 run the following command:
 
 ```bash
-poetry run flask db migrate -m "describe what has changed here"
+poetry run alembic revision --autogenerate -m "describe what has changed here"
 ```
 
 Migrations will be automatically applied in the Docker environment (dev/prod) 
@@ -65,7 +65,7 @@ on container restart, but if you want to run them manually, use the following
 command:
 
 ```bash
-poetry run flask db upgrade
+poetry run alembic upgrade head
 ```
 
 
@@ -77,19 +77,19 @@ To run all tests and calculate coverage, run the following command:
 poetry run tox
 ```
 
-Tox is configured to run both pytest and flake8, you may want to uncomment
+Tox is configured to run ruff (format + lint) and pytest. You may want to uncomment
 the second line of tox.ini (envlist = ...) so as to run these commands
 for multiple versions of Python.
 
 
 ## Deploying
 
-In production, the service should be deployed using a WSGI service like
-[uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/).
+In production, the service is an ASGI application, run with
+[uvicorn](https://www.uvicorn.org/) (see `run.bash`):
 
-With uWSGI you should point to chord_drs.app:application, the wsgi.py file
-at the root of the project is there to simplify executing the commands (such
-as "ingest")
+```bash
+uvicorn --factory chord_drs.app:create_app
+```
 
 
 ## API

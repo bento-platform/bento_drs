@@ -1,12 +1,7 @@
-import asyncio
-from collections.abc import AsyncGenerator, Generator
 from hashlib import sha256
-from logging import Logger
-from typing import Any
 
 __all__ = [
     "drs_file_checksum",
-    "sync_generator_stream",
     "len_zero",
 ]
 
@@ -21,47 +16,6 @@ def drs_file_checksum(path: str, chunk_size: int = CHUNK_SIZE) -> str:
             hash_obj.update(chunk)
 
     return hash_obj.hexdigest()
-
-
-def _iter_over_async(async_generator: AsyncGenerator, logger: Logger):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    iterator = async_generator.__aiter__()
-
-    async def get_next() -> tuple[bool, Any]:
-        try:
-            obj_ = await iterator.__anext__()
-            return False, obj_
-        except StopAsyncIteration:
-            return True, None
-        except Exception:  # pragma: no cover
-            logger.exception("exception occurred in _iter_over_async")
-            return True, None
-
-    try:
-        while True:
-            done, next_obj = loop.run_until_complete(get_next())
-            if done:
-                break
-            yield next_obj
-    finally:
-        loop.close()
-
-
-def sync_generator_stream[T](async_generator: AsyncGenerator[T, None], logger: Logger) -> Generator[T, None, None]:
-    """
-    Flask cannot handle async generators for streaming responses on its own.
-    This function takes in an AsyncGenerator and returns a sync Generator
-    bridge that yields the chunks as they arrive.
-
-    Adopted from: https://medium.com/@mr.murga/streaming-ai-responses-with-flask-a-practical-guide-677c15e82cdd
-    """
-
-    async def iterator():
-        async for chunk in async_generator:
-            yield chunk
-
-    return _iter_over_async(iterator(), logger)
 
 
 def len_zero(x: list) -> bool:

@@ -1,5 +1,5 @@
+import asyncio
 import logging
-import os
 import pathlib
 import shutil
 from collections.abc import Generator
@@ -9,13 +9,14 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 from aioboto3 import Session
-from flask import g
-from flask.testing import FlaskClient
+from fastapi.testclient import TestClient
 from pytest_lazyfixture import lazy_fixture
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 # Must only be imports that don't import authz/app/config/db
-from chord_drs.backends.s3 import S3Backend
-from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
+from tests import authz_mock
 from tests.constants import (
     AUTHZ_URL,
     DATA_TYPE_PHENOPACKET,
@@ -26,7 +27,6 @@ from tests.constants import (
     S3_HOST,
     S3_PORT,
     S3_SECRET_KEY,
-    SQLALCHEMY_DATABASE_URI,
 )
 
 T = TypeVar("T")
@@ -47,7 +47,7 @@ def dummy_file_path() -> str:  # Function rather than constant so we can set env
 def dummy_directory_path() -> pathlib.Path:  # Function rather than constant so we can set environ first
     from chord_drs.config import APP_DIR
 
-    return APP_DIR / "migrations"
+    return APP_DIR.parent / "tests" / "multi_objects"
 
 
 def empty_file_path():  # Function rather than constant so we can set environ first
@@ -56,9 +56,60 @@ def empty_file_path():  # Function rather than constant so we can set environ fi
     return str(APP_DIR.parent / "tests" / "empty_file.txt")
 
 
+def reset_caches() -> None:
+    """
+    Clear all cached configuration-derived objects, so changes to the environment are picked up.
+    """
+    from chord_drs.authz import get_authz_middleware
+    from chord_drs.backend import get_backend
+    from chord_drs.config import get_config
+    from chord_drs.db import get_engine, get_session_maker
+
+    for f in (get_config, get_authz_middleware, get_backend, get_engine, get_session_maker):
+        if hasattr(f, "cache_clear"):  # get_engine is replaced by a plain function in tests using an in-memory DB
+            f.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def config_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("BENTO_AUTHZ_SERVICE_URL", AUTHZ_URL)
+    monkeypatch.setenv("DATABASE", str(tmp_path))
+    monkeypatch.setenv("DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("SERVICE_BASE_URL", "http://127.0.0.1:5000")
+    reset_caches()
+    yield
+    reset_caches()
+
+
+@pytest.fixture(autouse=True)
+def mock_authz(monkeypatch):
+    """
+    Mocks the authorization service; see tests.authz_mock for how to set responses.
+    """
+    authz_mock.install(monkeypatch)
+
+
 @pytest.fixture
 def test_logger():
     return logging.getLogger("drs_test")
+
+
+@pytest.fixture
+def session_maker(monkeypatch):
+    from chord_drs import db
+    from chord_drs.models import Base
+
+    # StaticPool: every connection must share the same in-memory database
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+
+    monkeypatch.setattr(db, "get_engine", lambda: engine)
+    db.get_session_maker.cache_clear()
+
+    yield sessionmaker(engine, expire_on_commit=False)
+
+    Base.metadata.drop_all(engine)
+    engine.dispose()
 
 
 def create_fake_session(base_class: type[T], url_overrides: dict[str, str]) -> type[T]:
@@ -116,51 +167,22 @@ def s3_session(s3_server):
 
 
 @pytest.fixture
-def drs_base_url():
-    base_url = "http://127.0.0.1:5000"
-    os.environ["SERVICE_BASE_URL"] = base_url
-    from chord_drs.app import application
-
-    application.config["SERVICE_BASE_URL"] = base_url
-
-
-@pytest.fixture
-def s3_config() -> dict:
-    return {
-        "S3_ENDPOINT": f"{S3_HOST}:{S3_PORT}",
-        "S3_ACCESS_KEY": "test_access_key",
-        "S3_SECRET_KEY": "test_secret_key",
-        "S3_BUCKET": "test",
-        "S3_REGION_NAME": "us-east-1",
-        "S3_VALIDATE_SSL": False,
-        "S3_USE_HTTPS": False,
-        "SERVICE_DATA_SOURCE": DATA_SOURCE_S3,
-        "AUTHZ_URL": AUTHZ_URL,
-        "LOG_LEVEL": "info",
-    }
+def s3_env(monkeypatch):
+    monkeypatch.setenv("S3_ENDPOINT", f"{S3_HOST}:{S3_PORT}")
+    monkeypatch.setenv("S3_ACCESS_KEY", "test_access_key")
+    monkeypatch.setenv("S3_SECRET_KEY", "test_secret_key")
+    monkeypatch.setenv("S3_BUCKET", "test")
+    monkeypatch.setenv("S3_REGION_NAME", "us-east-1")
+    monkeypatch.setenv("S3_VALIDATE_SSL", "false")
+    monkeypatch.setenv("S3_USE_HTTPS", "false")
+    reset_caches()
 
 
 @pytest.fixture
-def client_s3(s3_session, drs_base_url, s3_config, test_logger) -> Generator[FlaskClient, None, None]:
-    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
+def s3_config(s3_env):
+    from chord_drs.config import get_config
 
-    import asyncio
-
-    from chord_drs.app import application, db
-
-    application.config.update(s3_config)
-
-    with application.app_context():
-        s3_backend = S3Backend(application.config, test_logger)
-        asyncio.run(s3_backend._init_bucket_if_required())
-        g.backend = s3_backend
-
-        db.create_all()
-
-        yield application.test_client()
-
-        db.session.remove()
-        db.drop_all()
+    return get_config()
 
 
 @pytest.fixture
@@ -175,95 +197,85 @@ def local_volume():
 
 
 @pytest.fixture
-def client_local(local_volume: pathlib.Path, drs_base_url) -> Generator[FlaskClient, None, None]:
-    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
-    os.environ["DATA"] = str(local_volume)
+def authz_disabled(monkeypatch):
+    monkeypatch.setenv("BENTO_AUTHZ_ENABLED", "false")
+    reset_caches()
 
-    from chord_drs.app import application, db
 
-    application.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
-    application.config["SERVICE_DATA_SOURCE"] = DATA_SOURCE_LOCAL
-    application.config["SERVICE_DATA"] = str(local_volume)
-    application.config["AUTHZ_URL"] = AUTHZ_URL
+@pytest.fixture
+def client_s3(s3_session, s3_env, session_maker) -> Generator[TestClient, None, None]:
+    from chord_drs.app import create_app
+    from chord_drs.backend import get_backend
 
-    with application.app_context():
-        db.create_all()
+    asyncio.run(get_backend()._init_bucket_if_required())
 
-        yield application.test_client()
+    with TestClient(create_app()) as c:
+        yield c
 
-        db.session.remove()
-        db.drop_all()
+
+@pytest.fixture
+def client_local(local_volume: pathlib.Path, monkeypatch, session_maker) -> Generator[TestClient, None, None]:
+    from chord_drs.app import create_app
+
+    monkeypatch.setenv("DATA", str(local_volume))
+    reset_caches()
+
+    with TestClient(create_app()) as c:
+        yield c
 
 
 @pytest.fixture(params=[lazy_fixture("client_s3"), lazy_fixture("client_local")])
-def client(request) -> FlaskClient:
+def client(request) -> TestClient:
     return request.param
 
 
-@pytest_asyncio.fixture
-async def drs_object():
-    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
-
-    from chord_drs.app import db
+async def _create_blob(location: str, dataset_id: str):
     from chord_drs.models import DrsBlob
 
-    drs_object = await DrsBlob.create(
-        location=dummy_file_path(),
+    return await DrsBlob.create(
+        location=location,
         project_id=DUMMY_PROJECT_ID,
-        dataset_id=DUMMY_DATASET_ID_1,
+        dataset_id=dataset_id,
         data_type=DATA_TYPE_PHENOPACKET,
     )
 
-    db.session.add(drs_object)
-    db.session.commit()
 
-    yield drs_object
+@pytest_asyncio.fixture
+async def drs_object(session_maker):
+    obj = await _create_blob(dummy_file_path(), DUMMY_DATASET_ID_1)
+
+    with session_maker() as session:
+        session.add(obj)
+        session.commit()
+
+    yield obj
 
 
 @pytest_asyncio.fixture
-async def drs_multi_object():
-    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
-
-    from chord_drs.app import db
-    from chord_drs.models import DrsBlob
-
+async def drs_multi_object(session_maker):
     objs = []
 
     for f in sorted(dummy_directory_path().glob("*"), key=lambda ff: ff.name.casefold()):
         if f.is_file():
-            obj = await DrsBlob.create(
-                location=str(f),
-                project_id=DUMMY_PROJECT_ID,
-                dataset_id=(DUMMY_DATASET_ID_1, DUMMY_DATASET_ID_2)[len(objs) % 2],  # 0, 2 are ID 1; 1, 3 are ID 2
-                data_type=DATA_TYPE_PHENOPACKET,
-            )
+            # files are sorted by name: 0, 2 are ID 1; 1, 3 are ID 2
+            objs.append(await _create_blob(str(f), (DUMMY_DATASET_ID_1, DUMMY_DATASET_ID_2)[len(objs) % 2]))
 
-            db.session.add(obj)
-            objs.append(obj)
-
-    db.session.commit()
+    with session_maker() as session:
+        session.add_all(objs)
+        session.commit()
 
     return objs
 
 
 @pytest_asyncio.fixture
-async def drs_object_s3():
-    os.environ["BENTO_AUTHZ_SERVICE_URL"] = AUTHZ_URL
+async def drs_object_s3(session_maker):
+    obj = await _create_blob(dummy_file_path(), DUMMY_DATASET_ID_1)
 
-    from chord_drs.app import db
-    from chord_drs.models import DrsBlob
+    with session_maker() as session:
+        session.add(obj)
+        session.commit()
 
-    drs_obj = await DrsBlob.create(
-        location=dummy_file_path(),
-        project_id=DUMMY_PROJECT_ID,
-        dataset_id=DUMMY_DATASET_ID_1,
-        data_type=DATA_TYPE_PHENOPACKET,
-    )
-
-    db.session.add(drs_obj)
-    db.session.commit()
-
-    yield drs_obj
+    yield obj
 
 
 pytest_plugins = ["s3_server_mock"]

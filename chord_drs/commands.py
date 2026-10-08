@@ -1,23 +1,14 @@
 import asyncio
-import logging
 import os
-from functools import wraps
 
 import click
 from click import ClickException
-from flask import current_app
-from flask.cli import with_appcontext
 
-from .db import db
+from .db import get_session_maker
+from .logger import logger
 from .models import DrsBlob
 
-
-def async_wrapper(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        return asyncio.run(f(*args, **kwargs))
-
-    return wrapper
+__all__ = ["ingest"]
 
 
 async def create_drs_blob(
@@ -25,16 +16,13 @@ async def create_drs_blob(
     project_id: str | None = None,
     dataset_id: str | None = None,
     data_type: str | None = None,
-) -> None:
-    drs_blob = await DrsBlob.create(
+) -> DrsBlob:
+    return await DrsBlob.create(
         location=location,
         project_id=project_id,
         dataset_id=dataset_id,
         data_type=data_type,
     )
-    db.session.add(drs_blob)
-
-    current_app.logger.info(f"Created a new blob, filename: {drs_blob.location} ID : {drs_blob.id}")
 
 
 @click.command("ingest")
@@ -42,9 +30,7 @@ async def create_drs_blob(
 @click.option("--project", default="", help="Project ID this object is attached to.")
 @click.option("--dataset", default="", help="Dataset ID this object is attached to.")
 @click.option("--data-type", default="", help="Data type this object is attached to.")
-@async_wrapper
-@with_appcontext
-async def ingest(source: str, project: str, dataset: str, data_type: str) -> None:
+def ingest(source: str, project: str, dataset: str, data_type: str) -> None:
     """
     When provided with a file or a directory, this command will add these
     to our list of objects, to be served by the application.
@@ -52,7 +38,6 @@ async def ingest(source: str, project: str, dataset: str, data_type: str) -> Non
     Should we go through the directories recursively?
     """
 
-    current_app.logger.setLevel(logging.INFO)
     # TODO: ingestion for remote files or archives
 
     if not os.path.exists(source):
@@ -65,5 +50,13 @@ async def ingest(source: str, project: str, dataset: str, data_type: str) -> Non
     if not os.path.isfile(source):
         raise ClickException("Directories cannot be ingested")
 
-    await create_drs_blob(source, **perms_kwargs)
-    db.session.commit()
+    drs_blob = asyncio.run(create_drs_blob(source, **perms_kwargs))
+    with get_session_maker()() as session:
+        session.add(drs_blob)
+        session.commit()
+
+    logger.info(f"Created a new blob, filename: {drs_blob.location} ID : {drs_blob.id}")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    ingest()

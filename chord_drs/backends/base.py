@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
-from collections.abc import Generator
+from collections.abc import AsyncGenerator
 from logging import Logger
+
+from chord_drs.config import Config
 
 __all__ = ["Backend"]
 
@@ -8,7 +10,7 @@ __all__ = ["Backend"]
 # noinspection PyUnusedLocal
 class Backend(ABC):
     @abstractmethod
-    def __init__(self, config: dict, logger: Logger):  # pragma: no cover
+    def __init__(self, config: Config, logger: Logger):  # pragma: no cover
         pass
 
     @abstractmethod
@@ -22,5 +24,5 @@ class Backend(ABC):
     @abstractmethod
     async def get_stream_generator(
         self, location: str, range: tuple[int, int] | None = None
-    ) -> Generator[bytes, None, None]:  # pragma: no cover
+    ) -> AsyncGenerator[bytes, None]:  # pragma: no cover
         pass
