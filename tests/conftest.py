@@ -197,6 +197,12 @@ def local_volume():
 
 
 @pytest.fixture
+def authz_disabled(monkeypatch):
+    monkeypatch.setenv("BENTO_AUTHZ_ENABLED", "false")
+    reset_caches()
+
+
+@pytest.fixture
 def client_s3(s3_session, s3_env, session_maker) -> Generator[TestClient, None, None]:
     from chord_drs.app import create_app
     from chord_drs.backend import get_backend

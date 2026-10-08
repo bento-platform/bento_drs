@@ -9,6 +9,7 @@ from jsonschema import validate
 
 from chord_drs.config import get_config
 from chord_drs.constants import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
+from tests import authz_mock
 from tests.authz_mock import authz_drs_specific_obj, authz_everything_false, authz_everything_true
 from tests.conftest import dummy_file_path, non_existant_dummy_file_path
 from tests.constants import DUMMY_DATASET_ID_1, DUMMY_DATASET_ID_2, DUMMY_PROJECT_ID
@@ -493,3 +494,62 @@ def test_object_ingest_post_file(client):
         res = client.post("/ingest", files={"file": ("dummy_file.txt", fh)})
     assert res.status_code == 201
     validate_object_fields(res.json(), with_bento_properties=True)
+
+
+def test_authz_disabled(authz_disabled, client_local):
+    # no authorization mocking: the authz service is never contacted when authorization is disabled
+    res = client_local.post("/ingest", data={"path": dummy_file_path()})
+    assert res.status_code == 201
+    obj_id = res.json()["id"]
+
+    assert client_local.get(f"/objects/{obj_id}").status_code == 200
+    assert client_local.get(f"/search?name={res.json()['name']}").json()[0]["id"] == obj_id
+    assert client_local.delete(f"/objects/{obj_id}").status_code == 204
+
+
+def test_object_forbidden_for_specific_object(client_local, drs_object):
+    authz_everything_false()  # no permission on everything...
+    authz_everything_false()  # ...nor on the specific object's resource
+
+    res = client_local.get(f"/objects/{drs_object.id}")
+    assert res.status_code == 403
+
+
+def test_object_download_post_with_token(client_local, drs_object):
+    authz_drs_specific_obj()
+
+    res = client_local.post(f"/objects/{drs_object.id}/download", data={"token": "some-token"})
+    assert res.status_code == 200
+    # the token in the form body is used to evaluate permissions on the specific object (second request)
+    assert authz_mock.request_headers[-1] == {"Authorization": "Bearer some-token"}
+    assert len(res.content) == drs_object.size
+
+
+def test_object_download_streaming_error(client_local, drs_object, monkeypatch):
+    from bento_lib.streaming.exceptions import StreamingException
+
+    from chord_drs.models import DrsBlob
+
+    async def _raise(*_args, **_kwargs):
+        raise StreamingException("could not stream")
+
+    monkeypatch.setattr(DrsBlob, "get_streaming_generator", _raise)
+    authz_everything_true()
+
+    res = client_local.get(f"/objects/{drs_object.id}/download")
+    assert res.status_code == 400
+    assert res.json()["errors"] == [{"message": "could not stream"}]
+
+
+def test_object_ingest_unexpected_error(client_local, monkeypatch):
+    from chord_drs.models import DrsBlob
+
+    async def _raise(*_args, **_kwargs):
+        raise RuntimeError("something broke")
+
+    monkeypatch.setattr(DrsBlob, "create", _raise)
+    authz_everything_true()
+
+    res = client_local.post("/ingest", data={"path": dummy_file_path()})
+    assert res.status_code == 500
+    assert res.json()["errors"] == [{"message": "Error while creating the object"}]

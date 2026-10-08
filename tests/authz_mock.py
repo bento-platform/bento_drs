@@ -13,8 +13,12 @@ __all__ = [
 
 _queue: list[list[list[bool]]] = []
 
+# Headers which would have been sent to the authorization service with each request, for assertions
+request_headers: list[dict[str, str]] = []
 
-async def _async_authz_post(_self, _request, _path, _body, *_args, **_kwargs) -> dict:
+
+async def _async_authz_post(self, request, _path, _body, require_token=False, headers_getter=None) -> dict:
+    request_headers.append(self._extract_token_and_build_headers(request, require_token, headers_getter))
     return {"result": _queue.pop(0) if len(_queue) > 1 else _queue[0]}
 
 
@@ -22,6 +26,7 @@ def install(monkeypatch) -> None:
     from bento_lib.auth.middleware.base import BaseAuthMiddleware
 
     _queue.clear()
+    request_headers.clear()
     monkeypatch.setattr(BaseAuthMiddleware, "async_authz_post", _async_authz_post)
 
 
