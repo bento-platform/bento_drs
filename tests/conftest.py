@@ -251,7 +251,7 @@ async def drs_multi_object(session_maker):
 
     for f in sorted(dummy_directory_path().glob("*"), key=lambda ff: ff.name.casefold()):
         if f.is_file():
-            # 0, 2 are ID 1; 1, 3 are ID 2
+            # files are sorted by name: 0, 2 are ID 1; 1, 3 are ID 2
             objs.append(await _create_blob(str(f), (DUMMY_DATASET_ID_1, DUMMY_DATASET_ID_2)[len(objs) % 2]))
 
     with session_maker() as session:

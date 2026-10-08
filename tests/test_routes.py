@@ -333,7 +333,7 @@ def test_search_bad_query(client, drs_multi_object):
     (
         "/search?name=asd",
         "/search?fuzzy_name=asd",
-        "/search?fuzzy_name=alembic.ini&data_type=experiment",  # data type wrong
+        "/search?fuzzy_name=a_text.txt&data_type=experiment",  # data type wrong
         "/search?data_type=experiment",  # data type wrong
     ),
 )
@@ -350,12 +350,12 @@ def test_search_object_empty(client, drs_multi_object, url):
 @pytest.mark.parametrize(
     "url,count,n_resources",
     (
-        ("/search?name=alembic.ini", 1, 1),
-        ("/search?fuzzy_name=mbic", 1, 1),
-        ("/search?name=alembic.ini&internal_path=1", 1, 1),
-        ("/search?q=alembic.ini", 1, 1),
-        ("/search?q=mbic.i", 1, 1),
-        ("/search?q=alembic.ini&internal_path=1", 1, 1),
+        ("/search?name=a_text.txt", 1, 1),
+        ("/search?fuzzy_name=_tex", 1, 1),
+        ("/search?name=a_text.txt&internal_path=1", 1, 1),
+        ("/search?q=a_text.txt", 1, 1),
+        ("/search?q=_tex", 1, 1),
+        ("/search?q=a_text.txt&internal_path=1", 1, 1),
         ("/search?fuzzy_name=.py", 2, 1),  # two objects, same resource (idx 1 and 3)
         (f"/search?dataset={DUMMY_DATASET_ID_1}", 2, 1),  # two objects, same resource (idx 1 and 3)
         (f"/search?dataset={DUMMY_DATASET_ID_1}&dataset={DUMMY_DATASET_ID_2}", 4, 2),  # both datasets, all objects
@@ -386,7 +386,7 @@ def test_search_object(client, drs_multi_object, url, count, n_resources):
 def test_search_no_permissions(client, drs_multi_object):
     authz_everything_false(count=len(drs_multi_object))
 
-    res = client.get("/search?name=alembic.ini")
+    res = client.get("/search?name=a_text.txt")
     data = res.json()
 
     assert res.status_code == 200
