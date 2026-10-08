@@ -1,12 +1,14 @@
 from datetime import datetime
-from operator import is_none
-from typing import Literal
+from functools import partial
+from operator import is_
+from typing import ClassVar, Literal
 
 from pydantic import AnyUrl, BaseModel, Field
 
 from .utils import len_zero
 
 __all__ = [
+    "DrsUri",
     "DrsBentoExtension",
     "DrsChecksum",
     "DrsAccessUrl",
@@ -16,6 +18,15 @@ __all__ = [
 
 
 # NOTE: these are Pydantic models for the Bento *IMPLEMENTATION* of DRS, not the entire DRS spec.
+
+is_none = partial(is_, None)
+
+
+class DrsUri(AnyUrl):
+    allowed_schemes: ClassVar[set[str]] = {"drs"}
+    host_required = True
+
+    __slots__ = ()
 
 
 class DrsBentoExtension(BaseModel):
@@ -35,16 +46,16 @@ class DrsAccessUrl(BaseModel):
 
 
 class DrsAccessMethod(BaseModel):
-    type: Literal["https", "s3"]
+    type: Literal["file", "https", "s3"]
     access_url: DrsAccessUrl
 
-    # TODO: validate HTTPS-only or S3
+    # TODO: validate scheme
 
 
 class DrsBlobResponse(BaseModel):
     # required fields
     id: str = Field(..., min_length=1)
-    self_url: AnyUrl  # TODO: validate DRS scheme
+    self_uri: DrsUri
     size: int = Field(..., ge=0)
     created_time: datetime
     # optional fields
