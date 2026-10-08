@@ -1,9 +1,9 @@
 from datetime import datetime
 from functools import partial
 from operator import is_
-from typing import ClassVar, Literal
+from typing import Literal
 
-from pydantic import AnyUrl, BaseModel, Field
+from pydantic import AnyUrl, BaseModel, Field, UrlConstraints
 
 from .utils import len_zero
 
@@ -23,10 +23,7 @@ is_none = partial(is_, None)
 
 
 class DrsUri(AnyUrl):
-    allowed_schemes: ClassVar[set[str]] = {"drs"}
-    host_required = True
-
-    __slots__ = ()
+    _constraints = UrlConstraints(host_required=True, allowed_schemes=["drs"])
 
 
 class DrsBentoExtension(BaseModel):
