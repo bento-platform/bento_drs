@@ -1,9 +1,17 @@
 import hashlib
 
 import pytest
-from pydantic import TypeAdapter, ValidationError
+from pydantic import FileUrl, TypeAdapter, ValidationError
 
-from chord_drs.pydantic_models import DrsBentoExtension, DrsChecksum, DrsUri
+from chord_drs.pydantic_models import (
+    DrsAccessMethod,
+    DrsAccessUrl,
+    DrsBentoExtension,
+    DrsChecksum,
+    DrsUri,
+    HttpsUrl,
+    S3Url,
+)
 
 
 def test_drs_uri():
@@ -26,3 +34,16 @@ def test_drs_checksum_construction():
 
     with pytest.raises(ValidationError, match="String should have at least 64 characters"):
         DrsChecksum(type="sha-256", checksum="not long enough")
+
+
+def test_access_method_construction():
+    DrsAccessMethod(type="file", access_url=DrsAccessUrl(url=FileUrl("file:///whatever.txt")))
+    DrsAccessMethod(type="https", access_url=DrsAccessUrl(url=HttpsUrl("https://dlougheed.com")))
+    DrsAccessMethod(type="s3", access_url=DrsAccessUrl(url=S3Url("s3://bucket/object")))
+
+    with pytest.raises(ValidationError, match="access method URL scheme does not match type"):
+        DrsAccessMethod(type="file", access_url=DrsAccessUrl(url=HttpsUrl("https://dlougheed.com")))
+    with pytest.raises(ValidationError, match="access method URL scheme does not match type"):
+        DrsAccessMethod(type="https", access_url=DrsAccessUrl(url=S3Url("s3://bucket/object")))
+    with pytest.raises(ValidationError, match="access method URL scheme does not match type"):
+        DrsAccessMethod(type="s3", access_url=DrsAccessUrl(url=FileUrl("file:///whatever.txt")))

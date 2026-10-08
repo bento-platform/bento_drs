@@ -3,7 +3,7 @@ from functools import partial
 from operator import is_
 from typing import Literal
 
-from pydantic import AnyUrl, BaseModel, Field, UrlConstraints
+from pydantic import AnyUrl, BaseModel, Field, FileUrl, HttpUrl, UrlConstraints, model_validator
 
 from .utils import len_zero
 
@@ -14,6 +14,8 @@ __all__ = [
     "DrsAccessUrl",
     "DrsAccessMethod",
     "DrsBlobResponse",
+    "HttpsUrl",
+    "S3Url",
 ]
 
 
@@ -24,6 +26,14 @@ is_none = partial(is_, None)
 
 class DrsUri(AnyUrl):
     _constraints = UrlConstraints(host_required=True, allowed_schemes=["drs"])
+
+
+class HttpsUrl(HttpUrl):
+    _constraints = UrlConstraints(max_length=2083, allowed_schemes=["https"])
+
+
+class S3Url(AnyUrl):
+    _constraints = UrlConstraints(allowed_schemes=["s3"])
 
 
 class DrsBentoExtension(BaseModel):
@@ -39,14 +49,17 @@ class DrsChecksum(BaseModel):
 
 
 class DrsAccessUrl(BaseModel):
-    url: AnyUrl
+    url: FileUrl | HttpsUrl | S3Url
 
 
 class DrsAccessMethod(BaseModel):
     type: Literal["file", "https", "s3"]
     access_url: DrsAccessUrl
 
-    # TODO: validate scheme
+    @model_validator(mode="after")
+    def validate_scheme_matches_type(self):
+        if self.type != self.access_url.url.scheme:
+            raise ValueError("access method URL scheme does not match type")
 
 
 class DrsBlobResponse(BaseModel):
