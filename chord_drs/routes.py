@@ -1,61 +1,48 @@
-import logging
+import asyncio
 import os
-import re
+import shutil
 import tempfile
 import urllib.parse
+from collections.abc import Callable
+from typing import Annotated
 
 import orjson
+from bento_lib.auth.middleware.fastapi import FastApiAuthMiddleware
 from bento_lib.auth.permissions import P_DELETE_DATA, P_DOWNLOAD_DATA, P_INGEST_DATA, P_QUERY_DATA, Permission
 from bento_lib.auth.resources import RESOURCE_EVERYTHING, build_resource
-from bento_lib.service_info.constants import SERVICE_ORGANIZATION_C3G
-from bento_lib.service_info.helpers import build_service_info
 from bento_lib.streaming.exceptions import StreamingBadRange, StreamingException, StreamingRangeNotSatisfiable
 from bento_lib.streaming.range import parse_range_header
-from flask import (
-    Blueprint,
-    Request,
-    current_app,
-    jsonify,
-    request,
-)
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
+from pydantic import BeforeValidator
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.orm import Session
-from werkzeug.exceptions import BadRequest, Forbidden, InternalServerError, NotFound, RequestedRangeNotSatisfiable
 
-from . import __version__
-from .authz import authz_middleware
+from .authz import AuthzMiddlewareDep
 from .backend import get_backend
-from .constants import BENTO_SERVICE_KIND, MIME_OCTET_STREAM, SERVICE_NAME, SERVICE_TYPE
-from .db import db
+from .config import ConfigDep
+from .constants import MIME_OCTET_STREAM
+from .db import SessionDep
+from .logger import logger
 from .models import DrsBlob
+from .pydantic_models import DrsBlobResponse
 from .serialization import build_blob_response
 from .utils import drs_file_checksum
 
-RE_STARTING_SLASH = re.compile(r"^/")
+__all__ = ["drs_router"]
 
-drs_service = Blueprint("drs_service", __name__)
+drs_router = APIRouter()
 
 
 def str_to_bool(val: str) -> bool:
     return val.lower() in ("yes", "true", "t", "1", "on")
 
 
-def forbidden() -> Forbidden:
-    authz_middleware.mark_authz_done(request)
-    return Forbidden()
+# Boolean query/form parameter which, like in the pre-FastAPI versions of this service, treats any unrecognized value
+# (including a blank one) as false rather than as a validation error.
+LenientBool = Annotated[bool, BeforeValidator(lambda v: str_to_bool(v) if isinstance(v, str) else v)]
 
-
-def authz_enabled() -> bool:
-    return current_app.config["AUTHZ_ENABLED"]
-
-
-def check_everything_permission(permission: Permission) -> bool:
-    return authz_middleware.evaluate_one(request, RESOURCE_EVERYTHING, permission) if authz_enabled() else True
-
-
-def _post_headers_getter(r: Request) -> dict[str, str]:
-    token = r.form.get("token")
-    return {"Authorization": f"Bearer {token}"} if token else {}
+HeadersGetter = Callable[[Request], dict[str, str]]
 
 
 def attachment_header(filename: str) -> dict[str, str]:
@@ -97,21 +84,30 @@ def resources_from_objects(drs_objs: list[DrsBlob]) -> tuple[dict[str, int], lis
     return id_resource_map, resources_dedup
 
 
-def check_objects_permission(
-    drs_objs: list[DrsBlob], permission: Permission, mark_authz_done: bool = False
+async def check_everything_permission(authz: FastApiAuthMiddleware, request: Request, permission: Permission) -> bool:
+    return await authz.async_evaluate_one(request, RESOURCE_EVERYTHING, permission) if authz.enabled else True
+
+
+async def check_objects_permission(
+    authz: FastApiAuthMiddleware,
+    request: Request,
+    drs_objs: list[DrsBlob],
+    permission: Permission,
+    mark_authz_done: bool = False,
+    headers_getter: HeadersGetter | None = None,
 ) -> tuple[bool, ...]:
-    if not authz_enabled():
+    if not authz.enabled:
         return tuple([True] * len(drs_objs))  # Assume we have permission for everything if authz disabled
 
     id_resource_map, resources_list = resources_from_objects(drs_objs)
 
     # gets us a matrix of len(resources_list) rows, 1 column with the permission evaluation result:
     if resources_list:
-        authz_results = authz_middleware.evaluate(
+        authz_results = await authz.async_evaluate(
             request,
             resources_list,
             [permission],
-            headers_getter=_post_headers_getter if request.method == "POST" else None,
+            headers_getter=headers_getter,
             mark_authz_done=mark_authz_done,
         )
     else:  # TODO: when evaluate does this optimization for us, don't bother with this if/else
@@ -121,80 +117,81 @@ def check_objects_permission(
     return tuple(drs_obj.public or authz_results[id_resource_map[drs_obj.id]][0] for drs_obj in drs_objs)
 
 
-def fetch_and_check_object_permissions(
-    session: Session, object_id: str, permission: Permission, logger: logging.Logger
+def get_drs_object(session: Session, object_id: str) -> DrsBlob | None:
+    return session.scalars(select(DrsBlob).where(DrsBlob.id == object_id)).one_or_none()
+
+
+async def fetch_and_check_object_permissions(
+    session: Session,
+    authz: FastApiAuthMiddleware,
+    request: Request,
+    object_id: str,
+    permission: Permission,
+    headers_getter: HeadersGetter | None = None,
 ) -> DrsBlob:
-    has_permission_on_everything = check_everything_permission(permission)
+    has_permission_on_everything = await check_everything_permission(authz, request, permission)
 
     drs_object = get_drs_object(session, object_id)
 
+    # The HTTPException handler marks authorization as determined, so we don't need to do it before raising.
+
     if not drs_object:
-        authz_middleware.mark_authz_done(request)
-        if authz_enabled() and not has_permission_on_everything:  # Don't leak if this object exists
+        if authz.enabled and not has_permission_on_everything:  # Don't leak if this object exists
             logger.error("No object found for the requested ID; masking with 403 to prevent ID discovery")
-            raise forbidden()
-        raise NotFound("No object found for this ID")
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No object found for this ID")
 
     # Check permissions -------------------------------------------------
     if has_permission_on_everything:
         # Good to go already!
-        authz_middleware.mark_authz_done(request)
+        authz.mark_authz_done(request)
     else:
-        p = check_objects_permission([drs_object], permission, mark_authz_done=True)
+        p = await check_objects_permission(
+            authz, request, [drs_object], permission, mark_authz_done=True, headers_getter=headers_getter
+        )
         if not p[0]:
-            raise forbidden()
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
     # -------------------------------------------------------------------
 
     return drs_object
 
 
-def bad_request_log_mark(err: str, logger: logging.Logger) -> BadRequest:
-    authz_middleware.mark_authz_done(request)
+def bad_request_log(err: str) -> HTTPException:
     logger.error(err)
-    return BadRequest(err)
+    return HTTPException(status.HTTP_400_BAD_REQUEST, err)
 
 
-def range_not_satisfiable_log_mark(
-    description: str, length: int, logger: logging.Logger
-) -> RequestedRangeNotSatisfiable:
-    authz_middleware.mark_authz_done(request)
+def range_not_satisfiable_log(description: str, length: int) -> HTTPException:
     logger.error("Requested range not satisfiable: %s; true length: %d", description, length)
-    return RequestedRangeNotSatisfiable(description=description, length=length)
+    return HTTPException(status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE, description)
 
 
-@drs_service.route("/service-info", methods=["GET"])
-@drs_service.route("/ga4gh/drs/v1/service-info", methods=["GET"])
-@authz_middleware.deco_public_endpoint
-async def service_info():
-    # Spec: https://github.com/ga4gh-discovery/ga4gh-service-info
-    return jsonify(
-        await build_service_info(
-            {
-                "id": current_app.config["SERVICE_ID"],
-                "name": SERVICE_NAME,
-                "type": SERVICE_TYPE,
-                "description": "Data repository service (based on GA4GH's specs) for a Bento platform node.",
-                "organization": SERVICE_ORGANIZATION_C3G,
-                "contactUrl": "mailto:info@c3g.ca",
-                "version": __version__,
-                "bento": {
-                    "serviceKind": BENTO_SERVICE_KIND,
-                    "gitRepository": "https://github.com/bento-platform/bento_drs",
-                },
-            },
-            debug=current_app.config["BENTO_DEBUG"],
-            local=current_app.config["BENTO_CONTAINER_LOCAL"],
-            logger=current_app.logger,
-        )
+# Each endpoint is available both at the root and under the GA4GH DRS spec's path prefix.
+
+
+@drs_router.get("/objects/{object_id}", response_model=DrsBlobResponse)
+@drs_router.get("/ga4gh/drs/v1/objects/{object_id}", response_model=DrsBlobResponse)
+async def object_info(
+    object_id: str,
+    request: Request,
+    session: SessionDep,
+    authz: AuthzMiddlewareDep,
+    config: ConfigDep,
+    # The requester can ask for additional, non-spec-compliant Bento properties to be included in the response
+    with_bento_properties: LenientBool = False,
+    # The requester can specify object internal path to be added to the response
+    internal_path: LenientBool = False,
+):
+    drs_object = await fetch_and_check_object_permissions(session, authz, request, object_id, P_QUERY_DATA)
+    return build_blob_response(
+        config, drs_object, inside_container=internal_path, with_bento_properties=with_bento_properties
     )
 
 
-def get_drs_object(session: Session, object_id: str) -> DrsBlob | None:
-    return session.scalars(select(DrsBlob).where(DrsBlob.id == object_id)).one_or_none()
-
-
-async def delete_drs_object(session: Session, object_id: str, logger: logging.Logger):
-    drs_object = fetch_and_check_object_permissions(session, object_id, P_DELETE_DATA, logger)
+@drs_router.delete("/objects/{object_id}", status_code=status.HTTP_204_NO_CONTENT)
+@drs_router.delete("/ga4gh/drs/v1/objects/{object_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def object_delete(object_id: str, request: Request, session: SessionDep, authz: AuthzMiddlewareDep):
+    drs_object = await fetch_and_check_object_permissions(session, authz, request, object_id, P_DELETE_DATA)
 
     logger.info("Deleting object %s", drs_object.id)
 
@@ -214,42 +211,22 @@ async def delete_drs_object(session: Session, object_id: str, logger: logging.Lo
     session.delete(drs_object)
     session.commit()
 
-
-@drs_service.route("/objects/<string:object_id>", methods=["GET", "DELETE"])
-@drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>", methods=["GET", "DELETE"])
-async def object_info(object_id: str):
-    logger = current_app.logger
-
-    if request.method == "DELETE":
-        await delete_drs_object(db.session, object_id, logger)
-        return current_app.response_class(status=204)
-
-    drs_object = fetch_and_check_object_permissions(db.session, object_id, P_QUERY_DATA, logger)
-
-    # The requester can ask for additional, non-spec-compliant Bento properties to be included in the response
-    with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
-
-    # The requester can specify object internal path to be added to the response
-    use_internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
-
-    return jsonify(
-        build_blob_response(
-            drs_object, inside_container=use_internal_path, with_bento_properties=with_bento_properties
-        ).model_dump(mode="json")
-    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@drs_service.route("/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
-@drs_service.route("/ga4gh/drs/v1/objects/<string:object_id>/access/<string:access_id>", methods=["GET"])
-def object_access(object_id: str, access_id: str):
-    fetch_and_check_object_permissions(db.session, object_id, P_QUERY_DATA, current_app.logger)
+@drs_router.get("/objects/{object_id}/access/{access_id}")
+@drs_router.get("/ga4gh/drs/v1/objects/{object_id}/access/{access_id}")
+async def object_access(
+    object_id: str, access_id: str, request: Request, session: SessionDep, authz: AuthzMiddlewareDep
+):
+    await fetch_and_check_object_permissions(session, authz, request, object_id, P_QUERY_DATA)
 
     # We explicitly do not support access_id-based accesses; all of them will be 'not found'
     # since we don't provide access IDs
 
     # TODO: Eventually generate one-time signed URLs or something?
 
-    raise NotFound(f"No access ID '{access_id}' exists for object '{object_id}'")
+    raise HTTPException(status.HTTP_404_NOT_FOUND, f"No access ID '{access_id}' exists for object '{object_id}'")
 
 
 def _build_filter_clauses(
@@ -286,52 +263,64 @@ def _build_filter_clauses(
     return filter_clauses
 
 
-@drs_service.route("/search", methods=["GET"])
-def object_search():
-    response: list[dict] = []
-
-    internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
-    with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
-
+@drs_router.get("/search", response_model=list[DrsBlobResponse])
+async def object_search(
+    request: Request,
+    session: SessionDep,
+    authz: AuthzMiddlewareDep,
+    config: ConfigDep,
+    name: str | None = None,
+    fuzzy_name: str | None = None,
+    q: str | None = None,
+    project: str | None = None,
+    dataset: Annotated[list[str] | None, Query()] = None,
+    data_type: Annotated[list[str] | None, Query()] = None,
+    internal_path: LenientBool = False,
+    with_bento_properties: LenientBool = False,
+):
     # we can optionally pass query params limiting/filtering the search response to a specific scope
     filter_clauses = _build_filter_clauses(
-        name=request.args.get("name"),
-        fuzzy_name=request.args.get("fuzzy_name"),
-        search_q=request.args.get("q"),
-        project=request.args.get("project"),
-        datasets=request.args.getlist("dataset"),
-        data_types=request.args.getlist("data_type"),
+        name=name,
+        fuzzy_name=fuzzy_name,
+        search_q=q,
+        project=project,
+        datasets=dataset or [],
+        data_types=data_type or [],
     )
 
     # search requires: (name XOR fuzzy_name XOR q) | project | dataset (1+) | data_type (1+)
     if not filter_clauses:
-        authz_middleware.mark_authz_done(request)
-        raise BadRequest("Missing GET search terms: (name XOR fuzzy_name XOR q) | project | dataset | data_type")
+        raise bad_request_log("Missing GET search terms: (name XOR fuzzy_name XOR q) | project | dataset | data_type")
 
-    objects = db.session.scalars(select(DrsBlob).where(*filter_clauses)).all()
+    objects = list(session.scalars(select(DrsBlob).where(*filter_clauses)).all())
 
     # TODO: invert the permissions logic - get IDs of projects/datasets where we have query:data access, to avoid this
     #  gross O(n) lookup when searching. Although at least it's now O(n) in terms of number of resources, not number
     #  of objects.
     # TODO: it's also important to pre-check list of resources with query:data access to avoid timing attacks.
 
-    for obj, p in zip(objects, check_objects_permission(list(objects), P_QUERY_DATA)):
-        if p:  # Only include the blob in the search results if we have permissions to view it.
-            response.append(
-                build_blob_response(obj, internal_path, with_bento_properties=with_bento_properties).model_dump(
-                    mode="json"
-                )
-            )
+    permissions = await check_objects_permission(authz, request, objects, P_QUERY_DATA)
+    response = [
+        # Only include the blob in the search results if we have permissions to view it.
+        build_blob_response(config, obj, internal_path, with_bento_properties=with_bento_properties)
+        for obj, p in zip(objects, permissions)
+        if p
+    ]
 
-    authz_middleware.mark_authz_done(request)
-    return jsonify(response)
+    authz.mark_authz_done(request)
+    return response
 
 
-@drs_service.route("/objects/<string:object_id>/download", methods=["GET", "POST"])
-async def object_download(object_id: str):
-    logger = current_app.logger
-
-    drs_object = fetch_and_check_object_permissions(db.session, object_id, P_DOWNLOAD_DATA, logger)
+async def _download_object(
+    request: Request,
+    session: Session,
+    authz: FastApiAuthMiddleware,
+    object_id: str,
+    headers_getter: HeadersGetter | None = None,
+) -> StreamingResponse:
+    drs_object = await fetch_and_check_object_permissions(
+        session, authz, request, object_id, P_DOWNLOAD_DATA, headers_getter
+    )
     obj_size = drs_object.size
 
     mime_type: str = drs_object.mime_type or MIME_OCTET_STREAM
@@ -344,9 +333,9 @@ async def object_download(object_id: str):
         try:
             range_intervals = parse_range_header(range_header, obj_size)
         except StreamingBadRange as e:
-            raise bad_request_log_mark(str(e), logger)
+            raise bad_request_log(str(e))
         except StreamingRangeNotSatisfiable as e:
-            raise range_not_satisfiable_log_mark(str(e), obj_size, logger)
+            raise range_not_satisfiable_log(str(e), obj_size)
         bytes_range = range_intervals[0]
         start, end = bytes_range
         response_headers["Content-Length"] = str(end + 1 - start)  # byte range is inclusive, so need to add one
@@ -359,58 +348,102 @@ async def object_download(object_id: str):
     try:
         obj_generator = await drs_object.get_streaming_generator(bytes_range)
     except StreamingException as e:
-        raise bad_request_log_mark(str(e), logger)
+        raise bad_request_log(str(e))
 
-    status: int = 206 if range_header else 200  # partial/full content based on range
-    stream_response = current_app.response_class(obj_generator, status=status, mimetype=mime_type)
-    return stream_response, response_headers
+    status_code: int = status.HTTP_206_PARTIAL_CONTENT if range_header else status.HTTP_200_OK
+    return StreamingResponse(obj_generator, status_code=status_code, media_type=mime_type, headers=response_headers)
 
 
-@drs_service.route("/ingest", methods=["POST"])
-async def object_ingest():
-    logger = current_app.logger
-    data = request.form or {}
+@drs_router.get("/objects/{object_id}/download")
+async def object_download(object_id: str, request: Request, session: SessionDep, authz: AuthzMiddlewareDep):
+    return await _download_object(request, session, authz, object_id)
 
-    deduplicate: bool = str_to_bool(data.get("deduplicate", "true"))  # Change for v0.9: default to True
-    obj_path: str | None = data.get("path")
-    project_id: str | None = data.get("project_id") or None  # replace blank strings with None
-    dataset_id: str | None = data.get("dataset_id") or None  # "
-    data_type: str | None = data.get("data_type") or None  # "
-    public: bool = data.get("public", "false").strip().lower() == "true"
 
-    file = request.files.get("file")
-    mime_type: str | None = data.get("mime_type") or None  # replace blank strings with None
+@drs_router.post("/objects/{object_id}/download")
+async def object_download_post(
+    object_id: str,
+    request: Request,
+    session: SessionDep,
+    authz: AuthzMiddlewareDep,
+    # A token can be passed in the form body (instead of an Authorization header), e.g., for browser form submissions
+    token: Annotated[str | None, Form()] = None,
+):
+    def headers_getter(_r: Request) -> dict[str, str]:
+        return {"Authorization": f"Bearer {token}"} if token else {}
 
-    logger.info(f"Received ingest request metadata: {data}")
+    return await _download_object(request, session, authz, object_id, headers_getter)
+
+
+def _save_upload(upload: UploadFile, path: str) -> None:
+    with open(path, "wb") as fh:
+        shutil.copyfileobj(upload.file, fh)
+
+
+@drs_router.post("/ingest", response_model=DrsBlobResponse, status_code=status.HTTP_201_CREATED)
+async def object_ingest(
+    request: Request,
+    session: SessionDep,
+    authz: AuthzMiddlewareDep,
+    config: ConfigDep,
+    # All form fields are optional so that authorization is evaluated before any 4xx caused by the request body, e.g.,
+    # an unauthorized request with an empty body should get a 403.
+    deduplicate: Annotated[LenientBool, Form()] = True,  # Change for v0.9: default to True
+    path: Annotated[str | None, Form()] = None,
+    project_id: Annotated[str | None, Form()] = None,
+    dataset_id: Annotated[str | None, Form()] = None,
+    data_type: Annotated[str | None, Form()] = None,
+    public: Annotated[str, Form()] = "false",
+    mime_type: Annotated[str | None, Form()] = None,
+    file: Annotated[UploadFile | None, File()] = None,
+):
+    obj_path: str | None = path
+    # replace blank strings with None
+    project_id = project_id or None
+    dataset_id = dataset_id or None
+    data_type = data_type or None
+    mime_type = mime_type or None
+    is_public: bool = public.strip().lower() == "true"
+
+    logger.info(
+        "Received ingest request metadata: deduplicate=%s path=%s project_id=%s dataset_id=%s data_type=%s "
+        "public=%s mime_type=%s",
+        deduplicate,
+        path,
+        project_id,
+        dataset_id,
+        data_type,
+        public,
+        mime_type,
+    )
 
     # This authz call determines everything, so we can mark authz as done when the call completes:
     has_permission: bool = (
-        authz_middleware.evaluate_one(
+        await authz.async_evaluate_one(
             request,
             build_resource(project_id, dataset_id, data_type),
             P_INGEST_DATA,
             mark_authz_done=True,
         )
-        if authz_enabled()
+        if authz.enabled
         else True
     )
 
     if not has_permission:
-        raise Forbidden("Forbidden")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
 
     if (obj_path is not None and file is not None) or (obj_path is None and file is None):
-        raise bad_request_log_mark("Must specify exactly one of path or file contents", logger)
+        raise bad_request_log("Must specify exactly one of path or file contents")
 
     drs_object: DrsBlob | None = None  # either the new object, or the object to fully reuse
     object_to_copy: DrsBlob | None = None
 
-    tfh, t_obj_path = tempfile.mkstemp(dir=current_app.config["DRS_INGEST_TMP_DIR"])
+    tfh, t_obj_path = tempfile.mkstemp(dir=config.drs_ingest_tmp_dir)
     try:
         filename: str | None = None  # no override, use path filename if path is specified instead of a file upload
         if file is not None:
             logger.debug("ingest - received file object: %s", file)
             logger.debug("ingest - writing to temporary path: %s", t_obj_path)
-            file.save(t_obj_path)
+            await asyncio.to_thread(_save_upload, file, t_obj_path)
             obj_path = t_obj_path
             filename = file.filename  # still may be none, in which case the temporary filename will be used
 
@@ -418,9 +451,9 @@ async def object_ingest():
             # Get checksum of original file, and query database for objects that match
 
             try:
-                checksum = drs_file_checksum(obj_path)
+                checksum = await asyncio.to_thread(drs_file_checksum, obj_path)
             except FileNotFoundError:
-                raise bad_request_log_mark(f"File not found at path {obj_path}", logger)
+                raise bad_request_log(f"File not found at path {obj_path}")
 
             # Currently, we require exact permissions compatibility for deduplication of IDs.
             # It might be possible to relax this a bit, but we can't fully relax this for two reasons:
@@ -429,7 +462,7 @@ async def object_ingest():
             #    and seeing which files are DRS ID duplicates.
             # However, we can actually deduplicate the files on the filesystem as these are more opaque.
 
-            candidate_drs_object: DrsBlob | None = db.session.scalars(
+            candidate_drs_object: DrsBlob | None = session.scalars(
                 select(DrsBlob).where(DrsBlob.checksum == checksum)
             ).one_or_none()
 
@@ -443,7 +476,7 @@ async def object_ingest():
                     c_project_id == project_id
                     and c_dataset_id == dataset_id
                     and c_data_type == data_type
-                    and c_public == public
+                    and c_public == is_public
                 ):
                     logger.info(
                         f"Found duplicate DRS object via checksum (will fully deduplicate): {candidate_drs_object}"
@@ -452,7 +485,7 @@ async def object_ingest():
                 else:
                     logger.info(
                         f"Found duplicate DRS object via checksum (will deduplicate JUST bytes; req resource: "
-                        f"({project_id}, {dataset_id}, {data_type}, {public}) vs existing resource: "
+                        f"({project_id}, {dataset_id}, {data_type}, {is_public}) vs existing resource: "
                         f"({c_project_id}, {c_dataset_id}, {c_data_type}, {c_public})): "
                         f"{candidate_drs_object}"
                     )
@@ -467,19 +500,18 @@ async def object_ingest():
                     project_id=project_id,
                     dataset_id=dataset_id,
                     data_type=data_type,
-                    public=public,
+                    public=is_public,
                 )
-                db.session.add(drs_object)
-                db.session.commit()
+                session.add(drs_object)
+                session.commit()
                 logger.info("added DRS object: %s", drs_object)
             except ValueError as e:
-                raise bad_request_log_mark(str(e), logger)
-            except Exception as e:  # TODO: More specific handling
-                authz_middleware.mark_authz_done(request)
+                raise bad_request_log(str(e))
+            except Exception as e:  # noqa: BLE001  # TODO: More specific handling
                 logger.exception("encountered exception during ingest", exc_info=e)
-                raise InternalServerError("Error while creating the object")
+                raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Error while creating the object")
 
-        return build_blob_response(drs_object, with_bento_properties=True).model_dump(mode="json"), 201
+        return build_blob_response(config, drs_object, with_bento_properties=True)
 
     finally:
         os.close(tfh)

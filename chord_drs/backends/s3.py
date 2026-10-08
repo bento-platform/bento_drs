@@ -1,5 +1,5 @@
 import logging
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator
 from typing import TypedDict
 
 import aioboto3
@@ -7,8 +7,8 @@ import botocore
 from bento_lib.logging import log_level_from_str
 from boto3.s3.transfer import S3TransferConfig
 
+from chord_drs.config import Config
 from chord_drs.constants import CHUNK_SIZE
-from chord_drs.utils import sync_generator_stream
 
 from .base import Backend
 
@@ -23,21 +23,21 @@ class S3ObjectGenerator(TypedDict):
 class S3Backend(Backend):
     def __init__(
         self,
-        config: dict,  # config is dict or flask.Config, which is a subclass of dict.
+        config: Config,
         logger: logging.Logger,
     ):
-        logging.getLogger("boto3").setLevel(log_level_from_str(config["LOG_LEVEL"]))
-        logging.getLogger("botocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
-        logging.getLogger("aiobotocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
-        protocol = "https" if config["S3_USE_HTTPS"] else "http"
-        endpoint_url = f"{protocol}://{config['S3_ENDPOINT']}"
+        logging.getLogger("boto3").setLevel(log_level_from_str(config.log_level))
+        logging.getLogger("botocore").setLevel(log_level_from_str(config.log_level))
+        logging.getLogger("aiobotocore").setLevel(log_level_from_str(config.log_level))
+        protocol = "https" if config.s3_use_https else "http"
+        endpoint_url = f"{protocol}://{config.s3_endpoint}"
 
         self._s3_url = endpoint_url
-        self.s3_access_key_id = config["S3_ACCESS_KEY"]
-        self.s3_secret_access_key = config["S3_SECRET_KEY"]
-        self.verify = config["S3_VALIDATE_SSL"]
-        self.region_name = config["S3_REGION_NAME"]
-        self.bucket_name = config["S3_BUCKET"]
+        self.s3_access_key_id = config.s3_access_key
+        self.s3_secret_access_key = config.s3_secret_key
+        self.verify = config.s3_validate_ssl
+        self.region_name = config.s3_region_name
+        self.bucket_name = config.s3_bucket
 
         self.session = aioboto3.Session()
 
@@ -116,9 +116,9 @@ class S3Backend(Backend):
 
     async def get_stream_generator(
         self, location: str, bytes_range: tuple[int, int] | None = None
-    ) -> Generator[bytes, None, None]:
+    ) -> AsyncGenerator[bytes, None]:
         s3_dict = await self.get_s3_object_dict(location, bytes_range)
-        return sync_generator_stream(s3_dict["generator"], self.logger)
+        return s3_dict["generator"]
 
     def _location_to_object_key(self, location: str) -> str:
         if location.startswith(f"s3://{self.bucket_name}"):

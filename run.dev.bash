@@ -5,9 +5,6 @@
 # Update dependencies and install module locally
 /poetry_user_install_dev.bash
 
-export FLASK_ENV='development'
-export FLASK_APP='chord_drs.app:application'
-
 # Set default internal port to 5000
 : "${INTERNAL_PORT:=5000}"
 
@@ -15,8 +12,11 @@ export FLASK_APP='chord_drs.app:application'
 : "${DEBUGGER_PORT:=5682}"
 
 # Run migrations if necessary
-flask db upgrade
+alembic upgrade head
 
-python -m debugpy --listen "0.0.0.0:${DEBUGGER_PORT}" -m flask run \
+# Start API server + debugger, with auto-reload on code changes
+python -m debugpy --listen "0.0.0.0:${DEBUGGER_PORT}" -m uvicorn \
+  --factory chord_drs.app:create_app \
   --host 0.0.0.0 \
-  --port "${INTERNAL_PORT}"
+  --port "${INTERNAL_PORT}" \
+  --reload

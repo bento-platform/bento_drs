@@ -5,12 +5,12 @@ import uuid
 
 import bento_lib
 import pytest
-import responses
-from flask import current_app
 from jsonschema import validate
 
-from chord_drs.data_sources import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
-from tests.conftest import AUTHZ_URL, dummy_file_path, non_existant_dummy_file_path
+from chord_drs.config import get_config
+from chord_drs.constants import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
+from tests.authz_mock import authz_drs_specific_obj, authz_everything_false, authz_everything_true
+from tests.conftest import dummy_file_path, non_existant_dummy_file_path
 from tests.constants import DUMMY_DATASET_ID_1, DUMMY_DATASET_ID_2, DUMMY_PROJECT_ID
 
 NON_EXISTENT_ID = "123"
@@ -22,8 +22,8 @@ def validate_object_fields(
     with_internal_path: bool = False,
     with_bento_properties: bool = False,
 ):
-    is_local = current_app.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_LOCAL
-    is_s3 = current_app.config["SERVICE_DATA_SOURCE"] == DATA_SOURCE_S3
+    is_local = get_config().service_data_source == DATA_SOURCE_LOCAL
+    is_s3 = get_config().service_data_source == DATA_SOURCE_S3
 
     assert "contents" not in data
     assert "access_methods" in data
@@ -57,20 +57,12 @@ def validate_object_fields(
 
 
 def test_service_info(client):
-    from chord_drs.app import application
-
     res = client.get("/service-info")
-    data = res.get_json()
+    data = res.json()
     validate(data, bento_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
 
     res = client.get("/ga4gh/drs/v1/service-info")
-    data = res.get_json()
-    validate(data, bento_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
-
-    application.config["BENTO_DEBUG"] = True
-
-    res = client.get("/service-info")
-    data = res.get_json()
+    data = res.json()
     validate(data, bento_lib.schemas.ga4gh.SERVICE_INFO_SCHEMA)
 
 
@@ -79,21 +71,6 @@ def test_method_not_allowed(client):
     assert res.status_code == 405
 
 
-def authz_everything_true(count=1):
-    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [[True] for _ in range(count)]})
-
-
-def authz_everything_false(count=1):
-    responses.post(f"{AUTHZ_URL}/policy/evaluate", json={"result": [[False] for _ in range(count)]})
-
-
-def authz_drs_specific_obj(iters=1):
-    for _ in range(iters):
-        authz_everything_false()
-        authz_everything_true()
-
-
-@responses.activate
 def test_object_fail(client):
     authz_everything_true()
 
@@ -104,7 +81,6 @@ def test_object_fail(client):
     assert res.status_code == 404
 
 
-@responses.activate
 def test_object_fail_forbidden(client):
     authz_everything_false()
 
@@ -115,30 +91,27 @@ def test_object_fail_forbidden(client):
     assert res.status_code == 403
 
 
-@responses.activate
 def test_object_download_fail(client):
     authz_everything_true()
     res = client.get(f"/objects/{NON_EXISTENT_ID}/download")
     assert res.status_code == 404
 
 
-@responses.activate
 def test_object_access_fail(client):
     authz_everything_true()
     res = client.get(f"/objects/{NON_EXISTENT_ID}/access/no_access")
     assert res.status_code == 404
 
 
-@responses.activate
 def _test_object_and_download(client, obj, test_range=False):
     res = client.get(f"/objects/{obj.id}")
-    data = res.get_json()
+    data = res.json()
     assert res.status_code == 200
     validate_object_fields(data, existing_id=obj.id)
 
     # Check that we can get extra Bento data
     res = client.get(f"/objects/{obj.id}?with_bento_properties=true")
-    data = res.get_json()
+    data = res.json()
     assert res.status_code == 200
     validate_object_fields(data, existing_id=obj.id, with_bento_properties=True)
 
@@ -149,14 +122,14 @@ def _test_object_and_download(client, obj, test_range=False):
     # Download the object
     res = client.get(data["access_methods"][0]["access_url"]["url"])
     assert res.status_code == 200
-    assert res.content_length == obj.size
-    assert len(res.get_data(as_text=False)) == obj.size
+    assert int(res.headers["content-length"]) == obj.size
+    assert len(res.content) == obj.size
 
     # Download the object (POST)
     res = client.post(data["access_methods"][0]["access_url"]["url"])
     assert res.status_code == 200
-    assert res.content_length == obj.size
-    assert len(res.get_data(as_text=False)) == obj.size
+    assert int(res.headers["content-length"]) == obj.size
+    assert len(res.content) == obj.size
 
     if test_range:
         # Test fetching with Range headers
@@ -164,25 +137,25 @@ def _test_object_and_download(client, obj, test_range=False):
         #  - first 5 bytes of a file
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=0-4"),))
         assert res.status_code == 206
-        body = res.get_data(as_text=False)
+        body = res.content
         assert len(body) == 5
 
         #  - bytes 100-1999
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=100-1999"),))
         assert res.status_code == 206
-        body = res.get_data(as_text=False)
+        body = res.content
         assert len(body) == 1900
 
         # Size is 2455, so these'll run off the end and return the whole thing after 100
 
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=100-"),))
         assert res.status_code == 206
-        body = res.get_data(as_text=False)
+        body = res.content
         assert len(body) == 2355
 
         res = client.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=0-"),))
         assert res.status_code == 206
-        body = res.get_data(as_text=False)
+        body = res.content
         assert len(body) == 2455
 
         # Test range error state
@@ -208,81 +181,72 @@ def _test_object_and_download(client, obj, test_range=False):
         assert res.status_code == 416
 
 
-@responses.activate
 def test_object_and_download_s3(client_s3, drs_object_s3):
     authz_everything_true()
     res = client_s3.get(f"/objects/{drs_object_s3.id}")
-    data = res.get_json()
+    data = res.json()
     assert res.status_code == 200
 
     res = client_s3.get(data["access_methods"][0]["access_url"]["url"])
     assert res.status_code == 200
 
     with open(dummy_file_path(), "rb") as fh:
-        assert res.get_data() == fh.read()
+        assert res.content == fh.read()
 
 
-@responses.activate
 def test_object_and_download_s3_range(client_s3, drs_object_s3):
     authz_everything_true()
     res = client_s3.get(f"/objects/{drs_object_s3.id}")
-    data = res.get_json()
+    data = res.json()
 
     res = client_s3.get(data["access_methods"][0]["access_url"]["url"], headers=(("Range", "bytes=0-4"),))
     assert res.status_code == 206
-    assert res.get_data() == b"# CHO"  # first five bytes (0-4 inclusive) of dummy_file.txt
+    assert res.content == b"# CHO"  # first five bytes (0-4 inclusive) of dummy_file.txt
 
 
-@responses.activate
 def test_object_and_download_s3_specific_perms(client_s3, drs_object_s3):
     # _test_object_and_download does 5 different accesses
     authz_drs_specific_obj(iters=5)
     _test_object_and_download(client_s3, drs_object_s3)
 
 
-@responses.activate
 def test_object_and_download(client, drs_object):
     authz_everything_true()
     _test_object_and_download(client, drs_object)
 
 
-@responses.activate
 def test_object_and_download_specific_perms(client, drs_object):
     # _test_object_and_download does 5 different accesses
     authz_drs_specific_obj(iters=5)
     _test_object_and_download(client, drs_object)
 
 
-@responses.activate
 def test_object_and_download_with_ranges(client_local, drs_object):
     authz_everything_true()
     # Only local backend supports ranges for now
     _test_object_and_download(client_local, drs_object, test_range=True)
 
 
-@responses.activate
 def test_object_with_internal_path(client, drs_object):
     authz_everything_true()
 
     res = client.get(f"/objects/{drs_object.id}?internal_path=1")
-    data = res.get_json()
+    data = res.json()
 
     assert res.status_code == 200
     validate_object_fields(data, with_internal_path=True)
 
 
-@responses.activate
 def test_object_with_disabled_internal_path(client, drs_object):
     authz_everything_true()
 
     res = client.get(f"/objects/{drs_object.id}?internal_path=0")
-    data = res.get_json()
+    data = res.json()
 
     assert res.status_code == 200
     validate_object_fields(data, with_internal_path=False)
 
 
-@responses.activate
 def test_object_delete(client):
     authz_everything_true()
 
@@ -294,7 +258,7 @@ def test_object_delete(client):
         tf.flush()
         res = client.post("/ingest", data={"path": tf.name})
 
-    ingested_obj = res.get_json()
+    ingested_obj = res.json()
 
     res = client.delete(f"/objects/{ingested_obj['id']}")
     assert res.status_code == 204
@@ -305,8 +269,7 @@ def test_object_delete(client):
     assert res.status_code == 404
 
 
-@responses.activate
-def test_object_multi_delete(client):
+def test_object_multi_delete(client, session_maker):
     from chord_drs.models import DrsBlob
 
     authz_everything_true()
@@ -324,13 +287,14 @@ def test_object_multi_delete(client):
         res2 = client.post("/ingest", data={"path": tf.name, "project_id": "project2"})
         assert res2.status_code == 201
 
-    i1 = res1.get_json()
-    i2 = res2.get_json()
+    i1 = res1.json()
+    i2 = res2.json()
 
     assert i1["id"] != i2["id"]
 
-    b1 = DrsBlob.query.filter_by(id=i1["id"]).first()
-    b2 = DrsBlob.query.filter_by(id=i2["id"]).first()
+    with session_maker() as session:
+        b1 = session.get(DrsBlob, i1["id"])
+        b2 = session.get(DrsBlob, i2["id"])
 
     assert b1.location == b2.location
 
@@ -357,7 +321,6 @@ def test_object_multi_delete(client):
         assert not os.path.exists(b1.location)
 
 
-@responses.activate
 def test_search_bad_query(client, drs_multi_object):
     authz_everything_true()
 
@@ -365,7 +328,6 @@ def test_search_bad_query(client, drs_multi_object):
     assert res.status_code == 400
 
 
-@responses.activate
 @pytest.mark.parametrize(
     "url",
     (
@@ -379,13 +341,12 @@ def test_search_object_empty(client, drs_multi_object, url):
     authz_everything_true(count=2)
 
     res = client.get(url)
-    data = res.get_json()
+    data = res.json()
 
     assert res.status_code == 200
     assert len(data) == 0
 
 
-@responses.activate
 @pytest.mark.parametrize(
     "url,count,n_resources",
     (
@@ -412,7 +373,7 @@ def test_search_object(client, drs_multi_object, url, count, n_resources):
     authz_everything_true(count=n_resources)
 
     res = client.get(url)
-    data = res.get_json()
+    data = res.json()
     has_internal_path = "internal_path" in url
 
     assert res.status_code == 200
@@ -422,25 +383,22 @@ def test_search_object(client, drs_multi_object, url, count, n_resources):
         validate_object_fields(obj, with_internal_path=has_internal_path)
 
 
-@responses.activate
 def test_search_no_permissions(client, drs_multi_object):
     authz_everything_false(count=len(drs_multi_object))
 
     res = client.get("/search?name=alembic.ini")
-    data = res.get_json()
+    data = res.json()
 
     assert res.status_code == 200
     assert len(data) == 0
 
 
-@responses.activate
 def test_object_ingest_fail_1(client):
     authz_everything_true()
     res = client.post("/ingest", data={"wrong_arg": "some_path"})
     assert res.status_code == 400
 
 
-@responses.activate
 def test_object_ingest_fail_2(client):
     authz_everything_true()
     res = client.post("/ingest", data={"path": non_existant_dummy_file_path()})
@@ -448,19 +406,18 @@ def test_object_ingest_fail_2(client):
 
 
 @pytest.mark.parametrize("mime_type", ["image/*", "invalid/mime", "text/html;"])
-@responses.activate
 def test_object_ingest_bad_mime_type(client, mime_type: str):
     authz_everything_true()
     res = client.post("/ingest", data={"path": dummy_file_path(), "mime_type": mime_type})
     assert res.status_code == 400
-    data = res.get_json()
+    data = res.json()
     assert data["code"] == 400
-    assert data["errors"] == [{"message": "400 Bad Request: Invalid MIME type"}]
+    assert data["errors"] == [{"message": "Invalid MIME type"}]
 
 
 def _ingest_one(client, existing_id=None, params=None):
     res = client.post("/ingest", data={"path": dummy_file_path(), **(params or {})})
-    data = res.get_json()
+    data = res.json()
 
     assert res.status_code == 201
     validate_object_fields(data, existing_id=existing_id, with_bento_properties=True)
@@ -468,7 +425,6 @@ def _ingest_one(client, existing_id=None, params=None):
     return data
 
 
-@responses.activate
 def test_object_ingest(client):
     authz_everything_true()
     data = _ingest_one(client)
@@ -477,14 +433,12 @@ def test_object_ingest(client):
     assert "mime_type" not in data
 
 
-@responses.activate
 def test_object_ingest_with_mime(client):
     authz_everything_true()
     data = _ingest_one(client, params={"mime_type": "text/plain"})
     assert data["mime_type"] == "text/plain"
 
 
-@responses.activate
 def test_object_ingest_dedup(client):
     authz_everything_true()
     data_1 = _ingest_one(client)
@@ -509,7 +463,6 @@ def test_object_ingest_dedup(client):
     assert not data_3["bento"]["public"]
 
 
-@responses.activate
 def test_object_ingest_no_deduplicate(client):
     authz_everything_true()
     data_1 = _ingest_one(client)
@@ -520,26 +473,23 @@ def test_object_ingest_no_deduplicate(client):
     assert json.dumps(data_1, sort_keys=True) != json.dumps(data_2, sort_keys=True)
 
 
-@responses.activate
 def test_object_ingest_bad_req(client):
     authz_everything_true()
     res = client.post("/ingest", data={})
     assert res.status_code == 400
 
 
-@responses.activate
 def test_object_ingest_forbidden(client):
     authz_everything_false()
     res = client.post("/ingest", data={})  # invalid body shouldn't be caught until after
     assert res.status_code == 403
 
 
-@responses.activate
 def test_object_ingest_post_file(client):
     # actual bytes of file in request
     fp = dummy_file_path()
     authz_everything_true()
     with open(fp, "rb") as fh:
-        res = client.post("/ingest", data={"file": (fh, "dummy_file.txt")}, content_type="multipart/form-data")
+        res = client.post("/ingest", files={"file": ("dummy_file.txt", fh)})
     assert res.status_code == 201
-    validate_object_fields(res.get_json(), with_bento_properties=True)
+    validate_object_fields(res.json(), with_bento_properties=True)

@@ -1,14 +1,13 @@
+import asyncio
 import os
-from collections.abc import Generator
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 from urllib.parse import urlparse
 from uuid import uuid4
 
 import botocore
 import botocore.exceptions
-from flask import current_app
 from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column
 from sqlalchemy.sql import func
@@ -20,6 +19,7 @@ from .backend import get_backend
 from .backends.s3 import S3Backend, S3ObjectGenerator
 from .constants import RE_INGESTABLE_MIME_TYPE
 from .exceptions import DrsBlobSaveError
+from .logger import logger
 from .utils import drs_file_checksum
 
 __all__ = [
@@ -62,8 +62,6 @@ class DrsBlob(Base):
 
         **Warning**: Using the default constructor will only instanciate a sqlalchemy ORM declarative base.
         """
-        logger = current_app.logger
-
         # If set, we are deduplicating with an existing file object
         object_to_copy: DrsBlob | None = kwargs.pop("object_to_copy", None)
 
@@ -104,7 +102,7 @@ class DrsBlob(Base):
             try:
                 instance.location = await backend.save(location, new_filename)
                 instance.size = os.path.getsize(p)
-                instance.checksum = drs_file_checksum(location)
+                instance.checksum = await asyncio.to_thread(drs_file_checksum, location)
             except botocore.exceptions.ClientError as err:
                 msg = f"S3 related error during DRS object creation: {err}"
                 logger.error(msg)
@@ -133,7 +131,7 @@ class DrsBlob(Base):
 
         return await backend.get_s3_object_dict(self.location)
 
-    async def get_streaming_generator(self, bytes_range: tuple[int, int] | None = None) -> Generator[Any, None, None]:
+    async def get_streaming_generator(self, bytes_range: tuple[int, int] | None = None) -> AsyncGenerator[bytes, None]:
         backend = get_backend()
         generator = await backend.get_stream_generator(self.location, bytes_range)
         return generator
