@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator, Sized
 from hashlib import sha256
 from logging import Logger
 from typing import Any
@@ -64,5 +64,5 @@ def sync_generator_stream[T](async_generator: AsyncGenerator[T, None], logger: L
     return _iter_over_async(iterator(), logger)
 
 
-def len_zero(x: list) -> bool:
+def len_zero(x: Sized) -> bool:
     return len(x) == 0
