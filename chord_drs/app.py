@@ -1,91 +1,52 @@
-import os
+import tempfile
+from contextlib import asynccontextmanager
 
-from bento_lib.responses import flask_errors
-from flask import Flask
-from flask_cors import CORS
-from flask_migrate import Migrate
-from werkzeug.exceptions import BadRequest, Forbidden, MethodNotAllowed, NotFound, RequestedRangeNotSatisfiable
+from bento_lib.apps.fastapi import BentoFastAPI
+from bento_lib.logging import log_level_from_str
 
-from .authz import authz_middleware
-from .backend import close_backend
-from .commands import ingest
-from .config import APP_DIR, Config
-from .db import db
-from .metrics import metrics
-from .request import DrsRequest
-from .routes import drs_service
+from . import __version__
+from .authz import get_authz_middleware
+from .config import BENTO_EXTRA_SERVICE_INFO, get_config
+from .constants import SERVICE_TYPE
+from .logger import logger
+from .routes import drs_router
 
-MIGRATION_DIR = os.path.join(APP_DIR, "migrations")
+__all__ = ["create_app"]
 
-application = Flask(__name__)
-application.config.from_object(Config)
-application.request_class = DrsRequest
 
-# Set up CORS
-CORS(
-    application,
-    origins=Config.CORS_ORIGINS,
-    supports_credentials=True,
-)
+@asynccontextmanager
+async def lifespan(_app: BentoFastAPI):
+    yield
 
-# Attach authz middleware to Flask instance
-authz_middleware.attach(application)
 
-# Register exception handlers, to return nice JSON responses
-# - Generic catch-all
-application.register_error_handler(
-    Exception,
-    flask_errors.flask_error_wrap_with_traceback(
-        flask_errors.flask_internal_server_error,
-        drs_compat=True,
-        logger=application.logger,
-        authz=authz_middleware,
-    ),
-)
-application.register_error_handler(
-    BadRequest,
-    flask_errors.flask_error_wrap(flask_errors.flask_bad_request_error, drs_compat=True, authz=authz_middleware),
-)
-application.register_error_handler(
-    Forbidden,
-    flask_errors.flask_error_wrap(flask_errors.flask_forbidden_error, drs_compat=True, authz=authz_middleware),
-)
-application.register_error_handler(
-    NotFound,
-    lambda e: flask_errors.flask_error_wrap(
-        flask_errors.flask_not_found_error,
-        str(e),
-        drs_compat=True,
-        authz=authz_middleware,
-    )(e),
-)
-application.register_error_handler(
-    MethodNotAllowed,
-    flask_errors.flask_error_wrap(flask_errors.flask_method_not_allowed_error, drs_compat=True, authz=authz_middleware),
-)
-application.register_error_handler(
-    RequestedRangeNotSatisfiable,
-    flask_errors.flask_error_wrap(
-        flask_errors.flask_range_not_satisfiable_error,
-        drs_compat=True,
-        authz=authz_middleware,
-    ),
-)
+def create_app() -> BentoFastAPI:
+    config = get_config()
+    logger.setLevel(log_level_from_str(config.log_level))
 
-# Attach the database to the application and run migrations if needed
-db.init_app(application)
-migrate = Migrate(application, db, directory=MIGRATION_DIR, render_as_batch=True)
+    if config.drs_ingest_tmp_dir:
+        # Uploaded files are spooled to disk by Starlette via the tempfile module, so point that at the configured
+        # directory in order for large uploads to use it.
+        tempfile.tempdir = config.drs_ingest_tmp_dir
 
-# Register routes
-application.register_blueprint(drs_service)
+    authz = get_authz_middleware()
 
-# Register application commands
-application.cli.add_command(ingest)
+    # BentoFastAPI sets up CORS, authorization, Bento-formatted error handlers, and the /service-info endpoint.
+    application = BentoFastAPI(
+        authz,
+        config,
+        logger,
+        BENTO_EXTRA_SERVICE_INFO,
+        SERVICE_TYPE,
+        __version__,
+        exc_handler_kwargs={"drs_compat": True},
+        lifespan=lifespan,
+    )
 
-# Add callback to handle tearing down backend when a context is closed
-application.teardown_appcontext(close_backend)
+    # The DRS spec says the service info should also be available under the DRS API prefix
+    @application.get("/ga4gh/drs/v1/service-info", dependencies=[authz.dep_public_endpoint()])
+    async def drs_service_info():
+        return await application.get_service_info()
 
-# Attach Prometheus metrics exporter (if enabled)
-with application.app_context():  # pragma: no cover
-    if application.config["PROMETHEUS_ENABLED"]:
-        metrics.init_app(application)
+    application.include_router(drs_router)
+
+    return application
