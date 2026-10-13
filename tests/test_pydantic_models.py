@@ -71,7 +71,7 @@ def test_drs_blob_response_construction():
     ct = ser["created_time"]
 
     assert "T" in ct
-    assert ct.endswith("Z")
+    assert ct.endswith("Z")  # should be ISO-spec, short version
 
     assert ser == {
         "id": "asdf",
