@@ -24,8 +24,6 @@ from tests.constants import (
     DUMMY_DATASET_ID_2,
     DUMMY_PROJECT_ID,
     S3_ACCESS_KEY,
-    S3_HOST,
-    S3_PORT,
     S3_SECRET_KEY,
 )
 
@@ -61,11 +59,10 @@ def reset_caches() -> None:
     Clear all cached configuration-derived objects, so changes to the environment are picked up.
     """
     from chord_drs.authz import get_authz_middleware
-    from chord_drs.backend import get_backend
     from chord_drs.config import get_config
     from chord_drs.db import get_engine, get_session_maker
 
-    for f in (get_config, get_authz_middleware, get_backend, get_engine, get_session_maker):
+    for f in (get_config, get_authz_middleware, get_engine, get_session_maker):
         if hasattr(f, "cache_clear"):  # get_engine is replaced by a plain function in tests using an in-memory DB
             f.cache_clear()
 
@@ -168,13 +165,8 @@ def s3_session(s3_server):
 
 @pytest.fixture
 def s3_env(monkeypatch):
-    monkeypatch.setenv("S3_ENDPOINT", f"{S3_HOST}:{S3_PORT}")
-    monkeypatch.setenv("S3_ACCESS_KEY", "test_access_key")
-    monkeypatch.setenv("S3_SECRET_KEY", "test_secret_key")
     monkeypatch.setenv("S3_BUCKET", "test")
-    monkeypatch.setenv("S3_REGION_NAME", "us-east-1")
     monkeypatch.setenv("S3_VALIDATE_SSL", "false")
-    monkeypatch.setenv("S3_USE_HTTPS", "false")
     reset_caches()
 
 
@@ -206,8 +198,9 @@ def authz_disabled(monkeypatch):
 def client_s3(s3_session, s3_env, session_maker) -> Generator[TestClient, None, None]:
     from chord_drs.app import create_app
     from chord_drs.backend import get_backend
+    from chord_drs.config import get_config
 
-    asyncio.run(get_backend()._init_bucket_if_required())
+    asyncio.run(get_backend(get_config())._init_bucket_if_required())
 
     with TestClient(create_app()) as c:
         yield c
@@ -230,9 +223,12 @@ def client(request) -> TestClient:
 
 
 async def _create_blob(location: str, dataset_id: str):
+    from chord_drs.backend import get_backend
+    from chord_drs.config import get_config
     from chord_drs.models import DrsBlob
 
     return await DrsBlob.create(
+        backend=get_backend(get_config()),
         location=location,
         project_id=DUMMY_PROJECT_ID,
         dataset_id=dataset_id,

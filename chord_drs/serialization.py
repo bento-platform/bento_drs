@@ -1,11 +1,19 @@
 from urllib.parse import urlparse
 
-from pydantic import AnyUrl
+from pydantic import FileUrl, HttpUrl
 
 from .config import Config
 from .constants import DATA_SOURCE_LOCAL, DATA_SOURCE_S3
 from .models import DrsBlob
-from .pydantic_models import DrsAccessMethod, DrsAccessUrl, DrsBentoExtension, DrsBlobResponse, DrsChecksum, DrsUri
+from .pydantic_models import (
+    DrsAccessMethod,
+    DrsAccessUrl,
+    DrsBentoExtension,
+    DrsBlobResponse,
+    DrsChecksum,
+    DrsUri,
+    S3Url,
+)
 
 __all__ = [
     "build_blob_response",
@@ -36,7 +44,7 @@ def build_blob_response(
     https_access_method = DrsAccessMethod(
         type="https",
         access_url=DrsAccessUrl(
-            url=AnyUrl(f"{config.service_base_url}/objects/{drs_blob.id}/download"),
+            url=HttpUrl(f"{config.service_base_url}/objects/{drs_blob.id}/download"),
             # No headers --> auth will have to be obtained via some
             # out-of-band method, or the object's contents are public. This
             # will depend on how the service is deployed.
@@ -47,10 +55,10 @@ def build_blob_response(
 
     if inside_container and data_source == DATA_SOURCE_LOCAL:
         access_methods.append(
-            DrsAccessMethod(type="file", access_url=DrsAccessUrl(url=AnyUrl(f"file://{drs_blob.location}")))
+            DrsAccessMethod(type="file", access_url=DrsAccessUrl(url=FileUrl(f"file://{drs_blob.location}")))
         )
     elif data_source == DATA_SOURCE_S3:
-        access_methods.append(DrsAccessMethod(type="s3", access_url=DrsAccessUrl(url=AnyUrl(drs_blob.location))))
+        access_methods.append(DrsAccessMethod(type="s3", access_url=DrsAccessUrl(url=S3Url(drs_blob.location))))
 
     return DrsBlobResponse(
         access_methods=access_methods,

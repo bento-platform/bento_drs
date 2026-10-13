@@ -8,7 +8,7 @@ A data repository / object storage service based on
 [GA4GH's DRS specifications](https://ga4gh.github.io/data-repository-service-schemas/preview/release/drs-1.4.0/docs/).
 
 For storing the files, two methods are currently supported: on-disk, or in an S3-compatible storage backend such as 
-[MinIO](https://github.com/minio/minio).
+[Garage](https://garagehq.deuxfleurs.fr/).
 
 
 ## Configuration
@@ -20,6 +20,17 @@ provide the missing values.
 ```bash
 cp .env-sample .env
 ```
+
+### S3 storage
+
+The S3 backend is enabled by setting `S3_BUCKET`.
+
+All other S3 client settings (credentials, region, endpoint, CA bundle) are resolved by botocore from the 
+[standard AWS environment variables](https://docs.aws.amazon.com/sdkref/latest/guide/environment-variables.html) 
+(e.g. `AWS_ENDPOINT_URL_S3`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`) or from shared 
+config/credentials files selected with `AWS_PROFILE`.
+
+`S3_VALIDATE_SSL=false` disables TLS verification (dev only, prefer `AWS_CA_BUNDLE` for self-signed certificates).
 
 
 ## Running in Development

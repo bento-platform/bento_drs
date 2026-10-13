@@ -1,3 +1,4 @@
+from collections.abc import Sized
 from hashlib import sha256
 
 __all__ = [
@@ -18,5 +19,5 @@ def drs_file_checksum(path: str, chunk_size: int = CHUNK_SIZE) -> str:
     return hash_obj.hexdigest()
 
 
-def len_zero(x: list) -> bool:
+def len_zero(x: Sized) -> bool:
     return len(x) == 0

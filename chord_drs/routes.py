@@ -19,7 +19,8 @@ from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.orm import Session
 
 from .authz import AuthzMiddlewareDep
-from .backend import get_backend
+from .backend import BackendDep
+from .backends.base import Backend
 from .config import ConfigDep
 from .constants import MIME_OCTET_STREAM
 from .db import SessionDep
@@ -190,7 +191,9 @@ async def object_info(
 
 @drs_router.delete("/objects/{object_id}", status_code=status.HTTP_204_NO_CONTENT)
 @drs_router.delete("/ga4gh/drs/v1/objects/{object_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def object_delete(object_id: str, request: Request, session: SessionDep, authz: AuthzMiddlewareDep):
+async def object_delete(
+    object_id: str, request: Request, session: SessionDep, authz: AuthzMiddlewareDep, backend: BackendDep
+):
     drs_object = await fetch_and_check_object_permissions(session, authz, request, object_id, P_DELETE_DATA)
 
     logger.info("Deleting object %s", drs_object.id)
@@ -205,7 +208,6 @@ async def object_delete(object_id: str, request: Request, session: SessionDep, a
         logger.info(
             f"Deleting file at {drs_object.location}, since {drs_object.id} is the only object referring to it."
         )
-        backend = get_backend()
         await backend.delete(drs_object.location)
 
     session.delete(drs_object)
@@ -315,6 +317,7 @@ async def _download_object(
     request: Request,
     session: Session,
     authz: FastApiAuthMiddleware,
+    backend: Backend,
     object_id: str,
     headers_getter: HeadersGetter | None = None,
 ) -> StreamingResponse:
@@ -346,7 +349,7 @@ async def _download_object(
 
     # Get the streaming generator from the backend (local | S3)
     try:
-        obj_generator = await drs_object.get_streaming_generator(bytes_range)
+        obj_generator = await drs_object.get_streaming_generator(backend, bytes_range)
     except StreamingException as e:
         raise bad_request_log(str(e))
 
@@ -355,8 +358,10 @@ async def _download_object(
 
 
 @drs_router.get("/objects/{object_id}/download")
-async def object_download(object_id: str, request: Request, session: SessionDep, authz: AuthzMiddlewareDep):
-    return await _download_object(request, session, authz, object_id)
+async def object_download(
+    object_id: str, request: Request, session: SessionDep, authz: AuthzMiddlewareDep, backend: BackendDep
+):
+    return await _download_object(request, session, authz, backend, object_id)
 
 
 @drs_router.post("/objects/{object_id}/download")
@@ -365,18 +370,22 @@ async def object_download_post(
     request: Request,
     session: SessionDep,
     authz: AuthzMiddlewareDep,
+    backend: BackendDep,
     # A token can be passed in the form body (instead of an Authorization header), e.g., for browser form submissions
     token: Annotated[str | None, Form()] = None,
 ):
     def headers_getter(_r: Request) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}"} if token else {}
 
-    return await _download_object(request, session, authz, object_id, headers_getter)
+    return await _download_object(request, session, authz, backend, object_id, headers_getter)
 
 
-def _save_upload(upload: UploadFile, path: str) -> None:
-    with open(path, "wb") as fh:
-        shutil.copyfileobj(upload.file, fh)
+async def _save_upload(upload: UploadFile, path: str) -> None:
+    def _copy() -> None:
+        with open(path, "wb") as fh:
+            shutil.copyfileobj(upload.file, fh)
+
+    await asyncio.to_thread(_copy)
 
 
 @drs_router.post("/ingest", response_model=DrsBlobResponse, status_code=status.HTTP_201_CREATED)
@@ -385,6 +394,7 @@ async def object_ingest(
     session: SessionDep,
     authz: AuthzMiddlewareDep,
     config: ConfigDep,
+    backend: BackendDep,
     # All form fields are optional so that authorization is evaluated before any 4xx caused by the request body, e.g.,
     # an unauthorized request with an empty body should get a 403.
     deduplicate: Annotated[LenientBool, Form()] = True,  # Change for v0.9: default to True
@@ -443,7 +453,7 @@ async def object_ingest(
         if file is not None:
             logger.debug("ingest - received file object: %s", file)
             logger.debug("ingest - writing to temporary path: %s", t_obj_path)
-            await asyncio.to_thread(_save_upload, file, t_obj_path)
+            await _save_upload(file, t_obj_path)
             obj_path = t_obj_path
             filename = file.filename  # still may be none, in which case the temporary filename will be used
 
@@ -494,6 +504,7 @@ async def object_ingest(
         if not drs_object:
             try:
                 drs_object = await DrsBlob.create(
+                    backend=backend,
                     **({"object_to_copy": object_to_copy} if object_to_copy else {"location": obj_path}),
                     filename=filename,
                     mime_type=mime_type,

@@ -35,7 +35,7 @@ def test_urls_have_trailing_slash_stripped(monkeypatch):
 
 
 def test_data_source_local_by_default(monkeypatch, tmp_path):
-    monkeypatch.setenv("S3_ENDPOINT", "  ")  # blank is the same as unset
+    monkeypatch.setenv("S3_BUCKET", "  ")  # blank is the same as unset
 
     config = get_config()
     assert config.service_data_source == DATA_SOURCE_LOCAL

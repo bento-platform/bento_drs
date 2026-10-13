@@ -4,6 +4,8 @@ import os
 import click
 from click import ClickException
 
+from .backend import get_backend
+from .config import get_config
 from .db import get_session_maker
 from .logger import logger
 from .models import DrsBlob
@@ -22,6 +24,7 @@ async def create_drs_blob(
         project_id=project_id,
         dataset_id=dataset_id,
         data_type=data_type,
+        backend=get_backend(get_config()),
     )
 
 

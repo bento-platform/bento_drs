@@ -1,9 +1,9 @@
 from datetime import datetime
 from functools import partial
 from operator import is_
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import AnyUrl, BaseModel, Field, UrlConstraints
+from pydantic import AnyUrl, BaseModel, Field, FileUrl, HttpUrl, UrlConstraints, model_validator
 
 from .utils import len_zero
 
@@ -14,6 +14,7 @@ __all__ = [
     "DrsAccessUrl",
     "DrsAccessMethod",
     "DrsBlobResponse",
+    "S3Url",
 ]
 
 
@@ -26,6 +27,10 @@ class DrsUri(AnyUrl):
     _constraints = UrlConstraints(host_required=True, allowed_schemes=["drs"])
 
 
+class S3Url(AnyUrl):
+    _constraints = UrlConstraints(allowed_schemes=["s3"])
+
+
 class DrsBentoExtension(BaseModel):
     project_id: str | None
     dataset_id: str | None
@@ -34,19 +39,26 @@ class DrsBentoExtension(BaseModel):
 
 
 class DrsChecksum(BaseModel):
-    checksum: str = Field(..., min_length=1)
+    checksum: str = Field(..., min_length=64, max_length=64)
     type: Literal["sha-256"]
 
 
 class DrsAccessUrl(BaseModel):
-    url: AnyUrl
+    url: FileUrl | HttpUrl | S3Url
 
 
 class DrsAccessMethod(BaseModel):
     type: Literal["file", "https", "s3"]
     access_url: DrsAccessUrl
 
-    # TODO: validate scheme
+    @model_validator(mode="after")
+    def validate_scheme_matches_type(self) -> Self:
+        if self.type != self.access_url.url.scheme and not (
+            self.type == "https" and self.access_url.url.scheme == "http"
+        ):
+            # slightly looser than DRS spec; allow unencrypted HTTP URLs to be access urls
+            raise ValueError("access method URL scheme does not match type")
+        return self
 
 
 class DrsBlobResponse(BaseModel):

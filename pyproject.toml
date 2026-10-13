@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "chord-drs"
-version = "1.0.0"
+version = "0.23.0"
 description = "An implementation of a data repository system (as per GA4GH's specs) for the Bento platform."
 authors = [
     "David Lougheed <david.lougheed@mail.mcgill.ca>",
@@ -23,6 +23,7 @@ sqlalchemy = ">=2.0.29,<2.1"
 python-multipart = "^0.0.20"
 werkzeug = "~3.1.4"  # secure_filename
 orjson = "^3.11.5"
+pydantic = "^2.14.1"
 
 [tool.poetry.group.dev.dependencies]
 boto3-stubs = "~=1.40.61"

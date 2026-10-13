@@ -61,13 +61,11 @@ class Config(BentoFastAPIBaseConfig):
     # Directory to store objects in, when not using S3
     data: Path = Path.home() / "chord_drs_data"
 
-    s3_endpoint: str | None = None
-    s3_access_key: str | None = None
-    s3_secret_key: str | None = None
+    # Setting the S3 bucket enables the S3 backend. All other S3 client settings (credentials, region, endpoint, CA
+    # bundle) are resolved by botocore from the standard AWS environment variables / config files.
     s3_bucket: str | None = None
-    s3_region_name: str | None = None
-    s3_validate_ssl: bool = False
-    s3_use_https: bool = True
+    # False disables TLS verification (dev only); prefer AWS_CA_BUNDLE for self-signed certs
+    s3_validate_ssl: bool = True
 
     # Temporary directory to write files to while they're being ingested - useful in containerized contexts, so we can
     # choose to write temporary files to a volume bound to a host directory with sufficient space for ingesting large
@@ -79,7 +77,7 @@ class Config(BentoFastAPIBaseConfig):
     def _strip_trailing_slash(cls, v: str) -> str:
         return v.strip().rstrip("/")
 
-    @field_validator("s3_endpoint", "drs_ingest_tmp_dir", mode="after")
+    @field_validator("s3_bucket", "drs_ingest_tmp_dir", mode="after")
     @classmethod
     def _blank_to_none(cls, v: str | None) -> str | None:
         return (v or "").strip() or None
@@ -96,11 +94,11 @@ class Config(BentoFastAPIBaseConfig):
 
     @property
     def service_data_source(self) -> str:
-        return DATA_SOURCE_S3 if self.s3_endpoint else DATA_SOURCE_LOCAL
+        return DATA_SOURCE_S3 if self.s3_bucket else DATA_SOURCE_LOCAL
 
     @property
     def service_data(self) -> Path | None:
-        return None if self.s3_endpoint else self.data.expanduser().resolve()
+        return None if self.s3_bucket else self.data.expanduser().resolve()
 
 
 @lru_cache

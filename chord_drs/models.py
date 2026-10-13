@@ -15,7 +15,7 @@ from werkzeug.utils import secure_filename
 
 from chord_drs.backends.exceptions import BackendImproperlyConfigured
 
-from .backend import get_backend
+from .backends.base import Backend
 from .backends.s3 import S3Backend, S3ObjectGenerator
 from .constants import RE_INGESTABLE_MIME_TYPE
 from .exceptions import DrsBlobSaveError
@@ -61,7 +61,13 @@ class DrsBlob(Base):
         Class method for creating a DrsBlob and saving it to the storage backend.
 
         **Warning**: Using the default constructor will only instanciate a sqlalchemy ORM declarative base.
+
+        The storage backend (injected dependency) must be passed as the `backend` keyword argument.
         """
+
+        # The storage backend to save the object's file to; None means the backend is not properly configured
+        backend: Backend | None = kwargs.pop("backend", None)
+
         # If set, we are deduplicating with an existing file object
         object_to_copy: DrsBlob | None = kwargs.pop("object_to_copy", None)
 
@@ -95,8 +101,6 @@ class DrsBlob(Base):
                 raise ValueError("Invalid MIME type")
             instance.mime_type = mime_type
 
-            backend = get_backend()
-
             if not backend:
                 raise BackendImproperlyConfigured("The backend for this instance is not properly configured.")
             try:
@@ -118,21 +122,20 @@ class DrsBlob(Base):
 
         return instance
 
-    async def return_s3_object(self) -> S3ObjectGenerator | None:
+    async def return_s3_object(self, backend: Backend | None) -> S3ObjectGenerator | None:
         parsed_url = urlparse(self.location)
 
         if parsed_url.scheme != "s3":
             return None
-
-        backend = get_backend()
 
         if not backend or not isinstance(backend, S3Backend):
             raise BackendImproperlyConfigured("The backend for this instance is not properly configured.")
 
         return await backend.get_s3_object_dict(self.location)
 
-    async def get_streaming_generator(self, bytes_range: tuple[int, int] | None = None) -> AsyncGenerator[bytes, None]:
-        backend = get_backend()
+    async def get_streaming_generator(
+        self, backend: Backend, bytes_range: tuple[int, int] | None = None
+    ) -> AsyncGenerator[bytes, None]:
         generator = await backend.get_stream_generator(self.location, bytes_range)
         return generator
 
