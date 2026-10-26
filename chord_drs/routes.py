@@ -28,7 +28,7 @@ from .backend import get_backend
 from .constants import BENTO_SERVICE_KIND, MIME_OCTET_STREAM, SERVICE_NAME, SERVICE_TYPE
 from .db import db
 from .models import DrsBlob
-from .serialization import build_blob_json
+from .serialization import build_blob_response
 from .utils import drs_file_checksum
 
 RE_STARTING_SLASH = re.compile(r"^/")
@@ -233,7 +233,9 @@ async def object_info(object_id: str):
     use_internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
 
     return jsonify(
-        build_blob_json(drs_object, inside_container=use_internal_path, with_bento_properties=with_bento_properties)
+        build_blob_response(
+            drs_object, inside_container=use_internal_path, with_bento_properties=with_bento_properties
+        ).model_dump(mode="json")
     )
 
 
@@ -286,7 +288,7 @@ def _build_filter_clauses(
 
 @drs_service.route("/search", methods=["GET"])
 def object_search():
-    response = []
+    response: list[dict] = []
 
     internal_path: bool = str_to_bool(request.args.get("internal_path", ""))
     with_bento_properties: bool = str_to_bool(request.args.get("with_bento_properties", ""))
@@ -315,7 +317,11 @@ def object_search():
 
     for obj, p in zip(objects, check_objects_permission(list(objects), P_QUERY_DATA)):
         if p:  # Only include the blob in the search results if we have permissions to view it.
-            response.append(build_blob_json(obj, internal_path, with_bento_properties=with_bento_properties))
+            response.append(
+                build_blob_response(obj, internal_path, with_bento_properties=with_bento_properties).model_dump(
+                    mode="json"
+                )
+            )
 
     authz_middleware.mark_authz_done(request)
     return jsonify(response)
@@ -473,7 +479,7 @@ async def object_ingest():
                 logger.exception("encountered exception during ingest", exc_info=e)
                 raise InternalServerError("Error while creating the object")
 
-        return build_blob_json(drs_object, with_bento_properties=True), 201
+        return build_blob_response(drs_object, with_bento_properties=True).model_dump(mode="json"), 201
 
     finally:
         os.close(tfh)
