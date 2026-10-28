@@ -23,8 +23,6 @@ from tests.constants import (
     DUMMY_DATASET_ID_2,
     DUMMY_PROJECT_ID,
     S3_ACCESS_KEY,
-    S3_HOST,
-    S3_PORT,
     S3_SECRET_KEY,
     SQLALCHEMY_DATABASE_URI,
 )
@@ -127,13 +125,8 @@ def drs_base_url():
 @pytest.fixture
 def s3_config() -> dict:
     return {
-        "S3_ENDPOINT": f"{S3_HOST}:{S3_PORT}",
-        "S3_ACCESS_KEY": "test_access_key",
-        "S3_SECRET_KEY": "test_secret_key",
         "S3_BUCKET": "test",
-        "S3_REGION_NAME": "us-east-1",
         "S3_VALIDATE_SSL": False,
-        "S3_USE_HTTPS": False,
         "SERVICE_DATA_SOURCE": DATA_SOURCE_S3,
         "AUTHZ_URL": AUTHZ_URL,
         "LOG_LEVEL": "info",

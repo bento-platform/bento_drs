@@ -50,8 +50,8 @@ SERVICE_DATA: str = str(
 AUTHZ_ENABLED = str_to_bool(os.environ.get("AUTHZ_ENABLED", "true"))
 AUTHZ_URL: str = _get_from_environ_or_fail("BENTO_AUTHZ_SERVICE_URL").strip().rstrip("/") if AUTHZ_ENABLED else ""
 
-# S3 variables: S3_ENDPOINT loaded here for conditional init of Config fields
-S3_ENDPOINT: str | None = os.environ.get("S3_ENDPOINT")
+# S3 variables: S3_BUCKET loaded here for conditional init of Config fields
+S3_BUCKET: str | None = os.environ.get("S3_BUCKET")
 
 
 class Config:
@@ -61,17 +61,16 @@ class Config:
     PROMETHEUS_ENABLED: bool = str_to_bool(os.environ.get("PROMETHEUS_ENABLED", "false"))
 
     SERVICE_ID: str = os.environ.get("SERVICE_ID", ":".join(list(SERVICE_TYPE.values())[:2]))
-    SERVICE_DATA_SOURCE: str = DATA_SOURCE_S3 if S3_ENDPOINT else DATA_SOURCE_LOCAL
-    SERVICE_DATA: str | None = None if S3_ENDPOINT else SERVICE_DATA
+    SERVICE_DATA_SOURCE: str = DATA_SOURCE_S3 if S3_BUCKET else DATA_SOURCE_LOCAL
+    SERVICE_DATA: str | None = None if S3_BUCKET else SERVICE_DATA
     SERVICE_BASE_URL: str = os.environ.get("SERVICE_BASE_URL", "http://127.0.0.1").strip().rstrip("/")
 
-    S3_ENDPOINT: str | None = S3_ENDPOINT
-    S3_ACCESS_KEY: str | None = os.environ.get("S3_ACCESS_KEY")
-    S3_SECRET_KEY: str | None = os.environ.get("S3_SECRET_KEY")
-    S3_BUCKET: str | None = os.environ.get("S3_BUCKET")
-    S3_REGION_NAME: str | None = os.environ.get("S3_REGION_NAME")
-    S3_VALIDATE_SSL: bool = str_to_bool(os.environ.get("S3_VALIDATE_SSL", "false"))
-    S3_USE_HTTPS: bool = str_to_bool(os.environ.get("S3_USE_HTTPS", "true"))
+    # S3 credentials, region and endpoint are resolved by botocore from
+    # standard AWS environment variables or AWS_PROFILE.
+    S3_BUCKET: str | None = S3_BUCKET
+    # False disables TLS verification (dev only);
+    # prefer AWS_CA_BUNDLE for self-signed certs
+    S3_VALIDATE_SSL: bool = str_to_bool(os.environ.get("S3_VALIDATE_SSL", "true"))
     BENTO_DEBUG: bool = BENTO_DEBUG
     BENTO_VALIDATE_SSL: bool = BENTO_VALIDATE_SSL
     BENTO_CONTAINER_LOCAL: bool = str_to_bool(os.environ.get("BENTO_CONTAINER_LOCAL", "false"))
@@ -96,4 +95,4 @@ print(f"[{SERVICE_NAME}] Data source: {Config.SERVICE_DATA_SOURCE}")
 print(f"[{SERVICE_NAME}] Data path: {Config.SERVICE_DATA}")
 
 if Config.SERVICE_DATA_SOURCE == DATA_SOURCE_S3:  # pragma: no cover
-    print(f"[{SERVICE_NAME}] S3 URL {Config.S3_ENDPOINT}", flush=True)
+    print(f"[{SERVICE_NAME}] S3 bucket {Config.S3_BUCKET}", flush=True)
