@@ -185,7 +185,7 @@ async def object_info(
 ):
     drs_object = await fetch_and_check_object_permissions(session, authz, request, object_id, P_QUERY_DATA)
     return build_blob_response(
-        config, drs_object, inside_container=internal_path, with_bento_properties=with_bento_properties
+        config, drs_object, logger, inside_container=internal_path, with_bento_properties=with_bento_properties
     )
 
 
@@ -304,7 +304,7 @@ async def object_search(
     permissions = await check_objects_permission(authz, request, objects, P_QUERY_DATA)
     response = [
         # Only include the blob in the search results if we have permissions to view it.
-        build_blob_response(config, obj, internal_path, with_bento_properties=with_bento_properties)
+        build_blob_response(config, obj, logger, internal_path, with_bento_properties=with_bento_properties)
         for obj, p in zip(objects, permissions)
         if p
     ]
@@ -522,7 +522,7 @@ async def object_ingest(
                 logger.exception("encountered exception during ingest", exc_info=e)
                 raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Error while creating the object")
 
-        return build_blob_response(config, drs_object, with_bento_properties=True)
+        return build_blob_response(config, drs_object, logger, with_bento_properties=True)
 
     finally:
         os.close(tfh)

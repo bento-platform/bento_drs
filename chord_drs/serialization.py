@@ -1,3 +1,4 @@
+from logging import Logger
 from urllib.parse import urlparse
 
 from pydantic import FileUrl, HttpUrl
@@ -36,6 +37,7 @@ def build_bento_extension_obj(drs_object: DrsBlob) -> DrsBentoExtension:
 def build_blob_response(
     config: Config,
     drs_blob: DrsBlob,
+    logger: Logger,
     inside_container: bool = False,
     with_bento_properties: bool = False,
 ) -> DrsBlobResponse:
@@ -57,8 +59,11 @@ def build_blob_response(
         access_methods.append(
             DrsAccessMethod(type="file", access_url=DrsAccessUrl(url=FileUrl(f"file://{drs_blob.location}")))
         )
-    elif data_source == DATA_SOURCE_S3 and drs_blob.location.startswith("s3://"):
-        access_methods.append(DrsAccessMethod(type="s3", access_url=DrsAccessUrl(url=S3Url(drs_blob.location))))
+    elif data_source == DATA_SOURCE_S3:
+        if drs_blob.location.startswith("s3://"):
+            access_methods.append(DrsAccessMethod(type="s3", access_url=DrsAccessUrl(url=S3Url(drs_blob.location))))
+        else:
+            logger.warning("invalid S3 URL: %s", drs_blob.location)
 
     return DrsBlobResponse(
         access_methods=access_methods,
