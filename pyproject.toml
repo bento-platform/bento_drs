@@ -20,7 +20,7 @@ aioboto3 = "^15.5.0"
 bento-lib = {version = "^18.1.4", extras = ["fastapi"]}
 alembic = "^1.16.0"
 sqlalchemy = ">=2.0.29,<2.1"
-python-multipart = "^0.0.20"
+python-multipart = ">=0.0.20,<0.0.32"
 werkzeug = "~3.1.4"  # secure_filename
 orjson = "^3.11.5"
 pydantic = "^2.14.1"
