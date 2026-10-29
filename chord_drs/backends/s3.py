@@ -1,5 +1,5 @@
 import logging
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator
 from typing import TypedDict
 
 import aioboto3
@@ -7,8 +7,8 @@ import botocore
 from bento_lib.logging import log_level_from_str
 from boto3.s3.transfer import S3TransferConfig
 
+from chord_drs.config import Config
 from chord_drs.constants import CHUNK_SIZE
-from chord_drs.utils import sync_generator_stream
 
 from .base import Backend
 
@@ -23,17 +23,16 @@ class S3ObjectGenerator(TypedDict):
 class S3Backend(Backend):
     def __init__(
         self,
-        config: dict,  # config is dict or flask.Config, which is a subclass of dict.
+        config: Config,
         logger: logging.Logger,
     ):
-        logging.getLogger("boto3").setLevel(log_level_from_str(config["LOG_LEVEL"]))
-        logging.getLogger("botocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
-        logging.getLogger("aiobotocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
-        self.verify = config["S3_VALIDATE_SSL"]
-        self.bucket_name = config["S3_BUCKET"]
+        logging.getLogger("boto3").setLevel(log_level_from_str(config.log_level))
+        logging.getLogger("botocore").setLevel(log_level_from_str(config.log_level))
+        logging.getLogger("aiobotocore").setLevel(log_level_from_str(config.log_level))
+        self.verify = config.s3_validate_ssl
+        self.bucket_name = config.s3_bucket
 
-        # Credentials, profile, region and endpoint are resolved by botocore from
-        # standard AWS env vars/config files.
+        # Credentials, profile, region and endpoint are resolved by botocore from standard AWS env vars/config files.
         self.session = aioboto3.Session()
 
         self.logger = logger
@@ -104,9 +103,9 @@ class S3Backend(Backend):
 
     async def get_stream_generator(
         self, location: str, bytes_range: tuple[int, int] | None = None
-    ) -> Generator[bytes, None, None]:
+    ) -> AsyncGenerator[bytes, None]:
         s3_dict = await self.get_s3_object_dict(location, bytes_range)
-        return sync_generator_stream(s3_dict["generator"], self.logger)
+        return s3_dict["generator"]
 
     def _location_to_object_key(self, location: str) -> str:
         if location.startswith(f"s3://{self.bucket_name}"):

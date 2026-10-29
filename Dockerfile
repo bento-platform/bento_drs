@@ -10,13 +10,13 @@ RUN mkdir /wes
 # Install dependencies
 COPY pyproject.toml .
 COPY poetry.lock .
-RUN pip install --no-cache-dir gunicorn==26.2.0 && \
-    poetry config virtualenvs.create false && \
+RUN poetry config virtualenvs.create false && \
     poetry install --without dev --no-root
 
 # Copy only what's required for a production instance
 COPY chord_drs chord_drs
 COPY entrypoint.bash .
+COPY alembic.ini .
 COPY run.bash .
 COPY LICENSE .
 COPY README.md .
