@@ -1,9 +1,17 @@
+import hashlib
+import os
 import pathlib
 
 import pytest
+import pytest_asyncio
+from botocore.exceptions import ClientError
 
+from chord_drs.backends import s3 as s3_module
 from chord_drs.backends.local import LocalBackend
 from chord_drs.backends.s3 import S3Backend
+
+MIB = 1024 * 1024
+TESTS_DIR = pathlib.Path(__file__).parent
 
 
 @pytest.mark.asyncio
@@ -45,3 +53,98 @@ def test_s3_backend_location_handling(s3_config, test_logger):
     invalid_location = "some-blob"
     with pytest.raises(ValueError):
         backend._location_to_object_key(invalid_location)
+
+
+@pytest_asyncio.fixture
+async def s3_backend(s3_env, s3_config, test_logger) -> S3Backend:
+    backend = S3Backend(s3_config, test_logger)
+    await backend._init_bucket_if_required()
+    return backend
+
+
+async def _head_object(backend: S3Backend, key: str):
+    async with backend._create_s3_client() as s3_client:
+        return await s3_client.head_object(Bucket=backend.bucket_name, Key=key)
+
+
+async def _download(backend: S3Backend, location: str) -> bytes:
+    obj = await backend.get_s3_object_dict(location)
+    return b"".join([chunk async for chunk in obj["generator"]])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("file_name", ["dummy_file.txt", "empty_file.txt"])
+async def test_s3_backend_save_single_request(s3_backend: S3Backend, file_name: str):
+    path = TESTS_DIR / file_name
+
+    location = await s3_backend.save(str(path), file_name)
+    assert location == f"s3://{s3_backend.bucket_name}/{file_name}"
+
+    head = await _head_object(s3_backend, file_name)
+    assert head["ContentLength"] == path.stat().st_size
+    assert "-" not in head["ETag"]  # multipart ETags end in -<number of parts>
+    assert await _download(s3_backend, location) == path.read_bytes()
+
+
+@pytest.mark.asyncio
+async def test_s3_backend_save_multipart(s3_backend: S3Backend, tmp_path, monkeypatch):
+    monkeypatch.setattr(s3_module, "MULTIPART_PART_SIZE", 5 * MIB)  # moto's minimum size for non-last parts
+
+    # Random bytes data that should be uploaded in 3 parts
+    data = os.urandom(int(12.5 * MIB))
+    path = tmp_path / "big_file.bin"
+    path.write_bytes(data)
+
+    location = await s3_backend.save(str(path), "big_file.bin")
+
+    head = await _head_object(s3_backend, "big_file.bin")
+    assert head["ContentLength"] == len(data)
+    assert head["ETag"].endswith('-3"')
+    downloaded = await _download(s3_backend, location)
+    assert hashlib.sha256(downloaded).hexdigest() == hashlib.sha256(data).hexdigest()
+
+
+@pytest.mark.asyncio
+async def test_s3_backend_multipart_abort(s3_backend: S3Backend, tmp_path, monkeypatch):
+    monkeypatch.setattr(s3_module, "MULTIPART_PART_SIZE", 5 * MIB)
+
+    upload_part = S3Backend._upload_part
+
+    async def fail_on_part_2(self, s3_client, path, key, upload_id, part_number, *args):
+        if part_number == 2:
+            raise ClientError({"Error": {"Code": "InternalError", "Message": "test"}}, "UploadPart")
+        return await upload_part(self, s3_client, path, key, upload_id, part_number, *args)
+
+    monkeypatch.setattr(S3Backend, "_upload_part", fail_on_part_2)
+
+    path = tmp_path / "big_file.bin"
+    path.write_bytes(os.urandom(12 * MIB))
+
+    # The part's own ClientError comes out, not an ExceptionGroup, so models.py can still handle it
+    with pytest.raises(ClientError):
+        await s3_backend.save(str(path), "big_file.bin")
+
+    async with s3_backend._create_s3_client() as s3_client:
+        uploads = await s3_client.list_multipart_uploads(Bucket=s3_backend.bucket_name)
+    assert not uploads.get("Uploads")
+
+    with pytest.raises(ClientError):
+        await _head_object(s3_backend, "big_file.bin")
+
+
+def test_s3_backend_part_size():
+    assert S3Backend._part_size(10 * MIB) == s3_module.MULTIPART_PART_SIZE
+
+    huge = 200 * 1024 * MIB  # 200 GiB: needs bigger parts to stay under the part count limit
+    assert S3Backend._part_size(huge) > s3_module.MULTIPART_PART_SIZE
+    assert S3Backend._part_size(huge) * s3_module.MULTIPART_MAX_PARTS >= huge
+
+
+@pytest.mark.asyncio
+async def test_s3_backend_delete(s3_backend: S3Backend):
+    location = await s3_backend.save(str(TESTS_DIR / "dummy_file.txt"), "dummy_file.txt")
+    await s3_backend.delete(location)
+
+    with pytest.raises(ClientError) as e:
+        await _head_object(s3_backend, "dummy_file.txt")
+    assert e.value.response["ResponseMetadata"]["HTTPStatusCode"] == 404
