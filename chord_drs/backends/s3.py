@@ -168,12 +168,16 @@ class S3Backend(Backend):
                 UploadId=upload_id,
                 MultipartUpload={"Parts": parts},
             )
-        except BaseException:
+        except BaseException as e:
             # Abort so the uploaded parts don't stay in the bucket
             try:
                 await s3_client.abort_multipart_upload(Bucket=self.bucket_name, Key=key, UploadId=upload_id)
             except Exception:
                 self.logger.exception(f"failed to abort multipart upload {upload_id} for {key}")
+
+            # Raise the relevant root botocore exception
+            if isinstance(e, BaseExceptionGroup):
+                raise e.exceptions[0]
             raise
 
     async def delete(self, location: str) -> None:

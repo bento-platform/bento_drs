@@ -108,26 +108,31 @@ async def test_s3_backend_save_multipart(s3_backend: S3Backend, tmp_path, monkey
 async def test_s3_backend_multipart_abort(s3_backend: S3Backend, tmp_path, monkeypatch):
     monkeypatch.setattr(s3_module, "MULTIPART_PART_SIZE", 5 * MIB)
 
+    # 50 MIB / 5 MIB/part = 10 parts upload
+    path = tmp_path / "big_file.bin"
+    path.write_bytes(os.urandom(50 * MIB))
+
+    # Needs to be referenced before monkeypatch, or causes a recursion
     upload_part = S3Backend._upload_part
 
-    async def fail_on_part_2(self, s3_client, path, key, upload_id, part_number, *args):
-        if part_number == 2:
+    # Force error on part upload #7, should abort the other parts and the whole upload.
+    async def fail_on_part_7(self, s3_client, path, key, upload_id, part_number, *args):
+        if part_number == 7:
             raise ClientError({"Error": {"Code": "InternalError", "Message": "test"}}, "UploadPart")
         return await upload_part(self, s3_client, path, key, upload_id, part_number, *args)
 
-    monkeypatch.setattr(S3Backend, "_upload_part", fail_on_part_2)
+    monkeypatch.setattr(S3Backend, "_upload_part", fail_on_part_7)
 
-    path = tmp_path / "big_file.bin"
-    path.write_bytes(os.urandom(12 * MIB))
-
-    # The part's own ClientError comes out, not an ExceptionGroup, so models.py can still handle it
+    # Check that ClientError is raised during multipart upload
     with pytest.raises(ClientError):
         await s3_backend.save(str(path), "big_file.bin")
 
+    # Check that the other part uploads have been purged
     async with s3_backend._create_s3_client() as s3_client:
         uploads = await s3_client.list_multipart_uploads(Bucket=s3_backend.bucket_name)
     assert not uploads.get("Uploads")
 
+    # Check that the object was not created
     with pytest.raises(ClientError):
         await _head_object(s3_backend, "big_file.bin")
 

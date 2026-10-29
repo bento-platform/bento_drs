@@ -52,6 +52,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 120
+target-version = "py312"
 exclude = ["wsgi.py", "chord_drs/migrations"]
 
 [tool.ruff.lint]
