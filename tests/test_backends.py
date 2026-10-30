@@ -1,6 +1,7 @@
 import hashlib
 import os
 import pathlib
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -60,6 +61,44 @@ def test_s3_backend_location_handling(s3_config, test_logger):
     invalid_location = "some-blob"
     with pytest.raises(ValueError):
         backend._location_to_object_key(invalid_location)
+
+
+def test_s3_backend_requires_bucket(s3_config, test_logger):
+    with pytest.raises(ValueError):
+        S3Backend(s3_config.model_copy(update={"s3_bucket": None}), test_logger)
+
+
+@pytest.mark.parametrize(
+    "ca_bundle, validate_ssl, expected_verify",
+    [
+        (None, True, True),
+        ("/ca.pem", True, None),  # None lets botocore use AWS_CA_BUNDLE
+        ("/ca.pem", False, False),
+    ],
+)
+def test_s3_backend_verify(s3_config, test_logger, monkeypatch, ca_bundle, validate_ssl, expected_verify):
+    monkeypatch.setattr(s3_module, "AWS_CA_BUNDLE", ca_bundle)
+    backend = S3Backend(s3_config.model_copy(update={"s3_validate_ssl": validate_ssl}), test_logger)
+    assert backend.verify is expected_verify
+
+
+@pytest.mark.asyncio
+async def test_s3_backend_init_bucket_non_404_raises(s3_config, test_logger, monkeypatch):
+    backend = S3Backend(s3_config, test_logger)
+
+    # Mock backend's aiobotocore client to get 403 ClientError
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    client.head_bucket.side_effect = ClientError(
+        {"Error": {"Code": "403"}, "ResponseMetadata": {"HTTPStatusCode": 403}}, "HeadBucket"
+    )
+    monkeypatch.setattr(backend, "_create_s3_client", lambda: client)
+
+    with pytest.raises(ClientError):
+        await backend._init_bucket_if_required()
+
+    # "create_bucket" should only be called on 404 ClientError
+    client.create_bucket.assert_not_awaited()
 
 
 @pytest_asyncio.fixture

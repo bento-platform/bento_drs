@@ -71,6 +71,7 @@ class S3Backend(Backend):
             except ClientError as err:
                 if err.response["ResponseMetadata"]["HTTPStatusCode"] == 404:
                     return await s3_client.create_bucket(Bucket=self.bucket_name)
+                raise
 
     def _build_s3_location(self, object_key: str):
         return f"s3://{self.bucket_name}/{object_key}"
@@ -173,13 +174,13 @@ class S3Backend(Backend):
             # Abort so the uploaded parts don't stay in the bucket
             try:
                 await s3_client.abort_multipart_upload(Bucket=self.bucket_name, Key=key, UploadId=upload_id)
-            except Exception:
+            except Exception:  # pragma: no cover - failed abort is only logged
                 self.logger.exception(f"failed to abort multipart upload {upload_id} for {key}")
 
             # Raise the relevant root botocore exception
             if isinstance(e, BaseExceptionGroup):
                 raise e.exceptions[0]
-            raise
+            raise  # pragma: no cover
 
     async def delete(self, location: str) -> None:
         object_key = self._location_to_object_key(location)
