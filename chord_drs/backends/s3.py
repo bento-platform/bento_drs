@@ -12,7 +12,7 @@ from bento_lib.logging import log_level_from_str
 from botocore.exceptions import ClientError
 
 from chord_drs.config import Config
-from chord_drs.constants import CHUNK_SIZE
+from chord_drs.constants import CHUNK_SIZE, MIME_OCTET_STREAM
 
 from .base import Backend
 
@@ -81,7 +81,8 @@ class S3Backend(Backend):
             head = await s3.head_object(Bucket=self.bucket_name, Key=object_key)
         return {
             "Content-Length": str(head["ContentLength"]),
-            "Content-Type": head["ContentType"],
+            # Some S3 servers (e.g. Garage) omit ContentType if none was given on upload
+            "Content-Type": head.get("ContentType") or MIME_OCTET_STREAM,
             "ETag": head["ETag"],
             "Last-Modified": str(head["LastModified"]),
         }
