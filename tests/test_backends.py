@@ -1,6 +1,7 @@
 import hashlib
 import os
 import pathlib
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
@@ -11,6 +12,7 @@ from chord_drs.backends import s3 as s3_module
 from chord_drs.backends.local import LocalBackend
 from chord_drs.backends.s3 import S3Backend
 from chord_drs.config import get_config
+from chord_drs.constants import MIME_OCTET_STREAM
 
 from .conftest import reset_caches
 
@@ -99,6 +101,27 @@ async def test_s3_backend_init_bucket_non_404_raises(s3_config, test_logger, mon
 
     # "create_bucket" should only be called on 404 ClientError
     client.create_bucket.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_s3_backend_headers_without_content_type(s3_config, test_logger, monkeypatch):
+    backend = S3Backend(s3_config, test_logger)
+
+    # Some S3 servers (e.g. Garage) omit ContentType if none was given on upload
+    # Moto returns a ContentType header, so this mock is to replicate Garage's response.
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    client.head_object.return_value = {
+        "ContentLength": 5,
+        "ETag": '"abc"',
+        "LastModified": datetime(2026, 1, 1, tzinfo=timezone.utc),
+    }
+    monkeypatch.setattr(backend, "_create_s3_client", lambda: client)
+
+    headers = await backend._retrieve_headers("some-key")
+
+    # assert Content-Type octet-stream was injected
+    assert headers["Content-Type"] == MIME_OCTET_STREAM
 
 
 @pytest_asyncio.fixture

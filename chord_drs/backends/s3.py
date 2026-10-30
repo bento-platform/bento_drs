@@ -81,7 +81,9 @@ class S3Backend(Backend):
             head = await s3.head_object(Bucket=self.bucket_name, Key=object_key)
         return {
             "Content-Length": str(head["ContentLength"]),
-            # Some S3 servers (e.g. Garage) omit ContentType if none was given on upload
+            # Some S3 servers (e.g. Garage) omit ContentType if none was given on upload.
+            # Ceph RGW returns octet-stream if not provided on upload.
+            # TODO: set ContentType on uploads?
             "Content-Type": head.get("ContentType") or MIME_OCTET_STREAM,
             "ETag": head["ETag"],
             "Last-Modified": str(head["LastModified"]),
