@@ -1,7 +1,7 @@
 import hashlib
 import os
 import pathlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -114,7 +114,7 @@ async def test_s3_backend_headers_without_content_type(s3_config, test_logger, m
     client.head_object.return_value = {
         "ContentLength": 5,
         "ETag": '"abc"',
-        "LastModified": datetime(2026, 1, 1, tzinfo=timezone.utc),
+        "LastModified": datetime(2026, 1, 1, tzinfo=UTC),
     }
     monkeypatch.setattr(backend, "_create_s3_client", lambda: client)
 
