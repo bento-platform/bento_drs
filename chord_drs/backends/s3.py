@@ -1,18 +1,35 @@
+import asyncio
 import logging
+import math
+import os
 from collections.abc import AsyncGenerator
-from typing import TypedDict
+from contextlib import AbstractAsyncContextManager
+from typing import TYPE_CHECKING, Any, TypedDict
 
-import aioboto3
-import botocore
+import aiofiles
+from aiobotocore.session import get_session
 from bento_lib.logging import log_level_from_str
-from boto3.s3.transfer import S3TransferConfig
+from botocore.exceptions import ClientError
 
 from chord_drs.config import Config
-from chord_drs.constants import CHUNK_SIZE
+from chord_drs.constants import CHUNK_SIZE, MIME_OCTET_STREAM
 
 from .base import Backend
 
+if TYPE_CHECKING:
+    from types_aiobotocore_s3 import S3Client
+    from types_aiobotocore_s3.type_defs import CompletedPartTypeDef
+
 __all__ = ["S3ObjectGenerator", "S3Backend"]
+
+# Files up to this size are uploaded with a single put_object, larger ones with a multipart upload.
+# It is also the minimum part size (same default as boto3's transfer manager).
+# TODO: make configurable with defaults
+MULTIPART_PART_SIZE = 8 * 1024 * 1024
+MULTIPART_MAX_PARTS = 10_000  # S3 hard limit on the number of parts in an upload
+MULTIPART_CONCURRENCY = 4  # Max parts uploaded at once; memory use is about concurrency * part size
+
+AWS_CA_BUNDLE = os.getenv("AWS_CA_BUNDLE")
 
 
 class S3ObjectGenerator(TypedDict):
@@ -26,39 +43,48 @@ class S3Backend(Backend):
         config: Config,
         logger: logging.Logger,
     ):
-        logging.getLogger("boto3").setLevel(log_level_from_str(config.log_level))
         logging.getLogger("botocore").setLevel(log_level_from_str(config.log_level))
         logging.getLogger("aiobotocore").setLevel(log_level_from_str(config.log_level))
-        self.verify = config.s3_validate_ssl
-        self.bucket_name = config.s3_bucket
+        if not config.s3_bucket:
+            raise ValueError("S3_BUCKET must be set to use the S3 backend")
+        self.bucket_name: str = config.s3_bucket
+
+        self.verify: bool | None = config.s3_validate_ssl
+        if AWS_CA_BUNDLE and self.verify:
+            # None lets botocore use AWS_CA_BUNDLE if set, passing True would ignore it.
+            self.verify = None
 
         # Credentials, profile, region and endpoint are resolved by botocore from standard AWS env vars/config files.
-        self.session = aioboto3.Session()
+        self.session = get_session()
 
         self.logger = logger
 
-    async def _create_s3_client(self):
-        return self.session.client("s3", verify=self.verify)
+    def _create_s3_client(self) -> AbstractAsyncContextManager["S3Client"]:
+        return self.session.create_client("s3", verify=self.verify)
 
     async def _init_bucket_if_required(self):
         # Mostly for tests with S3 mocks
-        async with await self._create_s3_client() as s3_client:
+        async with self._create_s3_client() as s3_client:
             try:
                 # Raises ClientError 404 if the bucket is missing
                 return await s3_client.head_bucket(Bucket=self.bucket_name)
-            except botocore.exceptions.ClientError as err:
+            except ClientError as err:
                 if err.response["ResponseMetadata"]["HTTPStatusCode"] == 404:
                     return await s3_client.create_bucket(Bucket=self.bucket_name)
+                raise
 
     def _build_s3_location(self, object_key: str):
         return f"s3://{self.bucket_name}/{object_key}"
 
     async def _retrieve_headers(self, object_key: str):
-        async with await self._create_s3_client() as s3:
+        async with self._create_s3_client() as s3:
             head = await s3.head_object(Bucket=self.bucket_name, Key=object_key)
         return {
             "Content-Length": str(head["ContentLength"]),
-            "Content-Type": head["ContentType"],
+            # Some S3 servers (e.g. Garage) omit ContentType if none was given on upload.
+            # Ceph RGW returns octet-stream if not provided on upload.
+            # TODO: set ContentType on uploads?
+            "Content-Type": head.get("ContentType") or MIME_OCTET_STREAM,
             "ETag": head["ETag"],
             "Last-Modified": str(head["LastModified"]),
         }
@@ -68,16 +94,13 @@ class S3Backend(Backend):
         headers = await self._retrieve_headers(object_key)
 
         async def stream_object() -> AsyncGenerator[bytes, None]:
-            async with await self._create_s3_client() as s3_client:
-                response = await s3_client.get_object(
-                    Bucket=self.bucket_name,
-                    Key=object_key,
-                    # if a byte range is set, pass a Range: bytes=... header to boto3
-                    **({"Range": f"bytes={bytes_range[0]}-{bytes_range[1]}"} if bytes_range else {}),
-                )
-                body_stream = response["Body"]
-                while chunk := await body_stream.read(CHUNK_SIZE):
-                    yield chunk
+            # if a byte range is set, pass a Range: bytes=... header to botocore
+            range_args: dict[str, Any] = {"Range": f"bytes={bytes_range[0]}-{bytes_range[1]}"} if bytes_range else {}
+            async with self._create_s3_client() as s3_client:
+                response = await s3_client.get_object(Bucket=self.bucket_name, Key=object_key, **range_args)
+                async with response["Body"] as body_stream:
+                    while chunk := await body_stream.read(CHUNK_SIZE):
+                        yield chunk
 
         return {
             "generator": stream_object(),
@@ -85,20 +108,86 @@ class S3Backend(Backend):
         }
 
     async def save(self, current_location: str, filename: str) -> str:
-        async with await self._create_s3_client() as s3_client:
-            transfer_config = S3TransferConfig(
-                multipart_threshold=5 * 1024 * 1024,  # 5MB threshold for multipart
-                multipart_chunksize=5 * 1024 * 1024,  # 5MB chunk size
+        size = await aiofiles.os.path.getsize(current_location)
+        async with self._create_s3_client() as s3_client:
+            if size <= MULTIPART_PART_SIZE:
+                async with aiofiles.open(current_location, "rb") as f:
+                    body = await f.read()
+                await s3_client.put_object(Bucket=self.bucket_name, Key=filename, Body=body)
+            else:
+                await self._multipart_upload(s3_client, current_location, filename, size)
+        return self._build_s3_location(filename)
+
+    @staticmethod
+    def _part_size(file_size: int) -> int:
+        # Grow parts for very large files so the upload stays under the S3 part count limit.
+        return max(MULTIPART_PART_SIZE, math.ceil(file_size / MULTIPART_MAX_PARTS))
+
+    async def _upload_part(
+        self,
+        s3_client: "S3Client",
+        path: str,
+        key: str,
+        upload_id: str,
+        part_number: int,
+        part_size: int,
+    ) -> "CompletedPartTypeDef":
+        async with aiofiles.open(path, "rb") as f:
+            await f.seek((part_number - 1) * part_size)
+            body = await f.read(part_size)
+
+        res = await s3_client.upload_part(
+            Bucket=self.bucket_name,
+            Key=key,
+            UploadId=upload_id,
+            PartNumber=part_number,
+            Body=body,
+        )
+
+        part: CompletedPartTypeDef = {"ETag": res["ETag"], "PartNumber": part_number}
+        return part
+
+    async def _multipart_upload(self, s3_client: "S3Client", path: str, key: str, size: int) -> None:
+        part_size = self._part_size(size)
+        n_parts = math.ceil(size / part_size)
+
+        upload = await s3_client.create_multipart_upload(Bucket=self.bucket_name, Key=key)
+        upload_id = upload["UploadId"]
+        self.logger.debug(f"started multipart upload of {path} to {key}: {n_parts} parts of {part_size} bytes")
+
+        semaphore = asyncio.Semaphore(MULTIPART_CONCURRENCY)
+
+        async def upload_part(part_number: int) -> "CompletedPartTypeDef":
+            async with semaphore:
+                return await self._upload_part(s3_client, path, key, upload_id, part_number, part_size)
+
+        try:
+            # A failed part cancels the parts still in progress
+            async with asyncio.TaskGroup() as tg:
+                tasks = [tg.create_task(upload_part(n)) for n in range(1, n_parts + 1)]
+
+            parts = [t.result() for t in tasks]  # tasks were created in part number order
+            await s3_client.complete_multipart_upload(
+                Bucket=self.bucket_name,
+                Key=key,
+                UploadId=upload_id,
+                MultipartUpload={"Parts": parts},
             )
-            await s3_client.upload_file(
-                Bucket=self.bucket_name, Key=filename, Filename=current_location, Config=transfer_config
-            )
-            location = self._build_s3_location(filename)
-            return location
+        except BaseException as e:
+            # Abort so the uploaded parts don't stay in the bucket
+            try:
+                await s3_client.abort_multipart_upload(Bucket=self.bucket_name, Key=key, UploadId=upload_id)
+            except Exception:  # pragma: no cover - failed abort is only logged
+                self.logger.exception(f"failed to abort multipart upload {upload_id} for {key}")
+
+            # Raise the relevant root botocore exception
+            if isinstance(e, BaseExceptionGroup):
+                raise e.exceptions[0]
+            raise  # pragma: no cover
 
     async def delete(self, location: str) -> None:
         object_key = self._location_to_object_key(location)
-        async with await self._create_s3_client() as s3_client:
+        async with self._create_s3_client() as s3_client:
             await s3_client.delete_object(Bucket=self.bucket_name, Key=object_key)
 
     async def get_stream_generator(

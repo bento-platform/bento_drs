@@ -32,6 +32,8 @@ config/credentials files selected with `AWS_PROFILE`.
 
 `S3_VALIDATE_SSL=false` disables TLS verification (dev only, prefer `AWS_CA_BUNDLE` for self-signed certificates).
 
+Files larger than 8 MiB are uploaded with 
+[S3 multipart uploads](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html).
 
 ## Running in Development
 

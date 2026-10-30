@@ -1,14 +1,12 @@
 import asyncio
 import logging
+import os
 import pathlib
 import shutil
 from collections.abc import Generator
-from typing import TypeVar
-from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from aioboto3 import Session
 from fastapi.testclient import TestClient
 from pytest_lazyfixture import lazy_fixture
 from sqlalchemy import create_engine
@@ -26,8 +24,6 @@ from tests.constants import (
     S3_ACCESS_KEY,
     S3_SECRET_KEY,
 )
-
-T = TypeVar("T")
 
 
 def non_existant_dummy_file_path() -> str:  # Function rather than constant so we can set environ first
@@ -109,58 +105,20 @@ def session_maker(monkeypatch):
     engine.dispose()
 
 
-def create_fake_session(base_class: type[T], url_overrides: dict[str, str]) -> type[T]:
-    """
-    Taken from aioboto3's unit tests: https://github.com/terricain/aioboto3/blob/main/tests/conftest.py
-
-    Creates a mocked session from the provided base class.
-    """
-
-    class FakeSession(base_class):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-
-            self.__url_overrides = url_overrides
-            self.__secret_key = S3_SECRET_KEY
-            self.__access_key = S3_ACCESS_KEY
-
-        def client(self, *args, **kwargs):
-            if "endpoint_url" not in kwargs and args[0] in self.__url_overrides:
-                kwargs["endpoint_url"] = self.__url_overrides[args[0]]
-
-            kwargs["aws_access_key_id"] = self.__secret_key
-            kwargs["aws_secret_access_key"] = self.__access_key
-
-            return super().client(*args, **kwargs)
-
-        def resource(self, *args, **kwargs):
-            if "endpoint_url" not in kwargs and args[0] in self.__url_overrides:
-                kwargs["endpoint_url"] = self.__url_overrides[args[0]]
-
-            kwargs["aws_access_key_id"] = self.__secret_key
-            kwargs["aws_secret_access_key"] = self.__access_key
-
-            return super().resource(*args, **kwargs)
-
-    return FakeSession
-
-
 @pytest.fixture
-def s3_session(s3_server):
+def s3_mock_env(s3_server, monkeypatch):
     """
-    Taken from aioboto3's unit tests: https://github.com/terricain/aioboto3/blob/main/tests/conftest.py
-
-    Creates and starts a mocked aioboto3.Session for async S3 tests.
-    Parent fixture 's3_server' starts the mock S3 server
+    Points botocore at the mock S3 server (started by the parent 's3_server' fixture) through the
+    standard AWS env vars, the same way a deployment configures the S3 backend.
     """
-    FakeAioboto3Session = create_fake_session(Session, {"s3": s3_server})
-
-    session = patch("aioboto3.Session", FakeAioboto3Session)
-    session.start()
-
-    yield
-
-    session.stop()
+    monkeypatch.setenv("AWS_ENDPOINT_URL_S3", s3_server)
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", S3_ACCESS_KEY)
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", S3_SECRET_KEY)
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    # Keep the developer's own AWS config out of the tests
+    monkeypatch.delenv("AWS_PROFILE", raising=False)
+    monkeypatch.setenv("AWS_CONFIG_FILE", os.devnull)
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", os.devnull)
 
 
 @pytest.fixture
@@ -195,7 +153,7 @@ def authz_disabled(monkeypatch):
 
 
 @pytest.fixture
-def client_s3(s3_session, s3_env, session_maker) -> Generator[TestClient, None, None]:
+def client_s3(s3_mock_env, s3_env, session_maker) -> Generator[TestClient, None, None]:
     from chord_drs.app import create_app
     from chord_drs.backend import get_backend
     from chord_drs.config import get_config
