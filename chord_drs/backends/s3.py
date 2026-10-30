@@ -105,7 +105,7 @@ class S3Backend(Backend):
         }
 
     async def save(self, current_location: str, filename: str) -> str:
-        size = os.path.getsize(current_location)
+        size = aiofiles.os.path.getsize(current_location)
         async with self._create_s3_client() as s3_client:
             if size <= MULTIPART_PART_SIZE:
                 async with aiofiles.open(current_location, "rb") as f:
