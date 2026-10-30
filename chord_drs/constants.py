@@ -1,8 +1,13 @@
 import re
+from pathlib import Path
 
 from bento_lib.service_info.helpers import build_service_type
 
 __all__ = [
+    "APP_DIR",
+    "DATA_SOURCE_LOCAL",
+    "DATA_SOURCE_S3",
+    "GIT_REPOSITORY",
     "BENTO_SERVICE_KIND",
     "SERVICE_NAME",
     "SERVICE_ARTIFACT",
@@ -13,7 +18,14 @@ __all__ = [
     "CHUNK_SIZE",
 ]
 
+APP_DIR = Path(__file__).resolve().parent.absolute()
+
 BENTO_SERVICE_KIND = "drs"
+GIT_REPOSITORY = "https://github.com/bento-platform/bento_drs"
+
+DATA_SOURCE_LOCAL = "local"
+DATA_SOURCE_S3 = "s3"
+
 SERVICE_NAME = "Bento Data Repository Service"
 SERVICE_ARTIFACT = BENTO_SERVICE_KIND
 DRS_SPEC_VERSION = "1.4.0"  # update to match whatever version of the DRS spec is implemented.

@@ -9,14 +9,19 @@ from botocore.exceptions import ClientError
 from chord_drs.backends import s3 as s3_module
 from chord_drs.backends.local import LocalBackend
 from chord_drs.backends.s3 import S3Backend
+from chord_drs.config import get_config
+
+from .conftest import reset_caches
 
 MIB = 1024 * 1024
 TESTS_DIR = pathlib.Path(__file__).parent
 
 
 @pytest.mark.asyncio
-async def test_local_backend(local_volume, test_logger):
-    backend = LocalBackend({"SERVICE_DATA": str(local_volume)}, test_logger)
+async def test_local_backend(local_volume, monkeypatch, test_logger):
+    monkeypatch.setenv("DATA", str(local_volume))
+    reset_caches()
+    backend = LocalBackend(get_config(), test_logger)
 
     file_to_ingest = pathlib.Path(__file__).parent / "dummy_file.txt"
 
@@ -28,8 +33,10 @@ async def test_local_backend(local_volume, test_logger):
 
 
 @pytest.mark.asyncio
-async def test_local_backend_raises(local_volume, test_logger):
-    backend = LocalBackend({"SERVICE_DATA": str(local_volume)}, test_logger)
+async def test_local_backend_raises(local_volume, monkeypatch, test_logger):
+    monkeypatch.setenv("DATA", str(local_volume))
+    reset_caches()
+    backend = LocalBackend(get_config(), test_logger)
 
     with pytest.raises(ValueError):
         # before we can even figure out file does not exist, this is not a local volume subpath:
@@ -56,7 +63,7 @@ def test_s3_backend_location_handling(s3_config, test_logger):
 
 
 @pytest_asyncio.fixture
-async def s3_backend(s3_env, s3_config, test_logger) -> S3Backend:
+async def s3_backend(s3_mock_env, s3_config, test_logger) -> S3Backend:
     backend = S3Backend(s3_config, test_logger)
     await backend._init_bucket_if_required()
     return backend

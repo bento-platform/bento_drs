@@ -1,25 +1,22 @@
-from flask import current_app, g
+from typing import Annotated
+
+from fastapi import Depends
 
 from chord_drs.backends.base import Backend
+from chord_drs.config import ConfigDep
 from chord_drs.data_sources import DATA_SOURCE_BACKENDS
+from chord_drs.logger import logger
 
 __all__ = [
     "get_backend",
-    "close_backend",
+    "BackendDep",
 ]
 
 
-def _get_backend() -> Backend | None:
+def get_backend(config: ConfigDep) -> Backend | None:
     # Instantiate backend if needed
-    backend_class = DATA_SOURCE_BACKENDS.get(current_app.config["SERVICE_DATA_SOURCE"])
-    return backend_class(current_app.config, current_app.logger) if backend_class else None
+    backend_class = DATA_SOURCE_BACKENDS.get(config.service_data_source)
+    return backend_class(config, logger) if backend_class else None
 
 
-def get_backend() -> Backend | None:
-    if "backend" not in g:
-        g.backend = _get_backend()
-    return g.backend
-
-
-def close_backend(_e=None) -> None:
-    g.pop("backend", None)
+BackendDep = Annotated[Backend | None, Depends(get_backend)]

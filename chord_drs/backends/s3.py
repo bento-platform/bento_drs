@@ -2,7 +2,7 @@ import asyncio
 import logging
 import math
 import os
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator
 from contextlib import AbstractAsyncContextManager
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -11,8 +11,8 @@ from aiobotocore.session import get_session
 from bento_lib.logging import log_level_from_str
 from botocore.exceptions import ClientError
 
+from chord_drs.config import Config
 from chord_drs.constants import CHUNK_SIZE
-from chord_drs.utils import sync_generator_stream
 
 from .base import Backend
 
@@ -40,20 +40,21 @@ class S3ObjectGenerator(TypedDict):
 class S3Backend(Backend):
     def __init__(
         self,
-        config: dict,  # config is dict or flask.Config, which is a subclass of dict.
+        config: Config,
         logger: logging.Logger,
     ):
-        logging.getLogger("botocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
-        logging.getLogger("aiobotocore").setLevel(log_level_from_str(config["LOG_LEVEL"]))
-        self.bucket_name = config["S3_BUCKET"]
+        logging.getLogger("botocore").setLevel(log_level_from_str(config.log_level))
+        logging.getLogger("aiobotocore").setLevel(log_level_from_str(config.log_level))
+        if not config.s3_bucket:
+            raise ValueError("S3_BUCKET must be set to use the S3 backend")
+        self.bucket_name: str = config.s3_bucket
 
-        self.verify = config["S3_VALIDATE_SSL"]
+        self.verify: bool | None = config.s3_validate_ssl
         if AWS_CA_BUNDLE and self.verify:
             # None lets botocore use AWS_CA_BUNDLE if set, passing True would ignore it.
             self.verify = None
 
-        # Credentials, profile, region and endpoint are resolved by botocore from
-        # standard AWS env vars/config files.
+        # Credentials, profile, region and endpoint are resolved by botocore from standard AWS env vars/config files.
         self.session = get_session()
 
         self.logger = logger
@@ -187,9 +188,9 @@ class S3Backend(Backend):
 
     async def get_stream_generator(
         self, location: str, bytes_range: tuple[int, int] | None = None
-    ) -> Generator[bytes, None, None]:
+    ) -> AsyncGenerator[bytes, None]:
         s3_dict = await self.get_s3_object_dict(location, bytes_range)
-        return sync_generator_stream(s3_dict["generator"], self.logger)
+        return s3_dict["generator"]
 
     def _location_to_object_key(self, location: str) -> str:
         if location.startswith(f"s3://{self.bucket_name}"):
