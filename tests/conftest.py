@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from pytest_lazyfixture import lazy_fixture
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 # Must only be imports that don't import authz/app/config/db
 from tests import authz_mock
@@ -59,8 +58,7 @@ def reset_caches() -> None:
     from chord_drs.db import get_engine, get_session_maker
 
     for f in (get_config, get_authz_middleware, get_engine, get_session_maker):
-        if hasattr(f, "cache_clear"):  # get_engine is replaced by a plain function in tests using an in-memory DB
-            f.cache_clear()
+        f.cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -88,20 +86,19 @@ def test_logger():
 
 
 @pytest.fixture
-def session_maker(monkeypatch):
-    from chord_drs import db
+def session_maker():
+    """
+    Creates the schema in the (temporary) database file the app is configured to use, and yields a synchronous session
+    maker onto it so tests can seed and inspect the database independently of the app's async engine.
+    """
+    from chord_drs.config import get_config
     from chord_drs.models import Base
 
-    # StaticPool: every connection must share the same in-memory database
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    engine = create_engine(get_config().database_url)
     Base.metadata.create_all(engine)
-
-    monkeypatch.setattr(db, "get_engine", lambda: engine)
-    db.get_session_maker.cache_clear()
 
     yield sessionmaker(engine, expire_on_commit=False)
 
-    Base.metadata.drop_all(engine)
     engine.dispose()
 
 

@@ -16,7 +16,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Respon
 from fastapi.responses import StreamingResponse
 from pydantic import BeforeValidator
 from sqlalchemy import ColumnElement, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .authz import AuthzMiddlewareDep
 from .backend import BackendDep
@@ -118,12 +118,12 @@ async def check_objects_permission(
     return tuple(drs_obj.public or authz_results[id_resource_map[drs_obj.id]][0] for drs_obj in drs_objs)
 
 
-def get_drs_object(session: Session, object_id: str) -> DrsBlob | None:
-    return session.scalars(select(DrsBlob).where(DrsBlob.id == object_id)).one_or_none()
+async def get_drs_object(session: AsyncSession, object_id: str) -> DrsBlob | None:
+    return (await session.scalars(select(DrsBlob).where(DrsBlob.id == object_id))).one_or_none()
 
 
 async def fetch_and_check_object_permissions(
-    session: Session,
+    session: AsyncSession,
     authz: FastApiAuthMiddleware,
     request: Request,
     object_id: str,
@@ -132,7 +132,7 @@ async def fetch_and_check_object_permissions(
 ) -> DrsBlob:
     has_permission_on_everything = await check_everything_permission(authz, request, permission)
 
-    drs_object = get_drs_object(session, object_id)
+    drs_object = await get_drs_object(session, object_id)
 
     # The HTTPException handler marks authorization as determined, so we don't need to do it before raising.
 
@@ -199,10 +199,9 @@ async def object_delete(
     logger.info("Deleting object %s", drs_object.id)
 
     cond = DrsBlob.location == drs_object.location
-    if (
-        session.scalars(select(func.count("*")).select_from(DrsBlob).where(cond)).one() == 1
-        and session.scalars(select(DrsBlob).where(cond)).one().id == drs_object.id
-    ):
+    if (await session.scalars(select(func.count("*")).select_from(DrsBlob).where(cond))).one() == 1 and (
+        await session.scalars(select(DrsBlob).where(cond))
+    ).one().id == drs_object.id:
         # If this object is the only one using the file, delete the file too
         # TODO: this can create a race condition and leave files undeleted... should we have a cleanup on start?
         logger.info(
@@ -210,8 +209,8 @@ async def object_delete(
         )
         await backend.delete(drs_object.location)
 
-    session.delete(drs_object)
-    session.commit()
+    await session.delete(drs_object)
+    await session.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -294,7 +293,7 @@ async def object_search(
     if not filter_clauses:
         raise bad_request_log("Missing GET search terms: (name XOR fuzzy_name XOR q) | project | dataset | data_type")
 
-    objects = list(session.scalars(select(DrsBlob).where(*filter_clauses)).all())
+    objects = list((await session.scalars(select(DrsBlob).where(*filter_clauses))).all())
 
     # TODO: invert the permissions logic - get IDs of projects/datasets where we have query:data access, to avoid this
     #  gross O(n) lookup when searching. Although at least it's now O(n) in terms of number of resources, not number
@@ -315,7 +314,7 @@ async def object_search(
 
 async def _download_object(
     request: Request,
-    session: Session,
+    session: AsyncSession,
     authz: FastApiAuthMiddleware,
     backend: Backend,
     object_id: str,
@@ -472,8 +471,8 @@ async def object_ingest(
             #    and seeing which files are DRS ID duplicates.
             # However, we can actually deduplicate the files on the filesystem as these are more opaque.
 
-            candidate_drs_object: DrsBlob | None = session.scalars(
-                select(DrsBlob).where(DrsBlob.checksum == checksum)
+            candidate_drs_object: DrsBlob | None = (
+                await session.scalars(select(DrsBlob).where(DrsBlob.checksum == checksum))
             ).one_or_none()
 
             if candidate_drs_object is not None:
@@ -514,7 +513,7 @@ async def object_ingest(
                     public=is_public,
                 )
                 session.add(drs_object)
-                session.commit()
+                await session.commit()
                 logger.info("added DRS object: %s", drs_object)
             except ValueError as e:
                 raise bad_request_log(str(e))

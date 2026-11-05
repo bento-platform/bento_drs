@@ -6,7 +6,7 @@ from click import ClickException
 
 from .backend import get_backend
 from .config import get_config
-from .db import get_session_maker
+from .db import get_engine, get_session_maker
 from .logger import logger
 from .models import DrsBlob
 
@@ -26,6 +26,18 @@ async def create_drs_blob(
         data_type=data_type,
         backend=get_backend(get_config()),
     )
+
+
+async def _ingest(source: str, **perms_kwargs: str | None) -> DrsBlob:
+    try:
+        drs_blob = await create_drs_blob(source, **perms_kwargs)
+        async with get_session_maker()() as session:
+            session.add(drs_blob)
+            await session.commit()
+    finally:
+        # This runs in its own event loop, which is closed afterwards - don't leave pooled connections behind.
+        await get_engine().dispose()
+    return drs_blob
 
 
 @click.command("ingest")
@@ -53,10 +65,7 @@ def ingest(source: str, project: str, dataset: str, data_type: str) -> None:
     if not os.path.isfile(source):
         raise ClickException("Directories cannot be ingested")
 
-    drs_blob = asyncio.run(create_drs_blob(source, **perms_kwargs))
-    with get_session_maker()() as session:
-        session.add(drs_blob)
-        session.commit()
+    drs_blob = asyncio.run(_ingest(source, **perms_kwargs))
 
     logger.info(f"Created a new blob, filename: {drs_blob.location} ID : {drs_blob.id}")
 

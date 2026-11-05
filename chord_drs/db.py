@@ -1,10 +1,9 @@
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
-from sqlalchemy import Engine, create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from .config import get_config
 
@@ -17,19 +16,18 @@ __all__ = [
 
 
 @lru_cache
-def get_engine() -> Engine:
-    # check_same_thread=False: sessions are used from FastAPI's threadpool and from the event bus thread.
-    return create_engine(get_config().database_url, connect_args={"check_same_thread": False})
+def get_engine() -> AsyncEngine:
+    return create_async_engine(get_config().async_database_url)
 
 
 @lru_cache
-def get_session_maker() -> sessionmaker[Session]:
-    return sessionmaker(get_engine(), expire_on_commit=False)
+def get_session_maker() -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(get_engine(), expire_on_commit=False)
 
 
-def get_session() -> Iterator[Session]:
-    with get_session_maker()() as session:
+async def get_session() -> AsyncIterator[AsyncSession]:
+    async with get_session_maker()() as session:
         yield session
 
 
-SessionDep = Annotated[Session, Depends(get_session)]
+SessionDep = Annotated[AsyncSession, Depends(get_session)]

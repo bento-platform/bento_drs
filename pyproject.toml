@@ -18,7 +18,9 @@ include = [
 python = "^3.12"
 bento-lib = {version = "^18.1.4", extras = ["fastapi"]}
 alembic = "^1.16.0"
-sqlalchemy = ">=2.0.29,<2.1"
+sqlalchemy = {version = ">=2.0.29,<2.1", extras = ["asyncio"]}
+aiosqlite = ">=0.21,<1"
+greenlet = ">=3.0"  # required by async SQLAlchemy; SQLAlchemy's own marker skips arm64 (Apple Silicon)
 python-multipart = ">=0.0.20,<0.0.32"
 werkzeug = "~3.1.4"  # secure_filename
 orjson = "^3.11.5"
