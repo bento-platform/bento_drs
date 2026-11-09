@@ -132,22 +132,20 @@ partial match `/search?fuzzy_name=1001`
 
 `/ingest`
 
-e.g. POST body (multipart form-encoded)
+POST body (multipart form-encoded) with the file contents in the `file` field, e.g.:
 
-```
-path=examples/P-1001.hc.g.vcf.gz
+```bash
+curl -F "file=@examples/P-1001.hc.g.vcf.gz" -F "project_id=..." -F "dataset_id=..." -F "data_type=..." \
+  https://.../ingest
 ```
 
 This will automatically deduplicate with existing DRS objects if the file matches.
 
-To ingest and force-create a duplicate record, provide the `deduplicate` parameter, set to `false`:
+To ingest and force-create a duplicate record, provide the `deduplicate` parameter, set to `false`
+(e.g., `-F "deduplicate=false"`).
 
-```
-path=examples/P-1001.hc.g.vcf.gz&deduplicate=false
-```
-
-If `path` is left out and instead a file is provided, the file will be uploaded instead
-of copied from the specified local filesystem path.
+Ingesting from a server-side filesystem path is not supported over HTTP; use the `drs-ingest` CLI
+inside the container for that.
 
 
 ##### GET service info

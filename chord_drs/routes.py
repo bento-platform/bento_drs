@@ -398,7 +398,6 @@ async def object_ingest(
     # All form fields are optional so that authorization is evaluated before any 4xx caused by the request body, e.g.,
     # an unauthorized request with an empty body should get a 403.
     deduplicate: Annotated[LenientBool, Form()] = True,  # Change for v0.9: default to True
-    path: Annotated[str | None, Form()] = None,
     project_id: Annotated[str | None, Form()] = None,
     dataset_id: Annotated[str | None, Form()] = None,
     data_type: Annotated[str | None, Form()] = None,
@@ -406,7 +405,6 @@ async def object_ingest(
     mime_type: Annotated[str | None, Form()] = None,
     file: Annotated[UploadFile | None, File()] = None,
 ):
-    obj_path: str | None = path
     # replace blank strings with None
     project_id = project_id or None
     dataset_id = dataset_id or None
@@ -415,10 +413,9 @@ async def object_ingest(
     is_public: bool = public.strip().lower() == "true"
 
     logger.info(
-        "Received ingest request metadata: deduplicate=%s path=%s project_id=%s dataset_id=%s data_type=%s "
+        "Received ingest request metadata: deduplicate=%s project_id=%s dataset_id=%s data_type=%s "
         "public=%s mime_type=%s",
         deduplicate,
-        path,
         project_id,
         dataset_id,
         data_type,
@@ -441,29 +438,27 @@ async def object_ingest(
     if not has_permission:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
 
-    if (obj_path is not None and file is not None) or (obj_path is None and file is None):
-        raise bad_request_log("Must specify exactly one of path or file contents")
+    # Only uploaded file contents are accepted. Ingesting from a server-side filesystem path is intentionally not
+    # supported over HTTP: it would let any user with ingest:data on one resource copy arbitrary files readable by the
+    # DRS process (the database, other projects' objects, /proc/self/environ, ...) into their own project.
+    if file is None:
+        raise bad_request_log("Must specify file contents")
 
     drs_object: DrsBlob | None = None  # either the new object, or the object to fully reuse
     object_to_copy: DrsBlob | None = None
 
     tfh, t_obj_path = tempfile.mkstemp(dir=config.drs_ingest_tmp_dir)
     try:
-        filename: str | None = None  # no override, use path filename if path is specified instead of a file upload
-        if file is not None:
-            logger.debug("ingest - received file object: %s", file)
-            logger.debug("ingest - writing to temporary path: %s", t_obj_path)
-            await _save_upload(file, t_obj_path)
-            obj_path = t_obj_path
-            filename = file.filename  # still may be none, in which case the temporary filename will be used
+        logger.debug("ingest - received file object: %s", file)
+        logger.debug("ingest - writing to temporary path: %s", t_obj_path)
+        await _save_upload(file, t_obj_path)
+        obj_path: str = t_obj_path
+        filename: str | None = file.filename  # still may be none, in which case the temporary filename will be used
 
         if deduplicate:
             # Get checksum of original file, and query database for objects that match
 
-            try:
-                checksum = await asyncio.to_thread(drs_file_checksum, obj_path)
-            except FileNotFoundError:
-                raise bad_request_log(f"File not found at path {obj_path}")
+            checksum = await asyncio.to_thread(drs_file_checksum, obj_path)
 
             # Currently, we require exact permissions compatibility for deduplication of IDs.
             # It might be possible to relax this a bit, but we can't fully relax this for two reasons:
