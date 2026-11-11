@@ -17,6 +17,11 @@ from tests.constants import DUMMY_DATASET_ID_1, DUMMY_DATASET_ID_2, DUMMY_PROJEC
 NON_EXISTENT_ID = "123"
 
 
+def _post_file(client, fp: str, data: dict | None = None):
+    with open(fp, "rb") as fh:
+        return client.post("/ingest", files={"file": (os.path.basename(fp), fh)}, data=data or {})
+
+
 def validate_object_fields(
     data,
     existing_id: str | None = None,
@@ -257,7 +262,7 @@ def test_object_delete(client):
     with tempfile.NamedTemporaryFile(mode="w") as tf:
         tf.write(contents)  # random content, so checksum is unique
         tf.flush()
-        res = client.post("/ingest", data={"path": tf.name})
+        res = _post_file(client, tf.name)
 
     ingested_obj = res.json()
 
@@ -283,9 +288,9 @@ def test_object_multi_delete(client, session_maker):
         tf.flush()
 
         # two different projects to ensure we have two objects pointing to the same resource:
-        res1 = client.post("/ingest", data={"path": tf.name, "project_id": "project1"})
+        res1 = _post_file(client, tf.name, {"project_id": "project1"})
         assert res1.status_code == 201
-        res2 = client.post("/ingest", data={"path": tf.name, "project_id": "project2"})
+        res2 = _post_file(client, tf.name, {"project_id": "project2"})
         assert res2.status_code == 201
 
     i1 = res1.json()
@@ -406,10 +411,19 @@ def test_object_ingest_fail_2(client):
     assert res.status_code == 400
 
 
+def test_object_ingest_path_not_supported(client):
+    # Ingesting from a server-side path must not be possible over HTTP (arbitrary file read); an existing path given via
+    # the old `path` form field must not be copied in.
+    authz_everything_true()
+    res = client.post("/ingest", data={"path": dummy_file_path()})
+    assert res.status_code == 400
+    assert res.json()["errors"] == [{"message": "Must specify file contents"}]
+
+
 @pytest.mark.parametrize("mime_type", ["image/*", "invalid/mime", "text/html;"])
 def test_object_ingest_bad_mime_type(client, mime_type: str):
     authz_everything_true()
-    res = client.post("/ingest", data={"path": dummy_file_path(), "mime_type": mime_type})
+    res = _post_file(client, dummy_file_path(), {"mime_type": mime_type})
     assert res.status_code == 400
     data = res.json()
     assert data["code"] == 400
@@ -417,7 +431,7 @@ def test_object_ingest_bad_mime_type(client, mime_type: str):
 
 
 def _ingest_one(client, existing_id=None, params=None):
-    res = client.post("/ingest", data={"path": dummy_file_path(), **(params or {})})
+    res = _post_file(client, dummy_file_path(), params)
     data = res.json()
 
     assert res.status_code == 201
@@ -498,7 +512,7 @@ def test_object_ingest_post_file(client):
 
 def test_authz_disabled(authz_disabled, client_local):
     # no authorization mocking: the authz service is never contacted when authorization is disabled
-    res = client_local.post("/ingest", data={"path": dummy_file_path()})
+    res = _post_file(client_local, dummy_file_path())
     assert res.status_code == 201
     obj_id = res.json()["id"]
 
@@ -550,6 +564,6 @@ def test_object_ingest_unexpected_error(client_local, monkeypatch):
     monkeypatch.setattr(DrsBlob, "create", _raise)
     authz_everything_true()
 
-    res = client_local.post("/ingest", data={"path": dummy_file_path()})
+    res = _post_file(client_local, dummy_file_path())
     assert res.status_code == 500
     assert res.json()["errors"] == [{"message": "Error while creating the object"}]
