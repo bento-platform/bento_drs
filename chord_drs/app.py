@@ -8,6 +8,7 @@ from . import __version__
 from .authz import get_authz_middleware
 from .config import BENTO_EXTRA_SERVICE_INFO, get_config
 from .constants import SERVICE_TYPE
+from .db import get_engine
 from .logger import logger
 from .routes import drs_router
 
@@ -17,6 +18,7 @@ __all__ = ["create_app"]
 @asynccontextmanager
 async def lifespan(_app: BentoFastAPI):
     yield
+    await get_engine().dispose()
 
 
 def create_app() -> BentoFastAPI:

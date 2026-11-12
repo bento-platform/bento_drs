@@ -93,6 +93,11 @@ class Config(BentoFastAPIBaseConfig):
         return f"sqlite:///{(self.database / 'db.sqlite3').expanduser().resolve()}"
 
     @property
+    def async_database_url(self) -> str:
+        # Same database as database_url (which is used by Alembic, synchronously), but with the async driver
+        return self.database_url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+
+    @property
     def service_data_source(self) -> str:
         return DATA_SOURCE_S3 if self.s3_bucket else DATA_SOURCE_LOCAL
 
