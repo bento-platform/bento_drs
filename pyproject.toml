@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "chord-drs"
-version = "0.22.0"
+version = "0.23.0"
 description = "An implementation of a data repository system (as per GA4GH's specs) for the Bento platform."
 authors = [
     "David Lougheed <david.lougheed@mail.mcgill.ca>",
@@ -16,16 +16,16 @@ include = [
 
 [tool.poetry.dependencies]
 python = "^3.12"
-bento-lib = {version = "^18.1.4", extras = ["fastapi"]}
+bento-lib = {version = "^18.2.0", extras = ["fastapi"]}
 alembic = "^1.16.0"
 sqlalchemy = {version = ">=2.0.29,<2.1", extras = ["asyncio"]}
 aiosqlite = ">=0.21,<1"
 greenlet = ">=3.0"  # required by async SQLAlchemy; SQLAlchemy's own marker skips arm64 (Apple Silicon)
-python-multipart = ">=0.0.20,<0.0.32"
+python-multipart = ">=0.0.34,<0.0.35"
 werkzeug = "~3.1.4"  # secure_filename
 orjson = "^3.11.5"
 pydantic = "^2.14.1"
-fastapi = "^0.162.0"
+fastapi = "^0.163.0"
 aiobotocore = "^3.10.0"
 aiofiles = ">=24.1.0,<26"
 
@@ -42,7 +42,7 @@ debugpy = "^1.8.19"
 pytest-lazy-fixture = "^0.6.3"
 mypy = "~2.4.0"
 httpx2 = "^2.13.1"
-ruff = "^0.16.1"
+ruff = "^0.17.5"
 types-aiofiles = "^25.1.0.20260518"
 types-aiobotocore = {version = "^3.10.0", extras = ["s3"]}
 
