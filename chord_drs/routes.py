@@ -164,7 +164,7 @@ def bad_request_log(err: str) -> HTTPException:
 
 def range_not_satisfiable_log(description: str, length: int) -> HTTPException:
     logger.error("Requested range not satisfiable: %s; true length: %d", description, length)
-    return HTTPException(status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE, description)
+    return HTTPException(status.HTTP_416_RANGE_NOT_SATISFIABLE, description)
 
 
 # Each endpoint is available both at the root and under the GA4GH DRS spec's path prefix.
